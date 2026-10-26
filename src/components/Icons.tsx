@@ -81,3 +81,33 @@ export const IconX = () => (
 export const IconDownload = () => (
   <svg {...small}><path d="M12 4v11M7 10l5 5 5-5" /><path d="M4 19h16" /></svg>
 )
+export const IconPower = () => (
+  <svg {...base} width={20} height={20} strokeWidth={2.2}><path d="M12 3v8" /><path d="M6.3 6.8a8 8 0 1 0 11.4 0" /></svg>
+)
+export const IconShieldCheck = () => (
+  <svg {...small}><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z" /><path d="m9 12 2 2 4-4" /></svg>
+)
+export const IconUsers = () => (
+  <svg {...small}><circle cx="9" cy="8" r="3.2" /><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" /><path d="M16 5.2a3.2 3.2 0 0 1 0 5.6M18 14.4c2 .8 3.5 2.8 3.5 5.6" /></svg>
+)
+export const IconSliders = () => (
+  <svg {...small}><path d="M4 7h10M18 7h2M4 17h2M10 17h10" /><circle cx="16" cy="7" r="2" /><circle cx="8" cy="17" r="2" /></svg>
+)
+export const IconArrowRight = () => (
+  <svg {...small}><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+)
+export const IconBrain = () => (
+  <svg {...small}><path d="M9 4a3 3 0 0 0-3 3v.3A3.5 3.5 0 0 0 4 10.5c0 1 .4 1.9 1.1 2.5A3.5 3.5 0 0 0 7 19a3 3 0 0 0 5-1.5V6a2 2 0 0 0-3-2z" /><path d="M15 4a3 3 0 0 1 3 3v.3a3.5 3.5 0 0 1 2 3.2c0 1-.4 1.9-1.1 2.5A3.5 3.5 0 0 1 17 19a3 3 0 0 1-5-1.5" /></svg>
+)
+export const IconBars = () => (
+  <svg {...small}><path d="M5 20V12M12 20V5M19 20v-9" /></svg>
+)
+export const IconPerson = () => (
+  <svg {...small}><circle cx="12" cy="8" r="3.5" /><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7" /></svg>
+)
+export const IconSearch = () => (
+  <svg {...small}><circle cx="11" cy="11" r="6" /><path d="m20 20-4-4" /></svg>
+)
+export const IconTower = () => (
+  <svg {...small}><path d="M12 3v3M8 6h8M9.5 6 7 21M14.5 6 17 21M8.4 12h7.2M7.6 17h8.8M9 12l6 5M15 12l-6 5" /></svg>
+)

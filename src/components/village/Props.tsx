@@ -3,6 +3,7 @@ import { memo, useMemo } from 'react'
 import { AdditiveBlending } from 'three'
 import type { LedState, NodeStatus } from '../../lib/village'
 import Label from '../three/Label'
+import SpeechBubble from '../three/SpeechBubble'
 import { POLE_H, SUBSTATION, type V3 } from './layout'
 import { glowTexture, gravelTexture, tiled } from './textures'
 
@@ -171,7 +172,7 @@ const LAMP_LABEL_BG: Record<NodeStatus, string> = {
   OUTAGE: 'rgba(40,43,50,0.92)',
 }
 
-export function StreetLamp({ c, view, pos, rot, night, selected, onSelect, showLabel = true }: { c: LedState; view: { status: NodeStatus; text: string }; pos: V3; rot: number; night: boolean; selected: boolean; onSelect: () => void; showLabel?: boolean }) {
+export function StreetLamp({ c, view, pos, rot, night, selected, onSelect, showLabel = true, speech = null }: { c: LedState; view: { status: NodeStatus; text: string }; pos: V3; rot: number; night: boolean; selected: boolean; onSelect: () => void; showLabel?: boolean; speech?: string | null }) {
   const lit = c.lit
   const color = view.status === 'FAULT' ? '#ff6b6b' : view.status === 'WARNING' ? '#ffa94d' : '#ffe8a3'
   return (
@@ -227,6 +228,7 @@ export function StreetLamp({ c, view, pos, rot, night, selected, onSelect, showL
         pointer
         lineHeight={0.42}
       />}
+      {showLabel && speech && <SpeechBubble text={speech} y={4.7} tone={view.status === 'FAULT' || view.status === 'OUTAGE' ? 'err' : 'warn'} />}
     </group>
   )
 }

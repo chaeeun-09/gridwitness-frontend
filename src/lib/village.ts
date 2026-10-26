@@ -65,8 +65,43 @@ export const IOT_MODEL = 'iot-anomaly-MOCK-0.2 (전체 전류 잔차)'
 export const NOMINAL_V = 5
 /** LED 1개(저항 포함) 정격 전류 A — 5개 합 ≈ 0.28 A */
 export const LED_A = 0.056
-export const SCORE_WARN = 0.3
-export const SCORE_FAULT = 0.6
+/** 이상 탐지 기준. 관리자 페이지에서 바꾸면 이 브라우저에 저장됨 */
+export interface Thresholds {
+  /** 이 점수 이상이면 '주의' */
+  warn: number
+  /** 이 점수 이상이면 '이상' */
+  fault: number
+  /** 릴레이가 닫혀 있을 때 이 전압(V) 아래로 내려가면 점수가 오름 */
+  vMin: number
+}
+export const DEFAULT_THRESHOLDS: Thresholds = { warn: 0.3, fault: 0.6, vMin: 4.75 }
+const TH_KEY = 'gridwitness.thresholds.v1'
+function loadThresholds(): Thresholds {
+  try {
+    const raw = JSON.parse(localStorage.getItem(TH_KEY) ?? 'null') as Partial<Thresholds> | null
+    if (raw && typeof raw.warn === 'number' && typeof raw.fault === 'number' && typeof raw.vMin === 'number' && raw.warn < raw.fault) return { warn: raw.warn, fault: raw.fault, vMin: raw.vMin }
+  } catch {
+    // 저장값을 못 읽으면 기본값
+  }
+  return { ...DEFAULT_THRESHOLDS }
+}
+/** 항상 같은 객체를 갱신해서 어디서 읽어도 최신 값 */
+export const THRESHOLDS: Thresholds = loadThresholds()
+export function setThresholds(next: Partial<Thresholds>) {
+  Object.assign(THRESHOLDS, next)
+  // 주의 기준이 이상 기준 이상이면 화면에서만 보여주고 저장하지 않음 (다시 열면 마지막 정상 값)
+  if (THRESHOLDS.warn < THRESHOLDS.fault) {
+    try {
+      localStorage.setItem(TH_KEY, JSON.stringify(THRESHOLDS))
+    } catch {
+      // 저장 불가 환경은 무시
+    }
+  }
+  emit()
+}
+export function resetThresholds() {
+  setThresholds({ ...DEFAULT_THRESHOLDS })
+}
 export const TICK_MS = 500
 const HISTORY = 120
 const COMMAND_LATENCY_MS = 350 // 시뮬레이터 릴레이 응답 지연
@@ -124,20 +159,21 @@ export interface VillageSnapshot {
   faults: Partial<Record<ChannelId, FaultKind>>
   supplyFault: FaultKind | null
   scenario: Scenario | null
+  thresholds: Thresholds
 }
 
 /** IoT 이상 탐지: 릴레이 상태로 예상 전류를 정하고, 실제 전류와의 차이(LED 2개 분량 = 1.0)와 전압 강하로 점수 산출 */
 export function anomalyScore(v: number, i: number, expected: number): number {
   const ri = Math.abs(i - expected) / (LED_A * 2)
-  const rv = expected > 0 ? Math.max(0, 4.75 - v) / 0.75 : 0
+  const rv = expected > 0 ? Math.max(0, THRESHOLDS.vMin - v) / 0.75 : 0
   return Math.min(1, Math.max(ri, rv))
 }
 
 export function classify(v: number, i: number, score: number, relay: boolean): NodeStatus {
   if (!relay) return i > 0.03 ? 'FAULT' : 'OFF'
   if (v < 1) return 'OUTAGE'
-  if (score >= SCORE_FAULT) return 'FAULT'
-  if (score >= SCORE_WARN) return 'WARNING'
+  if (score >= THRESHOLDS.fault) return 'FAULT'
+  if (score >= THRESHOLDS.warn) return 'WARNING'
   return 'NORMAL'
 }
 
@@ -227,6 +263,7 @@ function initial(): VillageSnapshot {
     faults: {},
     supplyFault: null,
     scenario: null,
+    thresholds: { ...THRESHOLDS },
   }
 }
 
@@ -247,6 +284,7 @@ function emit(patch: Partial<VillageSnapshot> = {}) {
     faults: { ...faults },
     supplyFault,
     scenario: scenario && { ...scenario },
+    thresholds: { ...THRESHOLDS },
   }
   listeners.forEach((l) => l())
 }
@@ -441,6 +479,11 @@ export function setConnected(on: boolean) {
 /** 공공데이터 시간대 패턴으로 켜진 부하 수를 바꿔 재생 (시뮬레이터 전용) */
 export function startScenario(label: string, profile: number[]) {
   if (source !== 'MOCK') return
+  // 전원이 끊긴 채로는 켜지는 LED 수가 장면에 보이지 않으므로 재생과 함께 전력 복구
+  clearTimeout(commandTimer)
+  relay = true
+  relayPending = null
+  connected = true
   scenario = { label, profile, hour: -1 }
   t = 3 // 다음 tick에서 바로 0시 적용
   emit()
@@ -463,7 +506,40 @@ export function lightView(led: LedState, snap: VillageSnapshot): { status: NodeS
   if (led.fault) return { status: led.fault === 'OPEN' ? 'WARNING' : 'FAULT', text: FAULT_LABEL[led.fault] }
   if (!snap.relay) return led.lit ? { status: 'FAULT', text: '차단했는데 켜짐' } : { status: 'OFF', text: '차단됨' }
   if (snap.status === 'OUTAGE') return { status: 'OUTAGE', text: '정전' }
-  if (!led.lit) return { status: 'OFF', text: snap.source === 'SERIAL' ? '꺼짐 (추정)' : '꺼짐' }
+  if (!led.lit) return { status: 'OFF', text: snap.scenario ? '꺼짐 · 시나리오' : snap.source === 'SERIAL' ? '꺼짐 (추정)' : '꺼짐' }
   const status = snap.status === 'WARNING' || snap.status === 'FAULT' ? snap.status : 'NORMAL'
   return { status, text: snap.source === 'SERIAL' ? '켜짐 (추정)' : '켜짐' }
+}
+
+/** 집·가로등이 상황에 따라 하는 말. 정전이나 고장일 때만 나옴 */
+const HOUSE_LINES = {
+  outage: ['큰일났다! 정전이야! 😱', '불이 다 꺼졌어요! 😰', '냉장고 어떡해… 😭'],
+  noPower: ['전기가 안 들어와요! 😱', '갑자기 캄캄해졌어요 😨', '누가 전기 좀 살려줘요 🆘'],
+  open: ['우리 집 불만 나갔어요! 😭', '내 전구가 끊어졌어요 💡'],
+  ground: ['찌릿! 전기가 이상해요 ⚡', '무서워요, 전기가 새는 것 같아요 😨'],
+  sag: ['불빛이 어두워졌어요 😟', '전기가 약해졌어요… 🥺'],
+  stuck: ['정전이라더니 불이 켜져 있네? 🤔', '차단됐다는데 왜 켜져 있죠? 😮'],
+  sleep: ['쿨쿨… 자는 중 😴', '불 끄고 자요 🌙'],
+}
+const LAMP_LINES = {
+  outage: ['캄캄해요… 🌑', '가로등도 꺼졌어요 😢'],
+  open: ['내 전구가 나갔어요 💡'],
+  ground: ['깜빡깜빡… ⚡'],
+  sag: ['어두워졌어요 😟'],
+}
+
+export function speech(led: LedState, snap: VillageSnapshot): string | null {
+  if (snap.status === 'NO_DATA') return null
+  const house = led.kind === 'HOUSE'
+  const pick = (arr: string[]) => arr[led.ch % arr.length]
+  const L = (house ? HOUSE_LINES : LAMP_LINES) as Record<string, string[] | undefined>
+  if (led.fault === 'OPEN') return pick(L.open ?? [])
+  if (led.fault === 'GROUND') return pick(L.ground ?? [])
+  if (snap.supplyFault === 'STUCK' && !snap.relay) return house ? pick(HOUSE_LINES.stuck) : null
+  if (!snap.relay) return pick(L.outage ?? [])
+  if (snap.supplyFault === 'OUTAGE') return house ? pick(HOUSE_LINES.noPower) : pick(LAMP_LINES.outage)
+  if (snap.supplyFault === 'SAG') return pick(L.sag ?? [])
+  // 공공데이터 시나리오로 꺼진 집은 잠든 것으로 표현
+  if (snap.scenario && house && !led.lit) return pick(HOUSE_LINES.sleep)
+  return null
 }

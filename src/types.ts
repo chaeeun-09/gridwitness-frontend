@@ -193,3 +193,14 @@ export interface CaseSummary {
   source: string
   diagnosisStatus: DiagnosisStatus
 }
+
+/** 모든 사건의 실행 이력을 시간순으로 펼친 항목 (관리자 활동 기록용) */
+export interface ActivityItem {
+  at: string
+  actor: string
+  action: string
+  detail?: string
+  caseId: string
+  caseTitle: string
+  caseType: CaseType
+}

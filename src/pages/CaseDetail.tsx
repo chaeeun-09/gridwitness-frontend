@@ -1,22 +1,19 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useLocation, useParams } from 'react-router-dom'
 import { api } from '../api'
 import { DiagnosisBadge, StageBadge, Steps, WAVEFORM_STEPS, waveformStepsDone } from '../components/Badges'
+import FaultAnalysis from '../components/FaultAnalysis'
 import IotCaseView from '../components/IotCaseView'
 import IssueList from '../components/IssueList'
 import ReviewPanel from '../components/ReviewPanel'
-import { ErrorState, PageHeader, PageSkeleton, Section, Segmented, Skeleton } from '../components/ui'
-import WaveformChart from '../components/WaveformChart'
+import { ErrorState, PageHeader, PageSkeleton, Section } from '../components/ui'
 import { fmtTime, getActor } from '../lib/actor'
-import { ANALYSIS_LABEL, SOURCE_LABEL, type AnalysisResult, type AnalysisType, type AnyCase, type ChannelFeatures, type EventLabel, type IncidentCase } from '../types'
+import { SOURCE_LABEL, type AnalysisType, type AnyCase, type ChannelFeatures, type IncidentCase } from '../types'
 
-const Waveform3D = lazy(() => import('../components/Waveform3D'))
-
-type Tab = 'diagnosis' | 'waveform' | 'analysis' | 'review' | 'source'
+type Tab = 'analysis' | 'diagnosis' | 'review' | 'source'
 const TABS: [Tab, string][] = [
+  ['analysis', '분석'],
   ['diagnosis', '입력 진단'],
-  ['waveform', '파형'],
-  ['analysis', 'AI 분석'],
   ['review', '검토·보고'],
   ['source', '원본 정보'],
 ]
@@ -37,7 +34,7 @@ export default function CaseDetail() {
 }
 
 function WaveformCaseView({ c, onChange }: { c: IncidentCase; onChange: (c: AnyCase) => void }) {
-  const [tab, setTab] = useState<Tab>('diagnosis')
+  const [tab, setTab] = useState<Tab>(c.diagnosis.status === 'REJECTED' ? 'diagnosis' : 'analysis')
   const fromHistory = useLocation().pathname.startsWith('/history')
   const ai = c.analysis
   return (
@@ -67,8 +64,7 @@ function WaveformCaseView({ c, onChange }: { c: IncidentCase; onChange: (c: AnyC
       <div key={tab} className="tab-panel">
         {tab === 'source' && <SourcePanel c={c} />}
         {tab === 'diagnosis' && <DiagnosisPanel c={c} onNext={() => setTab('analysis')} />}
-        {tab === 'waveform' && <WaveformPanel c={c} />}
-        {tab === 'analysis' && <AnalysisPanel c={c} onChange={onChange} onReview={() => setTab('review')} />}
+        {tab === 'analysis' && <AnalysisTab c={c} onChange={onChange} onReview={() => setTab('review')} />}
         {tab === 'review' && (
           <ReviewPanel
             c={c}
@@ -92,28 +88,6 @@ function WaveformCaseView({ c, onChange }: { c: IncidentCase; onChange: (c: AnyC
         )}
       </div>
     </>
-  )
-}
-
-function WaveformPanel({ c }: { c: IncidentCase }) {
-  const [view, setView] = useState<'3d' | '2d'>('2d')
-  if (!c.waveform) {
-    return <ErrorState message="입력 진단에서 거부된 자료라 파형을 표시하지 않습니다. 입력 진단 탭의 수정 방법을 확인하세요." />
-  }
-  return (
-    <Section
-      title="7채널 파형"
-      description={`${c.diagnosis.rows.toLocaleString()} 샘플 · ${c.source.samplingRateHz} Hz · 계통 ${c.source.systemFrequencyHz} Hz`}
-      actions={<Segmented value={view} onChange={setView} options={[{ value: '2d', label: '2D 상세' }, { value: '3d', label: '3D 개요' }]} />}
-    >
-      {view === '3d' ? (
-        <Suspense fallback={<Skeleton h={460} style={{ borderRadius: 12 }} />}>
-          <Waveform3D matrix={c.waveform} samplingRateHz={c.source.samplingRateHz} systemFrequencyHz={c.source.systemFrequencyHz} />
-        </Suspense>
-      ) : (
-        <WaveformChart matrix={c.waveform} samplingRateHz={c.source.samplingRateHz} />
-      )}
-    </Section>
   )
 }
 
@@ -171,11 +145,11 @@ function DiagnosisPanel({ c, onNext }: { c: IncidentCase; onNext: () => void }) 
   )
 }
 
-function AnalysisPanel({ c, onChange, onReview }: { c: IncidentCase; onChange: (c: AnyCase) => void; onReview: () => void }) {
-  const [type, setType] = useState<AnalysisType>('EVENT_TYPE')
+function AnalysisTab({ c, onChange, onReview }: { c: IncidentCase; onChange: (c: AnyCase) => void; onReview: () => void }) {
+  const [type, setType] = useState<AnalysisType>(c.analysis?.analysisType ?? 'EVENT_TYPE')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const rejected = c.diagnosis.status === 'REJECTED'
+  const rejected = c.diagnosis.status === 'REJECTED' || !c.waveform
 
   async function run() {
     setBusy(true)
@@ -189,101 +163,38 @@ function AnalysisPanel({ c, onChange, onReview }: { c: IncidentCase; onChange: (
     }
   }
 
+  if (!c.waveform) {
+    return <ErrorState message="입력 진단에서 거부된 자료라 파형을 표시하지 않습니다. 입력 진단 탭의 수정 방법을 확인하세요." />
+  }
+  const features = c.analysis?.features
   return (
     <>
-      <div className="filters no-print">
-        <label className="field" style={{ flex: '1 1 320px' }}>
-          요청할 분석
-          <select value={type} onChange={(e) => setType(e.target.value as AnalysisType)} disabled={rejected}>
-            {Object.entries(ANALYSIS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-          </select>
-        </label>
-        <button className="btn btn-primary" onClick={run} disabled={busy || rejected}>{busy ? '확인 중…' : c.analysis ? '다시 실행' : '지원 여부 확인 후 실행'}</button>
-      </div>
-      {rejected && <div className="alert alert-err">입력 진단에서 거부된 자료는 분석하지 않습니다.</div>}
-      {error && <div className="alert alert-err">{error}</div>}
-      {busy && !c.analysis && <Skeleton h={160} style={{ marginTop: 24 }} />}
-      {c.analysis && <AnalysisResultView r={c.analysis} onReview={onReview} />}
-    </>
-  )
-}
-
-function AnalysisResultView({ r, onReview }: { r: AnalysisResult; onReview: () => void }) {
-  return (
-    <Section
-      title={r.kind === 'COMPLETED' ? 'AI 결과' : '추가 확인 필요'}
-      description={ANALYSIS_LABEL[r.analysisType]}
-      actions={<button className="btn btn-sm" onClick={onReview}>검토 기록하기</button>}
-      style={{ marginTop: 32 }}
-    >
-      {r.kind === 'COMPLETED' ? (
-        <>
-          <div className="result-head">
-            <div>
-              <div className="small muted">예측 이벤트 유형</div>
-              <div className="pred">{r.predictedLabel}</div>
-            </div>
-            <ScoreBars scores={r.scores} highlight={r.predictedLabel} />
-          </div>
-          <div className="alert alert-warn">
-            <div>
-              <strong>함께 확인할 제한사항</strong>
-              <ul>{r.limitations.map((l) => <li key={l}>{l}</li>)}</ul>
-            </div>
-          </div>
-        </>
-      ) : (
-        <>
-          <div className="verdict warn">
-            <span><strong>결과를 내지 않았습니다.</strong> 근거가 부족한 상태에서 원인을 임의로 추정하지 않습니다.</span>
-          </div>
-          <div className="grid-2">
-            <div>
-              <h3 className="section-title" style={{ fontSize: 13.5, marginBottom: 8 }}>보류 이유</h3>
-              <ul className="small">{r.reasons.map((x) => <li key={x}>{x}</li>)}</ul>
-            </div>
-            <div>
-              <h3 className="section-title" style={{ fontSize: 13.5, marginBottom: 8 }}>추가로 필요한 정보</h3>
-              <ul className="small">{r.neededInfo.map((x) => <li key={x}>{x}</li>)}</ul>
-            </div>
-          </div>
-          {r.scores && (
-            <div style={{ marginTop: 24 }}>
-              <div className="small muted" style={{ marginBottom: 8 }}>참고: 모델 출력 (판단에 쓰지 않음)</div>
-              <ScoreBars scores={r.scores} />
-            </div>
-          )}
-        </>
+      {error && <div className="alert alert-err" style={{ marginTop: 0 }}>{error}</div>}
+      <FaultAnalysis
+        matrix={c.waveform}
+        fs={c.source.samplingRateHz}
+        hz={c.source.systemFrequencyHz}
+        analysis={c.analysis}
+        blocked={rejected}
+        busy={busy}
+        analysisType={type}
+        onType={setType}
+        onRun={run}
+        onReview={onReview}
+      />
+      {features && (
+        <details className="fa-details" style={{ marginTop: 16 }}>
+          <summary>채널별 특징값 (모델 입력에 쓰인 값)</summary>
+          <FeatureTable features={features} />
+        </details>
       )}
-      {r.features && <FeatureTable features={r.features} />}
-      <dl className="kv small">
-        <div><dt>모델</dt><dd className="mono">{r.modelVersion ?? '실행 안 함'}</dd></div>
-        <div><dt>전처리</dt><dd className="mono">{r.preprocessVersion ?? '—'}</dd></div>
-        <div><dt>실행 시각</dt><dd className="num">{fmtTime(r.executedAt)}</dd></div>
-      </dl>
-    </Section>
-  )
-}
-
-function ScoreBars({ scores, highlight }: { scores: Record<EventLabel, number>; highlight?: EventLabel }) {
-  return (
-    <div className="scores">
-      {Object.entries(scores).map(([k, v]) => (
-        <div key={k} className={`score ${k === highlight ? 'hl' : ''}`}>
-          <span className="mono">{k}</span>
-          <div className="bar"><div style={{ width: `${v * 100}%` }} /></div>
-          <span className="num" style={{ textAlign: 'right' }}>{v.toFixed(2)}</span>
-        </div>
-      ))}
-      <p className="hint">보정되지 않은 점수입니다. 정답일 확률이 아닙니다.</p>
-    </div>
+    </>
   )
 }
 
 function FeatureTable({ features }: { features: ChannelFeatures[] }) {
   return (
-    <div style={{ marginTop: 28 }}>
-      <div className="small muted" style={{ marginBottom: 8 }}>참고 특징값</div>
+    <div style={{ marginTop: 12 }}>
       <div className="table-wrap">
         <table>
           <thead><tr><th>채널</th><th className="num">RMS</th><th className="num">Peak</th><th className="num">Crest factor</th><th className="num">변화율 RMS</th></tr></thead>

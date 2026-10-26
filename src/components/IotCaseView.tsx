@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { CHART } from '../lib/chart'
 import { fmtTime } from '../lib/actor'
-import { SCORE_FAULT, SCORE_WARN, STATUS_LABEL } from '../lib/village'
+import { STATUS_LABEL, THRESHOLDS } from '../lib/village'
 import type { AnyCase, IotCase } from '../types'
 import { DiagnosisBadge, StageBadge, Steps } from './Badges'
 import IssueList from './IssueList'
@@ -101,7 +101,7 @@ export default function IotCaseView({ c, onChange }: { c: IotCase; onChange: (c:
           <>
             <Metrics>
               <Metric label="판정" value={<Status tone={NODE_TONE[d.status]}><span style={{ fontSize: 20, fontWeight: 600 }}>{STATUS_LABEL[d.status]}</span></Status>} />
-              <Metric label="최대 이상 점수" value={d.maxScore.toFixed(2)} foot={`주의 ≥ ${SCORE_WARN} · 이상 ≥ ${SCORE_FAULT}`} />
+              <Metric label="최대 이상 점수" value={d.maxScore.toFixed(2)} foot={`주의 ≥ ${THRESHOLDS.warn} · 이상 ≥ ${THRESHOLDS.fault}`} />
               <Metric label="최대 잔차" value={d.maxResidualA.toFixed(2)} unit="A" foot="|실제 − 예상|" />
               <Metric label="최저 전압" value={d.minV.toFixed(2)} unit="V" />
             </Metrics>
@@ -112,8 +112,8 @@ export default function IotCaseView({ c, onChange }: { c: IotCase; onChange: (c:
                   <XAxis dataKey="s" unit="s" type="number" domain={['dataMin', 'dataMax']} {...axis} />
                   <YAxis domain={[0, 1]} {...axis} width={52} />
                   <Tooltip />
-                  <ReferenceLine y={SCORE_WARN} stroke={CHART.warn} strokeDasharray="3 4" label={{ value: '주의', fontSize: 11, fill: CHART.warn, position: 'insideTopLeft' }} />
-                  <ReferenceLine y={SCORE_FAULT} stroke={CHART.err} strokeDasharray="3 4" label={{ value: '이상', fontSize: 11, fill: CHART.err, position: 'insideTopLeft' }} />
+                  <ReferenceLine y={THRESHOLDS.warn} stroke={CHART.warn} strokeDasharray="3 4" label={{ value: '주의', fontSize: 11, fill: CHART.warn, position: 'insideTopLeft' }} />
+                  <ReferenceLine y={THRESHOLDS.fault} stroke={CHART.err} strokeDasharray="3 4" label={{ value: '이상', fontSize: 11, fill: CHART.err, position: 'insideTopLeft' }} />
                   <Line dataKey="score" name="이상 점수" stroke={CHART.ink} dot={false} strokeWidth={1.75} isAnimationActive={false} />
                 </LineChart>
               </ResponsiveContainer>

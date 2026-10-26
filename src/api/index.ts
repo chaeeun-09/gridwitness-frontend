@@ -1,5 +1,5 @@
 import type { VillageEvent } from '../lib/village'
-import type { AnalysisType, AnyCase, CaseSummary, IncidentCase, IotCase, Review, SourceType } from '../types'
+import type { ActivityItem, AnalysisType, AnyCase, CaseSummary, IncidentCase, IotCase, Review, SourceType } from '../types'
 import { mockApi } from './mock'
 
 export interface RegisterCaseInput {
@@ -18,6 +18,10 @@ export interface RegisterCaseInput {
 
 export interface GridWitnessApi {
   listCases(): Promise<CaseSummary[]>
+  /** 모든 사건의 이력을 최신순으로 */
+  listActivity(): Promise<ActivityItem[]>
+  /** 관리자 내보내기용 전체 사건 */
+  exportCases(): Promise<AnyCase[]>
   getCase(id: string): Promise<AnyCase>
   registerCase(input: RegisterCaseInput): Promise<IncidentCase>
   runAnalysis(id: string, analysisType: AnalysisType, actor: string): Promise<IncidentCase>

@@ -1,12 +1,14 @@
 import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
 import { BrowserRouter, Link, NavLink, Route, Routes, useLocation } from 'react-router-dom'
-import { IconAnalysis, IconDashboard, IconDatabase, IconHistory, IconLive, IconLogo, IconMenu, IconSettings, IconVillage } from './components/Icons'
+import { IconAnalysis, IconDashboard, IconShieldCheck, IconDatabase, IconHistory, IconLive, IconLogo, IconMenu, IconSettings, IconVillage } from './components/Icons'
 import { Dot, PageSkeleton } from './components/ui'
 import { useActor } from './lib/actor'
 import { DEVICE_INFO, useVillage } from './lib/village'
 import CaseDetail from './pages/CaseDetail'
 import CaseList from './pages/CaseList'
+import Admin from './pages/Admin'
 import Dashboard from './pages/Dashboard'
+import Landing from './pages/Landing'
 import LiveData from './pages/LiveData'
 import NewCase from './pages/NewCase'
 import PublicData from './pages/PublicData'
@@ -18,7 +20,7 @@ const NAV: { label: string; items: { to: string; label: string; icon: ReactNode;
   {
     label: '모니터링',
     items: [
-      { to: '/', label: '개요', icon: <IconDashboard />, end: true },
+      { to: '/dashboard', label: '개요', icon: <IconDashboard /> },
       { to: '/village', label: '스마트 마을', icon: <IconVillage /> },
       { to: '/live', label: '실시간 분석', icon: <IconLive /> },
     ],
@@ -34,6 +36,7 @@ const NAV: { label: string; items: { to: string; label: string; icon: ReactNode;
     label: '관리',
     items: [
       { to: '/history', label: '사건·검토 이력', icon: <IconHistory /> },
+      { to: '/admin', label: '관리자', icon: <IconShieldCheck /> },
       { to: '/settings', label: '설정', icon: <IconSettings /> },
     ],
   },
@@ -71,7 +74,7 @@ function Shell() {
   return (
     <div className={`app ${navOpen ? 'nav-open' : ''}`}>
       <aside className="sidebar no-print" aria-label="주 메뉴">
-        <Link to="/" className="brand">
+        <Link to="/" className="brand" title="소개 화면">
           <span className="brand-mark"><IconLogo /></span>
           <span className="brand-name">GridWitness</span>
         </Link>
@@ -105,7 +108,8 @@ function Shell() {
         <main key={location.pathname} className={`page ${wide ? 'wide' : ''}`}>
           <Suspense fallback={<PageSkeleton />}>
             <Routes location={location}>
-              <Route path="/" element={<Dashboard />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/admin" element={<Admin />} />
               <Route path="/village" element={<Village />} />
               <Route path="/live" element={<LiveData />} />
               <Route path="/cases" element={<CaseList mode="waveform" />} />
@@ -123,10 +127,16 @@ function Shell() {
   )
 }
 
+/** 소개 화면(/)은 사이드바 없이, 나머지는 앱 셸 안에서 */
+function Root() {
+  const { pathname } = useLocation()
+  return pathname === '/' ? <Landing /> : <Shell />
+}
+
 export default function App() {
   return (
     <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, '')}>
-      <Shell />
+      <Root />
     </BrowserRouter>
   )
 }

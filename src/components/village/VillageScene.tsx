@@ -4,7 +4,7 @@ import { Bloom, EffectComposer, N8AO, SMAA, ToneMapping, Vignette } from '@react
 import { ToneMappingMode } from 'postprocessing'
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { CatmullRomCurve3, Vector3, type Group, type Mesh } from 'three'
-import { IOT_CHANNELS, lightView, type ChannelId, type NodeStatus, type VillageSnapshot } from '../../lib/village'
+import { IOT_CHANNELS, lightView, speech, type ChannelId, type NodeStatus, type VillageSnapshot } from '../../lib/village'
 import House from './House'
 import { BOX_FLOOR, HOUSE_POS, LAMP_POS, PART_Z, POLES, routePoints, type HouseChannel, type LampChannel } from './layout'
 import { Pole, STATUS_COLOR, StreetLamp, Substation } from './Props'
@@ -224,7 +224,7 @@ export default function VillageScene({
         shadows
         frameloop="demand"
         dpr={dpr}
-        camera={{ position: [-9, 19, 25], fov: 40, near: 0.5, far: 200 }}
+        camera={{ position: [-9, 19, 25], fov: 44, near: 0.5, far: 200 }}
         gl={{ antialias: !fx, powerPreference: fx ? 'high-performance' : 'default' }}
         onPointerMissed={() => (underground ? onPart(null) : onSelect(null))}
       >
@@ -243,9 +243,9 @@ export default function VillageScene({
           {IOT_CHANNELS.map((c) => {
             const view = lightView(snap.leds[c.id], snap)
             return c.kind === 'HOUSE' ? (
-              <House key={c.id} h={snap.leds[c.id]} view={view} {...HOUSE_POS[c.id as HouseChannel]} night={night} selected={selected === c.id} onSelect={() => onSelect(c.id)} />
+              <House key={c.id} h={snap.leds[c.id]} view={view} speech={speech(snap.leds[c.id], snap)} {...HOUSE_POS[c.id as HouseChannel]} night={night} selected={selected === c.id} onSelect={() => onSelect(c.id)} />
             ) : (
-              <StreetLamp key={c.id} c={snap.leds[c.id]} view={view} {...LAMP_POS[c.id as LampChannel]} night={night} selected={selected === c.id} onSelect={() => onSelect(c.id)} />
+              <StreetLamp key={c.id} c={snap.leds[c.id]} view={view} speech={speech(snap.leds[c.id], snap)} {...LAMP_POS[c.id as LampChannel]} night={night} selected={selected === c.id} onSelect={() => onSelect(c.id)} />
             )
           })}
         </Lift>

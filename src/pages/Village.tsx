@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import Channels from '../components/Channels'
+import EventList from '../components/EventList'
+import { IconMoon, IconPower, IconSun, IconX } from '../components/Icons'
 import PartPanel from '../components/PartPanel'
 import SceneBoundary from '../components/SceneBoundary'
-import EventList from '../components/EventList'
-import { IconMoon, IconSun, IconX } from '../components/Icons'
 import Sparkline from '../components/Sparkline'
-import { Badge, Metric, Metrics, NODE_TONE, PageHeader, Section, Segmented, Status } from '../components/ui'
+import { Badge, NODE_TONE, PageHeader, Section, Segmented, Status } from '../components/ui'
 import VillageScene from '../components/village/VillageScene'
 import { NET_COLOR, NET_KIND_LABEL, type NetKind, type PartId } from '../lib/hardware'
 import {
@@ -23,6 +23,7 @@ import {
   useVillage,
   type ChannelId,
   type FaultKind,
+  type VillageSnapshot,
 } from '../lib/village'
 
 /** 보기 설정은 브라우저별로 기억 */
@@ -46,6 +47,44 @@ function useStoredFlag(key: string, initial: boolean) {
   return [v, set] as const
 }
 
+/** 정전 발생 / 전력 복구 — 장치(릴레이)로 보내는 가장 중요한 조작이라 크게 */
+function PowerButton({ snap }: { snap: VillageSnapshot }) {
+  const pending = snap.relayPending !== null
+  if (pending) {
+    return (
+      <button className="btn btn-xl btn-power pending" disabled>
+        <span className="spin" />
+        장치에 명령 전송 중…
+      </button>
+    )
+  }
+  return snap.relay ? (
+    <button className="btn btn-xl btn-power off" onClick={() => setRelay(false)} disabled={!snap.connected}>
+      <IconPower />
+      정전 발생
+    </button>
+  ) : (
+    <button className="btn btn-xl btn-power on" onClick={() => setRelay(true)} disabled={!snap.connected}>
+      <IconPower />
+      전력 복구
+    </button>
+  )
+}
+
+/** 24시간 부하 패턴 막대 + 지금 재생 중인 시각 */
+function HourBars({ profile, hour }: { profile: number[]; hour: number }) {
+  const max = Math.max(...profile, 1)
+  return (
+    <div className="hourbars" role="img" aria-label={`24시간 부하 패턴, 현재 ${hour}시`}>
+      {profile.map((v, h) => (
+        <i key={h} className={h === hour ? 'now' : h < hour ? 'past' : ''} style={{ height: `${Math.max(8, (v / max) * 100)}%` }} title={`${h}시`} />
+      ))}
+    </div>
+  )
+}
+
+const ALARM = ['WARNING', 'FAULT', 'OUTAGE']
+
 export default function Village() {
   const snap = useVillage()
   const [selected, setSelected] = useState<ChannelId | null>(null)
@@ -58,50 +97,26 @@ export default function Village() {
   const sel = selected ? snap.leds[selected] : null
   const selView = sel ? lightView(sel, snap) : null
   const mock = snap.source === 'MOCK'
-  const residual = snap.i - snap.expected
-  const pending = snap.relayPending !== null
+  const alarm = ALARM.includes(snap.status)
+  const hour = snap.scenario ? Math.max(0, snap.scenario.hour) : 0
 
   return (
     <>
-      <PageHeader
-        title="스마트 마을"
-        description="5V 전원이 릴레이 하나를 거쳐 주택 3채와 가로등 2개에 함께 공급됩니다. INA219가 마을 전체 전압·전류를 측정합니다."
-        actions={
-          snap.relay ? (
-            <button className="btn btn-danger" onClick={() => setRelay(false)} disabled={!snap.connected || pending}>
-              {pending ? '차단 중…' : '정전 발생'}
-            </button>
-          ) : (
-            <button className="btn btn-primary" onClick={() => setRelay(true)} disabled={!snap.connected || pending}>
-              {pending ? '복구 중…' : '전력 복구'}
-            </button>
-          )
-        }
-      />
-
-      <Metrics>
-        <Metric
-          label="상태"
-          value={<Status tone={NODE_TONE[snap.status]} live={snap.status === 'FAULT' || snap.status === 'OUTAGE' || snap.status === 'WARNING'}><span style={{ fontSize: 20, fontWeight: 600 }}>{STATUS_LABEL[snap.status]}</span></Status>}
-          foot={`릴레이 ${snap.relay ? '닫힘' : '열림'} · 켜진 LED ${snap.estLit}/5${mock ? '' : ' (추정)'}`}
-        />
-        <Metric label="전압" value={snap.v.toFixed(2)} unit="V" foot="정격 5 V DC" />
-        <Metric label="전류" value={snap.i.toFixed(3)} unit="A" foot={<span className={Math.abs(residual) > 0.04 ? 'bad' : ''}>예상 {snap.expected.toFixed(3)} A · 차이 {residual >= 0 ? '+' : ''}{residual.toFixed(3)}</span>}>
-          <Sparkline values={snap.history.map((h) => h.i)} minSpan={0.06} />
-        </Metric>
-        <Metric label="전력" value={snap.p.toFixed(2)} unit="W" foot={`이상 점수 ${snap.score.toFixed(2)}`} />
-      </Metrics>
+      <PageHeader title="스마트 마을" actions={<PowerButton snap={snap} />} />
 
       {snap.scenario && (
-        <div className="alert alert-info" style={{ marginTop: 20, alignItems: 'center' }}>
-          <span style={{ flex: 1 }}>
-            <strong>부하 시나리오 재생 중 (시뮬레이터)</strong> — {snap.scenario.label}, {Math.max(0, snap.scenario.hour)}시. 공공데이터 시간대 패턴대로 켜진 LED 수를 바꿉니다.
-          </span>
+        <div className="scenario-banner">
+          <div style={{ minWidth: 0 }}>
+            <strong>공공데이터 패턴 재생 중</strong>
+            <div className="small muted">{snap.scenario.label} · {hour}시 · 시간대별 사용량만큼 LED가 켜집니다 (시뮬레이터)</div>
+          </div>
+          <HourBars profile={snap.scenario.profile} hour={hour} />
+          <span className="scenario-lit num"><b>{snap.estLit}</b> / 5 켜짐</span>
           <button className="btn btn-sm" onClick={stopScenario}>정지</button>
         </div>
       )}
 
-      <div className="scene" style={{ marginTop: 24 }}>
+      <div className="scene" style={{ marginTop: 16 }}>
         <div className="scene-canvas">
           <SceneBoundary>
             <VillageScene snap={snap} selected={selected} onSelect={setSelected} night={night} fx={fx} underground={underground} selectedPart={part} onPart={setPart} showPins={showPins} />
@@ -142,6 +157,7 @@ export default function Village() {
             </>
           )}
         </div>
+
         {underground ? (
           <div className="scene-legend glass">
             <strong>배선 색상</strong>
@@ -151,8 +167,23 @@ export default function Village() {
             <span className="muted" style={{ marginLeft: 'auto' }}>부품 클릭: 상세 · 선 위에 마우스: 연결</span>
           </div>
         ) : (
-          <div className="scene-hint glass">드래그 회전 · 휠 확대 · 객체 클릭</div>
+          <div className={`scene-hud glass ${alarm ? 'alarm' : ''}`} aria-live="polite">
+            <Status tone={NODE_TONE[snap.status]} live={alarm}><strong>{STATUS_LABEL[snap.status]}</strong></Status>
+            <div className="hud-nums num">
+              <span><b>{snap.v.toFixed(2)}</b> V</span>
+              <span><b>{snap.i.toFixed(2)}</b> A</span>
+              <span><b>{snap.p.toFixed(2)}</b> W</span>
+            </div>
+            <div className="hud-lit" aria-label={`켜진 LED ${snap.estLit}개`}>
+              {IOT_CHANNELS.map((c, k) => (
+                <i key={c.id} className={snap.leds[c.id].lit ? 'on' : ''} title={c.name} data-k={k} />
+              ))}
+              <span className="small muted">{snap.estLit}/5</span>
+            </div>
+          </div>
         )}
+        {!underground && <div className="scene-hint glass">드래그 회전 · 휠 확대 · 객체 클릭</div>}
+
         {underground && part && <PartPanel id={part} snap={snap} onClose={() => setPart(null)} />}
         {sel && selView && !underground && (
           <div className="scene-pop" role="dialog" aria-label={`${sel.name} 상세`}>
@@ -174,15 +205,21 @@ export default function Village() {
         )}
       </div>
 
-      <Section title="부하" description="LED 5개가 병렬로 연결되어 릴레이 하나로 함께 켜지고 꺼집니다." actions={<Link to="/settings" className="small">회로 구성 →</Link>}>
-        <Channels snap={snap} selected={selected} onSelect={setSelected} />
-      </Section>
-
       <div className="split section">
-        <Section title="이상 이벤트">
-          <EventList events={snap.events} />
+        <Section title="부하" description="LED 5개가 병렬로 연결되어 릴레이 하나로 함께 켜지고 꺼집니다." actions={<Link to="/settings" className="small">회로 구성 →</Link>}>
+          <Channels snap={snap} selected={selected} onSelect={setSelected} />
         </Section>
-        <Section title="고장 시뮬레이션" description="계측값만으로 판정하는지 확인하는 Mock 전용 기능입니다." actions={!mock && <Badge>실측 모드에서는 사용 안 함</Badge>}>
+        <Section title="이상 이벤트" description="이상 점수가 기준을 넘으면 기록되고, 사건으로 등록할 수 있습니다.">
+          <EventList events={snap.events} limit={4} />
+        </Section>
+      </div>
+
+      <Section
+        title="고장 시뮬레이션"
+        description="계측값만으로 판정하는지 확인하는 Mock 전용 기능입니다. 위 장면의 집이 상황에 맞게 말합니다."
+        actions={!mock && <Badge>실측 모드에서는 사용 안 함</Badge>}
+      >
+        <div className="sim-grid">
           <div className="form">
             <label className="field">
               LED 위치 고장
@@ -198,8 +235,10 @@ export default function Village() {
               ))}
               <button className="btn btn-ghost" onClick={() => clearFault(target)} disabled={!mock || !snap.faults[target]}>이 LED 복구</button>
             </div>
+          </div>
+          <div className="form">
             <div className="field">전원·제어·통신 고장</div>
-            <div className="cluster" style={{ marginTop: -8 }}>
+            <div className="cluster">
               {(Object.keys(FAULT_LABEL) as FaultKind[]).filter((k) => !FAULT_AT_LED[k]).map((k) => (
                 <button key={k} className={`btn ${snap.supplyFault === k ? 'btn-danger on' : ''}`} aria-pressed={snap.supplyFault === k} onClick={() => injectFault(target, k)} disabled={!mock}>
                   {FAULT_LABEL[k]}
@@ -211,8 +250,12 @@ export default function Village() {
               <button className="btn btn-ghost" onClick={() => { clearFault(); setConnected(true) }} disabled={!mock || (Object.keys(snap.faults).length === 0 && !snap.supplyFault && snap.connected)}>전체 복구</button>
             </div>
           </div>
-        </Section>
-      </div>
+          <div className="sim-spark">
+            <div className="small muted" style={{ marginBottom: 4 }}>전류 (최근 1분)</div>
+            <Sparkline values={snap.history.map((h) => h.i)} minSpan={0.08} height={44} />
+          </div>
+        </div>
+      </Section>
     </>
   )
 }

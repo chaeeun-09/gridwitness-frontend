@@ -58,7 +58,7 @@ export default function Dashboard() {
         <Section title="부하" description="주택 3 · 가로등 2 — 릴레이 하나로 함께 공급" actions={<Link to="/village" className="small">스마트 마을 →</Link>}>
           <Channels snap={snap} onSelect={() => nav('/village')} />
         </Section>
-        <Section title="이상 이벤트" actions={<Link to="/live" className="small">실시간 분석 →</Link>}>
+        <Section title="이상 이벤트" description="이상 점수가 기준을 넘으면 기록됩니다" actions={<Link to="/live" className="small">실시간 분석 →</Link>}>
           <EventList events={snap.events} limit={5} />
         </Section>
       </div>

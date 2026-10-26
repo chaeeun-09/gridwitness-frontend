@@ -103,6 +103,14 @@ export default function PublicData() {
   }
 
   const axis = { tick: CHART.tick, axisLine: CHART.axisLine, tickLine: CHART.tickLine }
+  const [hover, setHover] = useState<string | null>(null)
+  /** 막대 클릭: 그 지역을 선택 / Shift+클릭: 비교 지역 */
+  const pickRegion = (d: unknown, _i: number, e: { shiftKey?: boolean } | undefined) => {
+    const r = (d as { region?: string; payload?: { region?: string } })?.region ?? (d as { payload?: { region?: string } })?.payload?.region
+    if (!r) return
+    if (e?.shiftKey) setCompare(r)
+    else setRegion(r)
+  }
   const resetToExample = () => {
     setDs(EXAMPLE_DATASET)
     setImportResult(null)
@@ -179,7 +187,7 @@ export default function PublicData() {
               actions={<button className="btn btn-sm" onClick={playOnVillage}>스마트 마을에서 재생</button>}
             >
               <div className="legend" style={{ marginBottom: 8 }}>
-                <span><i style={{ background: CHART.ink }} />{region}</span>
+                <span><i style={{ background: CHART.accent }} />{region}</span>
                 <span style={{ color: CHART.secondary }}><i className="dash" />{compare}</span>
               </div>
               <ResponsiveContainer width="100%" height={260}>
@@ -188,28 +196,32 @@ export default function PublicData() {
                   <XAxis dataKey="h" interval={3} {...axis} />
                   <YAxis {...axis} width={48} />
                   <Tooltip />
-                  <Line name={region} dataKey="a" stroke={CHART.ink} strokeWidth={2} dot={false} connectNulls={false} isAnimationActive={false} />
+                  <Line name={region} dataKey="a" stroke={CHART.accent} strokeWidth={2.25} dot={false} connectNulls={false} isAnimationActive={false} />
                   <Line name={compare} dataKey="b" stroke={CHART.secondary} strokeWidth={1.5} strokeDasharray="4 4" dot={false} isAnimationActive={false} />
                 </LineChart>
               </ResponsiveContainer>
               {stats.missingHours > 0 && <p className="hint">빈 시간 {stats.missingHours}개는 보간하지 않고 비워 두었습니다.</p>}
             </Section>
-            <Section title={`지역별 일 사용량 · ${CONTRACT_LABEL[contract]}`}>
+            <Section title={`지역별 일 사용량 · ${CONTRACT_LABEL[contract]}`} description="막대를 누르면 그 지역이 선택되고, Shift+클릭은 비교 지역이 됩니다.">
               <div className="legend" style={{ marginBottom: 8 }}>
-                <span><i style={{ background: CHART.ink }} />선택</span>
-                <span><i style={{ background: CHART.secondary }} />비교</span>
+                <span><i style={{ background: CHART.accent }} />선택 지역</span>
+                <span><i style={{ background: '#7b808b' }} />비교 지역</span>
               </div>
-              <ResponsiveContainer width="100%" height={260}>
-                <BarChart data={barData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                  <CartesianGrid stroke={CHART.grid} vertical={false} />
-                  <XAxis dataKey="region" interval={0} {...axis} tick={{ ...CHART.tick, fontSize: 10.5 }} />
-                  <YAxis {...axis} width={48} />
-                  <Tooltip cursor={{ fill: 'rgba(20,22,27,0.04)' }} />
-                  <Bar dataKey="total" name="일 사용량" radius={[3, 3, 0, 0]} isAnimationActive={false}>
-                    {barData.map((d) => <Cell key={d.region} fill={d.region === region ? CHART.ink : d.region === compare ? CHART.secondary : '#e4e5ea'} />)}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              <div className="bar-chart">
+                <ResponsiveContainer width="100%" height={260}>
+                  <BarChart data={barData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }} onMouseLeave={() => setHover(null)}>
+                    <CartesianGrid stroke={CHART.grid} vertical={false} />
+                    <XAxis dataKey="region" interval={0} {...axis} tick={{ ...CHART.tick, fontSize: 10.5 }} />
+                    <YAxis {...axis} width={48} />
+                    <Tooltip cursor={{ fill: 'rgba(49,87,224,0.07)' }} formatter={(v) => [`${Number(v).toLocaleString()} kWh`, '일 사용량']} />
+                    <Bar dataKey="total" name="일 사용량" radius={[4, 4, 0, 0]} isAnimationActive={false} cursor="pointer" onClick={pickRegion} onMouseEnter={(d: unknown) => setHover((d as { region?: string })?.region ?? null)}>
+                      {barData.map((d) => (
+                        <Cell key={d.region} fill={d.region === region ? CHART.accent : d.region === compare ? '#7b808b' : d.region === hover ? '#9fb2ee' : '#e0e2e8'} style={{ transition: 'fill 120ms' }} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </Section>
           </div>
         </>

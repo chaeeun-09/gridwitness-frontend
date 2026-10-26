@@ -1,7 +1,7 @@
 import type { GridWitnessApi } from '.'
 import { parseComtrade } from '../lib/comtrade'
 import { computeFeatures, diagnose, parseCsv, PREPROCESS_VERSION, sha256Hex } from '../lib/waveform'
-import { DEVICE_INFO, FAULT_LABEL, IOT_MODEL, LED_A, NOMINAL_V, SCORE_FAULT, STATUS_LABEL, TICK_MS } from '../lib/village'
+import { DEVICE_INFO, FAULT_LABEL, IOT_MODEL, LED_A, NOMINAL_V, STATUS_LABEL, THRESHOLDS, TICK_MS } from '../lib/village'
 import {
   ANALYSIS_LABEL,
   CHANNELS,
@@ -97,6 +97,18 @@ const core: GridWitnessApi = {
       source: c.caseType === 'IOT' ? `IoT 모형 · ${c.device.scope}` : SOURCE_LABEL[c.source.sourceType],
       diagnosisStatus: c.diagnosis.status,
     }))
+  },
+
+  async listActivity() {
+    await delay()
+    return store
+      .flatMap((c) => c.history.map((h) => ({ ...h, caseId: c.id, caseTitle: c.title, caseType: c.caseType })))
+      .sort((a, b) => b.at.localeCompare(a.at))
+  },
+
+  async exportCases() {
+    await delay()
+    return structuredClone(store)
   },
 
   async getCase(id) {
@@ -290,7 +302,7 @@ const core: GridWitnessApi = {
     const findings: string[] = []
     const relayOn = w.some((p) => p.expected > 0)
     if (relayOn && minV < 1) findings.push(`릴레이가 켜져 있는데 전압이 ${minV.toFixed(2)}V까지 떨어졌습니다. 어댑터 전원이 끊긴 것으로 보입니다.`)
-    else if (relayOn && minV < 4.75) findings.push(`전압이 정격 ${NOMINAL_V}V 대비 ${minV.toFixed(2)}V까지 낮아졌습니다 (어댑터·배선 접촉 확인).`)
+    else if (relayOn && minV < THRESHOLDS.vMin) findings.push(`전압이 정격 ${NOMINAL_V}V 대비 ${minV.toFixed(2)}V까지 낮아졌습니다 (어댑터·배선 접촉 확인).`)
     // 과전류 판단은 릴레이가 닫혀 있어야 할 때만 (차단 후 흐르는 전류는 아래 고착 항목에서 따로 봄)
     const overA = Math.max(0, ...w.filter((p) => p.expected > 0).map((p) => p.i - p.expected))
     if (overA > LED_A) findings.push(`실제 전류가 예상보다 최대 ${overA.toFixed(2)}A 많습니다 (누설·단락 가능성).`)
@@ -333,7 +345,7 @@ const core: GridWitnessApi = {
       },
       reviews: [],
       history: [
-        { at: e.at, actor: DEVICE_INFO[e.source].deviceId, action: '이상 감지', detail: `마을 전체 · 점수 ${e.maxScore.toFixed(2)}${e.maxScore >= SCORE_FAULT ? ' (이상 기준 초과)' : ''}` },
+        { at: e.at, actor: DEVICE_INFO[e.source].deviceId, action: '이상 감지', detail: `마을 전체 · 점수 ${e.maxScore.toFixed(2)}${e.maxScore >= THRESHOLDS.fault ? ' (이상 기준 초과)' : ''}` },
         { at: t, actor, action: '사건 등록', detail: `계측 ${w.length}개 · 데이터 점검 ${status}` },
       ],
     }
@@ -432,6 +444,8 @@ export async function resetCases(withExamples: boolean) {
 
 export const mockApi: GridWitnessApi = {
   listCases: async () => (await ready(), core.listCases()),
+  listActivity: async () => (await ready(), core.listActivity()),
+  exportCases: async () => (await ready(), core.exportCases()),
   getCase: async (id) => (await ready(), core.getCase(id)),
   registerCase: async (input) => (await ready(), core.registerCase(input)),
   runAnalysis: async (id, type, actor) => (await ready(), core.runAnalysis(id, type, actor)),

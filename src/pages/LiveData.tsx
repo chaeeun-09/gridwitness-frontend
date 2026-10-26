@@ -2,7 +2,7 @@ import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Too
 import EventList from '../components/EventList'
 import { Metric, Metrics, NODE_TONE, PageHeader, Section, Status } from '../components/ui'
 import { CHART } from '../lib/chart'
-import { IOT_MODEL, LED_A, SCORE_FAULT, SCORE_WARN, STATUS_LABEL, TICK_MS, useVillage } from '../lib/village'
+import { IOT_MODEL, LED_A, STATUS_LABEL, THRESHOLDS, TICK_MS, useVillage } from '../lib/village'
 
 /** 실시간 분석: 예상 전류 vs 실제 전류, 이상 점수, 경고 이력 */
 export default function LiveData() {
@@ -18,7 +18,7 @@ export default function LiveData() {
   const ledUnits = residual / LED_A
   const warnings = snap.events.length
   const axis = { tick: CHART.tick, axisLine: CHART.axisLine, tickLine: CHART.tickLine }
-  const scoreColor = (s: number) => (s >= SCORE_FAULT ? CHART.err : s >= SCORE_WARN ? CHART.warn : CHART.ink)
+  const scoreColor = (s: number) => (s >= THRESHOLDS.fault ? CHART.err : s >= THRESHOLDS.warn ? CHART.warn : CHART.ink)
 
   return (
     <>
@@ -30,7 +30,7 @@ export default function LiveData() {
 
       <Metrics cols={3}>
         <Metric label="실제 / 예상 전류" value={snap.i.toFixed(3)} unit={`/ ${snap.expected.toFixed(3)} A`} foot={<span className={Math.abs(residual) > 0.04 ? 'bad' : ''}>차이 {residual >= 0 ? '+' : ''}{residual.toFixed(3)} A · LED {ledUnits >= 0 ? '+' : ''}{ledUnits.toFixed(1)}개 분량</span>} />
-        <Metric label="이상 점수" value={<span style={{ color: scoreColor(snap.score) }}>{snap.score.toFixed(2)}</span>} foot={`주의 ≥ ${SCORE_WARN} · 이상 ≥ ${SCORE_FAULT}`} />
+        <Metric label="이상 점수" value={<span style={{ color: scoreColor(snap.score) }}>{snap.score.toFixed(2)}</span>} foot={`주의 ≥ ${THRESHOLDS.warn} · 이상 ≥ ${THRESHOLDS.fault}`} />
         <Metric label="경고 이력" value={warnings} unit="건" foot={`진행 중 ${snap.events.filter((e) => !e.clearedAt).length}건`} />
       </Metrics>
 
@@ -53,8 +53,8 @@ export default function LiveData() {
         </Section>
         <Section title="이상 점수" description="0 = 예상대로, 1 = LED 2개 분량 이상 차이 또는 큰 전압 강하">
           <div className="legend" style={{ marginBottom: 8 }}>
-            <span style={{ color: CHART.warn }}><i className="dash" />주의 {SCORE_WARN}</span>
-            <span style={{ color: CHART.err }}><i className="dash" />이상 {SCORE_FAULT}</span>
+            <span style={{ color: CHART.warn }}><i className="dash" />주의 {THRESHOLDS.warn}</span>
+            <span style={{ color: CHART.err }}><i className="dash" />이상 {THRESHOLDS.fault}</span>
           </div>
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={data} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
@@ -62,8 +62,8 @@ export default function LiveData() {
               <XAxis dataKey="s" unit="s" type="number" domain={['dataMin', 'dataMax']} {...axis} />
               <YAxis domain={[0, 1]} {...axis} width={52} />
               <Tooltip />
-              <ReferenceLine y={SCORE_WARN} stroke={CHART.warn} strokeDasharray="3 4" />
-              <ReferenceLine y={SCORE_FAULT} stroke={CHART.err} strokeDasharray="3 4" />
+              <ReferenceLine y={THRESHOLDS.warn} stroke={CHART.warn} strokeDasharray="3 4" />
+              <ReferenceLine y={THRESHOLDS.fault} stroke={CHART.err} strokeDasharray="3 4" />
               <Line name="이상 점수" dataKey="score" stroke={CHART.ink} dot={false} strokeWidth={1.75} isAnimationActive={false} />
             </LineChart>
           </ResponsiveContainer>
@@ -73,7 +73,7 @@ export default function LiveData() {
       <Section title="판정 근거" description="INA219 하나로 마을 전체만 측정합니다. LED별 상태는 전류 차이를 LED 1개 정격(0.056 A)으로 나눠 추정합니다.">
         <dl className="dl-rows">
           <div><dt>릴레이</dt><dd>{snap.relay ? '닫힘 — 5개 LED에 전원 공급' : '열림 — 마을 전체 차단'}</dd></div>
-          <div><dt>전압</dt><dd className="num">{snap.v.toFixed(2)} V <span className="muted">(정격 5 V, 4.75 V 미만이면 점수 상승)</span></dd></div>
+          <div><dt>전압</dt><dd className="num">{snap.v.toFixed(2)} V <span className="muted">(정격 5 V, {THRESHOLDS.vMin} V 미만이면 점수 상승)</span></dd></div>
           <div><dt>실제 전류</dt><dd className="num">{snap.i.toFixed(3)} A</dd></div>
           <div><dt>예상 전류</dt><dd className="num">{snap.expected.toFixed(3)} A <span className="muted">(켜져야 할 LED × {LED_A} A)</span></dd></div>
           <div><dt>차이</dt><dd className={`num ${Math.abs(residual) > 0.04 ? 'text-bad' : ''}`}>{residual >= 0 ? '+' : ''}{residual.toFixed(3)} A · LED {ledUnits >= 0 ? '+' : ''}{ledUnits.toFixed(1)}개 분량</dd></div>

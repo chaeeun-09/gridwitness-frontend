@@ -4,6 +4,7 @@ import { memo, useEffect, useMemo } from 'react'
 import { AdditiveBlending, Color, ExtrudeGeometry, MeshStandardMaterial, Shape } from 'three'
 import type { LedState, NodeStatus } from '../../lib/village'
 import Label from '../three/Label'
+import SpeechBubble from '../three/SpeechBubble'
 import { glowTexture, shingleTexture, sidingTexture, tiled } from './textures'
 
 export type HouseStyle = 'cottage' | 'twoStory' | 'wide'
@@ -228,9 +229,11 @@ export default function House({
   onSelect,
   night,
   showLabel = true,
+  speech = null,
 }: {
   night: boolean
   showLabel?: boolean
+  speech?: string | null
   h: LedState
   view: { status: NodeStatus; text: string }
   style: HouseStyle
@@ -380,6 +383,7 @@ export default function House({
         pointer
         lineHeight={0.56}
       />}
+      {showLabel && speech && <SpeechBubble text={speech} y={labelY + 1.5} tone={view.status === 'FAULT' || view.status === 'OUTAGE' ? 'err' : 'warn'} />}
     </group>
   )
 }
