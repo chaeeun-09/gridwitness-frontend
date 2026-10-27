@@ -26,6 +26,8 @@ export interface GridWitnessApi {
   registerCase(input: RegisterCaseInput): Promise<IncidentCase>
   runAnalysis(id: string, analysisType: AnalysisType, actor: string): Promise<IncidentCase>
   registerIotEvent(input: { event: VillageEvent; actor: string }): Promise<IotCase>
+  /** 서버 목록에만 있는 사건에 원본 CSV를 연결해 파형을 표시 (해시가 같을 때만) */
+  attachWaveform(id: string, file: File): Promise<IncidentCase>
   submitReview(id: string, review: Omit<Review, 'reviewedAt'>): Promise<AnyCase>
 }
 

@@ -1,6 +1,6 @@
 import type { GridWitnessApi } from '.'
 import { apiBase } from '../lib/backend'
-import { PREPROCESS_VERSION, sha256Hex } from '../lib/waveform'
+import { diagnose, parseCsv, PREPROCESS_VERSION, sha256Hex } from '../lib/waveform'
 import { ingest } from './ingest'
 import { buildIotCase } from './iotCase'
 import { summarize } from './util'
@@ -281,6 +281,8 @@ export const backendApi: GridWitnessApi = {
   },
 
   async getCase(id) {
+    // 주소로 바로 들어온 서버 사건은 목록을 한 번 받은 뒤에야 알 수 있다
+    if (!store.some((x) => x.id === id)) await syncList()
     const c = find(id)
     if (c.caseType === 'WAVEFORM' && c.backend) {
       try {
@@ -393,6 +395,23 @@ export const backendApi: GridWitnessApi = {
     } catch {
       c.detection.limitations.push('서버 요약을 가져오지 못해 브라우저 판정만 표시합니다.')
     }
+    return put(c)
+  },
+
+  async attachWaveform(id, file) {
+    const c = findWaveform(id)
+    const buf = await file.arrayBuffer()
+    const sha = await sha256Hex(buf)
+    if (sha !== c.source.sha256) throw new Error('서버에 등록된 파일과 내용이 다릅니다 (SHA-256 불일치). 등록할 때 쓴 원본 CSV를 선택하세요.')
+    const { diagnosis, matrix } = diagnose(parseCsv(new TextDecoder().decode(buf)), file.size, {
+      samplingRateHz: c.source.samplingRateHz,
+      systemFrequencyHz: c.source.systemFrequencyHz,
+      sourceType: c.source.sourceType,
+    })
+    if (!matrix) throw new Error('파일을 파형으로 읽지 못했습니다.')
+    c.waveform = matrix
+    c.diagnosis = { ...c.diagnosis, rows: diagnosis.rows, cols: diagnosis.cols, issues: c.diagnosis.issues.filter((i) => i.code !== 'REMOTE_RECORD') }
+    c.source = { ...c.source, fileSize: file.size, channelOrder: parseCsv(new TextDecoder().decode(buf)).header ?? c.source.channelOrder }
     return put(c)
   },
 

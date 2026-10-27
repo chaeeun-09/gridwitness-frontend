@@ -167,7 +167,7 @@ function AnalysisTab({ c, onChange, onReview }: { c: IncidentCase; onChange: (c:
     return c.diagnosis.status === 'REJECTED' ? (
       <ErrorState message="입력 진단에서 거부된 자료라 파형을 표시하지 않습니다. 입력 진단 탭의 수정 방법을 확인하세요." />
     ) : (
-      <ErrorState message="이 브라우저에는 원본 파형이 없어 표시할 수 없습니다. 같은 파일을 다시 등록하면 파형을 볼 수 있습니다." />
+      <AttachWaveform c={c} onChange={onChange} />
     )
   }
   const features = c.analysis?.features
@@ -217,5 +217,41 @@ function FeatureTable({ features }: { features: ChannelFeatures[] }) {
         </table>
       </div>
     </div>
+  )
+}
+
+/** 다른 곳에서 등록된 사건: 서버에는 원본이 없어 같은 CSV를 고르면 파형을 표시 */
+function AttachWaveform({ c, onChange }: { c: IncidentCase; onChange: (c: AnyCase) => void }) {
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  async function pick(f: File | undefined) {
+    if (!f) return
+    setBusy(true)
+    setError(null)
+    try {
+      onChange(await api.attachWaveform(c.id, f))
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <Section title="이 브라우저에는 파형이 없습니다" description="이 사건은 다른 곳에서 등록되어 서버 기록만 있습니다. 서버는 원본 파일을 다시 내려주지 않으므로, 등록할 때 쓴 원본 CSV를 고르면 그래프를 볼 수 있습니다.">
+      <div className="stack" style={{ gap: 12 }}>
+        <dl className="dl-rows">
+          <div><dt>파일명</dt><dd>{c.source.fileName}</dd></div>
+          <div><dt>SHA-256</dt><dd><span className="mono break">{c.source.sha256}</span></dd></div>
+        </dl>
+        <div className="cluster">
+          <label className="btn btn-primary" style={{ cursor: busy ? 'wait' : 'pointer' }}>
+            {busy ? '확인 중…' : '원본 CSV 선택'}
+            <input type="file" accept=".csv,text/csv" hidden disabled={busy} onChange={(e) => pick(e.target.files?.[0])} />
+          </label>
+          <span className="small muted">선택한 파일의 해시가 위 값과 같을 때만 연결됩니다.</span>
+        </div>
+        {error && <div className="alert alert-err" style={{ margin: 0 }}>{error}</div>}
+      </div>
+    </Section>
   )
 }
