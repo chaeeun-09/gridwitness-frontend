@@ -33,7 +33,7 @@ export default function CaseDetail() {
   return c.caseType === 'IOT' ? <IotCaseView c={c} onChange={setC} /> : <WaveformCaseView c={c} onChange={setC} />
 }
 
-function WaveformCaseView({ c, onChange }: { c: IncidentCase; onChange: (c: AnyCase) => void }) {
+export function WaveformCaseView({ c, onChange }: { c: IncidentCase; onChange: (c: AnyCase) => void }) {
   const [tab, setTab] = useState<Tab>(c.diagnosis.status === 'REJECTED' ? 'diagnosis' : 'analysis')
   const ai = c.analysis
   return (

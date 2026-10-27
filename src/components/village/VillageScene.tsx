@@ -223,6 +223,8 @@ export default function VillageScene({
         key={fx ? 'hq' : 'std'}
         shadows
         frameloop="demand"
+        // CSS로 줄여 보여주는 곳(소개 화면 노트북)에서도 실제 레이아웃 크기로 측정
+        resize={{ offsetSize: true }}
         dpr={dpr}
         camera={{ position: [-9, 19, 25], fov: 44, near: 0.5, far: 200 }}
         gl={{ antialias: !fx, powerPreference: fx ? 'high-performance' : 'default' }}

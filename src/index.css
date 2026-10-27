@@ -772,9 +772,8 @@ body { background: linear-gradient(180deg, #e6effc 0%, #f1f6fd 380px, #f6f9fe 10
 .laptop-progress { height: 2px; background: #1a3a8f; overflow: hidden; }
 .laptop-progress i { display: block; height: 100%; width: 100%; background: #9fc0ff; transform-origin: left; animation: lp-fill linear forwards; }
 @keyframes lp-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
-.laptop-body { display: flex; flex-direction: column; }
-.laptop-panel { flex: 1; display: flex; flex-direction: column; animation: panel-in 0.5s var(--ease, ease) both; }
-.laptop-panel > * { flex: 1; }
+.laptop-body { display: block; }
+.laptop-panel { animation: panel-in 0.5s var(--ease, ease) both; }
 @keyframes panel-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
 /* 스크롤로 나타나기 */
@@ -837,88 +836,34 @@ body { background: linear-gradient(180deg, #e6effc 0%, #f1f6fd 380px, #f6f9fe 10
 @keyframes step-pulse { 0%, 20%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(31, 95, 224, 0); } 5% { transform: scale(1.18); box-shadow: 0 0 0 7px rgba(31, 95, 224, 0.18); } }
 
 /* 노트북 안 화면: 고장파형 */
-.demo-cases .fa-panel .recharts-wrapper { clip-path: inset(0 100% 0 0); animation: wave-reveal 2.2s cubic-bezier(0.3, 0.6, 0.2, 1) 0.3s forwards; }
+.embed-app .fa-panel .recharts-wrapper { clip-path: inset(0 100% 0 0); animation: wave-reveal 2.2s cubic-bezier(0.3, 0.6, 0.2, 1) 0.3s forwards; }
 @keyframes wave-reveal { to { clip-path: inset(0 0 0 0); } }
-.demo-cases .scores .bar > div { transform-origin: left; animation: bar-grow 1s cubic-bezier(0.2, 0.7, 0.2, 1) 1.6s both; }
-.demo-cases .scores .score:nth-child(2) .bar > div { animation-delay: 1.7s; }
-.demo-cases .scores .score:nth-child(3) .bar > div { animation-delay: 1.8s; }
-.demo-cases .scores .score:nth-child(4) .bar > div { animation-delay: 1.9s; }
-.demo-cases .pred { animation: pred-in 0.6s ease 1.4s both; }
-.demo-cases .fa-side .fa-card { animation: fade-up 0.6s ease both; }
-.demo-cases .fa-side .fa-card + .fa-card { animation-delay: 0.3s; }
+.embed-app .scores .bar > div { transform-origin: left; animation: bar-grow 1s cubic-bezier(0.2, 0.7, 0.2, 1) 1.6s both; }
+.embed-app .scores .score:nth-child(2) .bar > div { animation-delay: 1.7s; }
+.embed-app .scores .score:nth-child(3) .bar > div { animation-delay: 1.8s; }
+.embed-app .scores .score:nth-child(4) .bar > div { animation-delay: 1.9s; }
+.embed-app .pred { animation: pred-in 0.6s ease 1.4s both; }
+.embed-app .fa-side .fa-card { animation: fade-up 0.6s ease both; }
+.embed-app .fa-side .fa-card + .fa-card { animation-delay: 0.3s; }
 @keyframes bar-grow { from { transform: scaleX(0); } to { transform: none; } }
 @keyframes pred-in { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: none; } }
 
-/* 노트북 안 화면: 스마트 마을·실시간 분석 */
-.demo { display: grid; grid-template-columns: minmax(0, 1.9fr) minmax(150px, 1fr); gap: 14px; padding: 16px; min-height: 100%; background: #f4f6fb; }
-.demo-main, .demo-card { background: #fff; border-radius: 12px; box-shadow: 0 0 0 1px rgba(27, 43, 94, 0.08); }
-.demo-main { padding: 14px; display: flex; flex-direction: column; gap: 10px; }
-.demo-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; color: #121d3d; }
-.demo-pill { padding: 3px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 700; transition: background 0.3s, color 0.3s; }
-.demo-pill.ok { background: #e3f6ea; color: #14803c; }
-.demo-pill.bad { background: #fde8e8; color: #c0392b; }
-.demo-side { display: flex; flex-direction: column; gap: 10px; }
-.demo-card { padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
-.demo-k { font-size: 11.5px; color: #6b7794; }
-.demo-card b { font-size: 24px; color: #121d3d; letter-spacing: -0.02em; }
-.demo-card b small { font-size: 12px; font-weight: 600; color: #6b7794; }
-.demo-note { margin: 0; font-size: 11.5px; line-height: 1.5; color: #6b7794; }
-.demo-legend { font-size: 11.5px; color: #6b7794; }
-.demo-legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; margin: 0 4px 2px 8px; vertical-align: middle; }
-.demo-legend i.a { background: #c0392b; }
-.demo-legend i.e { background: #9aa6c4; }
-
-.village-svg, .live-svg { width: 100%; height: auto; display: block; flex: 1; }
-.demo-main.sky { background: #eaf1fd; }
-.demo-main.sky .village-svg { margin: auto 0; flex: none; }
-.v-deck { fill: #d5deef; }
-.v-wire { stroke: #9aa6c4; stroke-width: 3; fill: none; }
-.v-flow { stroke: #f2b01e; stroke-width: 3; fill: none; stroke-dasharray: 6 12; opacity: 0; transition: opacity 0.3s; animation: flow-dash 0.8s linear infinite; }
-.village-svg.on .v-flow { opacity: 1; }
-@keyframes flow-dash { to { stroke-dashoffset: -18; } }
-.v-adapter { fill: #1a3a8f; }
-.v-label { fill: #fff; font-size: 11px; font-weight: 700; }
-.v-house { fill: #fff; stroke: #c3cde4; stroke-width: 1.5; }
-.v-roof { fill: #2f62d6; }
-.v-win { fill: #3a4668; transition: opacity 0.35s; }
-.v-glow { fill: #ffd95a; opacity: 0; transition: opacity 0.35s; }
-.village-svg.on .v-glow { opacity: 1; }
-.v-pole { stroke: #6b7794; stroke-width: 4; stroke-linecap: round; }
-.v-bulb { fill: #3a4668; transition: fill 0.35s; }
-.v-halo { fill: #ffd95a; opacity: 0; transition: opacity 0.35s; }
-.village-svg.on .v-bulb { fill: #ffd95a; }
-.village-svg.on .v-halo { opacity: 0.22; }
-
-.l-grid { stroke: #e3e8f4; stroke-width: 1; }
-.l-exp { stroke: #9aa6c4; stroke-width: 2; stroke-dasharray: 5 5; fill: none; }
-.l-act { stroke: #c0392b; stroke-width: 2.4; fill: none; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw 3.2s linear 0.2s forwards; }
-.l-mark { stroke: #c0392b; stroke-width: 1.5; stroke-dasharray: 4 4; opacity: 0; animation: fade-in 0.3s ease 2s forwards; }
-.l-marktext { fill: #c0392b; font-size: 11px; font-weight: 700; opacity: 0; animation: fade-in 0.3s ease 2s forwards; }
-@keyframes fade-in { to { opacity: 1; } }
-.score-num { position: relative; display: block; height: 30px; }
-.score-num span { position: absolute; left: 0; top: 0; }
-.score-num .sc-a { animation: fade-out 0.3s ease 2.1s forwards; }
-.score-num .sc-b { opacity: 0; color: #c0392b; animation: fade-in 0.3s ease 2.2s forwards; }
-@keyframes fade-out { to { opacity: 0; } }
-.gauge { height: 8px; border-radius: 4px; background: #e6ebf6; overflow: hidden; margin-top: 4px; }
-.gauge i { display: block; height: 100%; width: 82%; border-radius: 4px; background: linear-gradient(90deg, #14a04d, #f2b01e 40%, #c0392b); transform-origin: left; transform: scaleX(0.05); animation: gauge-up 1.2s cubic-bezier(0.3, 0.6, 0.2, 1) 2s forwards; }
-@keyframes gauge-up { to { transform: scaleX(1); } }
-.gauge-scale { display: flex; justify-content: space-between; font-size: 10px; color: #8a94ad; }
-.demo-verdict { position: relative; display: block; height: 30px; }
-.demo-verdict span { position: absolute; left: 0; top: 0; }
-.demo-verdict .vd-a { color: #14803c; animation: fade-out 0.3s ease 2.1s forwards; }
-.demo-verdict .vd-b { color: #c0392b; opacity: 0; animation: fade-in 0.3s ease 2.2s forwards; }
-@media (max-width: 700px) { .demo { grid-template-columns: 1fr; } .demo-side { flex-direction: row; flex-wrap: wrap; } .demo-side .demo-card { flex: 1 1 120px; } }
+/* 노트북 안: 실제 앱 화면. 뷰포트가 좁아도 데스크톱 배치를 유지하고 클릭은 막음 */
+.embed-app { width: 100%; height: 100%; overflow: hidden; pointer-events: none; user-select: none; background: var(--bg, #fff); }
+.embed-app .app { zoom: 1; height: 100%; min-height: 0; grid-template-columns: var(--sidebar-w) minmax(0, 1fr); }
+.embed-app .main { overflow: hidden; height: 100%; }
+.embed-app .sidebar { position: static; height: 100%; transform: none; width: auto; box-shadow: 1px 0 0 rgba(27, 43, 94, 0.06); }
+.embed-app .mobile-bar, .embed-app .scrim { display: none; }
+.embed-app .page { padding: 32px 40px 40px; max-width: none; }
+.embed-app .fa { grid-template-columns: minmax(0, 1.65fr) minmax(300px, 1fr); }
+.embed-app .split { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.embed-app .scene-canvas { height: 420px; }
 
 @media (prefers-reduced-motion: reduce) {
   .reveal, .land-laptop.tilt { opacity: 1; transform: none; transition: none; }
   .land-nav, .land-wordmark .wm-a, .land-wordmark .wm-b, .land-lead, .land-sub, .land-cta, .land-quote, .land-quote::after, .land-features li, .land-signal,
-  .land-ficon, .land-sicon, .land-tower, .land-flow li, .land-flow li .land-step-no, .laptop-panel, .demo-cases .fa-side .fa-card, .demo-cases .pred, .demo-cases .scores .bar > div, .v-flow { animation: none !important; }
+  .land-ficon, .land-sicon, .land-tower, .land-flow li, .land-flow li .land-step-no, .laptop-panel, .embed-app .fa-side .fa-card, .embed-app .pred, .embed-app .scores .bar > div { animation: none !important; }
   .land-mark .bm-wave { animation: none; stroke-dashoffset: 0; }
   .land-mark .bm-tower { animation: none; opacity: 1; }
-  .demo-cases .fa-panel .recharts-wrapper { animation: none; clip-path: none; }
-  .l-act { animation: none; stroke-dashoffset: 0; }
-  .l-mark, .l-marktext, .score-num .sc-b, .demo-verdict .vd-b { animation: none; opacity: 1; }
-  .score-num .sc-a, .demo-verdict .vd-a { display: none; }
-  .gauge i { animation: none; transform: none; }
+  .embed-app .fa-panel .recharts-wrapper { animation: none; clip-path: none; }
 }

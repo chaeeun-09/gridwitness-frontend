@@ -1,38 +1,10 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import FaultAnalysis from '../components/FaultAnalysis'
 import { IconArrowRight, IconBars, IconPerson, IconWave } from '../components/Icons'
 import { BrandMark, IntroFeatures, IntroFlow } from '../components/Intro'
 import LandingDemo, { Reveal } from '../components/LandingDemo'
 import { computeFeatures, PREPROCESS_VERSION, synthesize } from '../lib/waveform'
-import type { AnalysisResult } from '../types'
-
-/** 안쪽 화면을 고정 폭으로 그린 뒤 컨테이너 폭에 맞게 줄여서 보여줌 (노트북 화면용) */
-function ScaleToFit({ width, children }: { width: number; children: ReactNode }) {
-  const box = useRef<HTMLDivElement>(null)
-  const inner = useRef<HTMLDivElement>(null)
-  const [scale, setScale] = useState(1)
-  const [h, setH] = useState(0)
-  useEffect(() => {
-    const el = box.current
-    const inn = inner.current
-    if (!el || !inn) return
-    const update = () => {
-      setScale(Math.min(1, el.clientWidth / width))
-      setH(inn.offsetHeight)
-    }
-    update()
-    const ro = new ResizeObserver(update)
-    ro.observe(el)
-    ro.observe(inn)
-    return () => ro.disconnect()
-  }, [width])
-  return (
-    <div ref={box} style={{ width: '100%', height: h * scale, overflow: 'hidden' }}>
-      <div ref={inner} style={{ width, transform: `scale(${scale})`, transformOrigin: 'top left' }}>{children}</div>
-    </div>
-  )
-}
+import { CHANNELS, type AnalysisResult, type IncidentCase } from '../types'
 
 function Tower({ className }: { className?: string }) {
   return (
@@ -50,10 +22,11 @@ const SIGNALS = [
 
 
 export default function Landing() {
-  // 소개 화면용 합성 예시 (실제 계측 자료가 아님)
-  const { matrix, analysis } = useMemo(() => {
+  // 소개 화면용 합성 예시 사건 (실제 계측 자료가 아님)
+  const demoCase = useMemo<IncidentCase>(() => {
     const m = synthesize({ phase: 0, seed: 101, currentGain: 6.2 })
-    const a: AnalysisResult = {
+    const now = new Date().toISOString()
+    const analysis: AnalysisResult = {
       kind: 'COMPLETED',
       analysisType: 'EVENT_TYPE',
       predictedLabel: 'SIF',
@@ -62,9 +35,21 @@ export default function Landing() {
       limitations: [],
       modelVersion: 'example',
       preprocessVersion: PREPROCESS_VERSION,
-      executedAt: new Date().toISOString(),
+      executedAt: now,
     }
-    return { matrix: m, analysis: a }
+    return {
+      caseType: 'WAVEFORM',
+      id: 'EXAMPLE',
+      title: '예시 사건 · 1상 지락 (합성 데이터)',
+      createdAt: now,
+      stage: 'ANALYZED',
+      source: { fileName: 'example_fault.csv', fileSize: m.length * 60, sha256: '0'.repeat(64), sourceType: 'SYNTHETIC', datasetId: 'example', samplingRateHz: 4096, systemFrequencyHz: 50, channelOrder: [...CHANNELS], labelMeaning: '' },
+      diagnosis: { status: 'ACCEPTED', rows: m.length, cols: 7, issues: [], checkedAt: now },
+      waveform: m,
+      analysis,
+      reviews: [],
+      history: [{ at: now, actor: '예시', action: '합성 예시 사건' }],
+    }
   }, [])
 
   return (
@@ -108,15 +93,7 @@ export default function Landing() {
 
       <section className="land-stage">
         <Reveal className="land-laptop tilt">
-          <LandingDemo
-            casesView={
-              <ScaleToFit width={1060}>
-                <div style={{ padding: 16 }}>
-                  <FaultAnalysis matrix={matrix} fs={4096} hz={50} analysis={analysis} compact />
-                </div>
-              </ScaleToFit>
-            }
-          />
+          <LandingDemo demoCase={demoCase} />
           <div className="laptop-base" />
           <div className="land-caption">합성 데이터 화면입니다. 실제 계측 자료가 아닙니다.</div>
         </Reveal>
