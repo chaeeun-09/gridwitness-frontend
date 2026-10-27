@@ -29,7 +29,7 @@ export default function IotCaseView({ c, onChange }: { c: IotCase; onChange: (c:
   return (
     <>
       <PageHeader
-        crumbs={[{ label: '사건·검토 이력', to: '/history' }, { label: c.id }]}
+        crumbs={[{ label: '스마트 마을', to: '/village' }, { label: c.id }]}
         title={c.title}
         meta={
           <>
@@ -45,7 +45,7 @@ export default function IotCaseView({ c, onChange }: { c: IotCase; onChange: (c:
       <Steps steps={STEPS} done={c.stage === 'REVIEWED' ? 5 : 4} />
 
       <div className="tabs no-print" role="tablist">
-        {([['record', '계측 기록'], ['detection', '이상 탐지 결과'], ['review', '검토·보고']] as [Tab, string][]).map(([k, label]) => (
+        {([['record', '계측 기록'], ['detection', '이상 탐지 결과'], ['review', '검토·이력']] as [Tab, string][]).map(([k, label]) => (
           <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{label}</button>
         ))}
       </div>

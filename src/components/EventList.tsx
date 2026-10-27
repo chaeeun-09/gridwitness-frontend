@@ -18,7 +18,7 @@ export default function EventList({ events, limit = 6 }: { events: VillageEvent[
     try {
       const c = await api.registerIotEvent({ event: e, actor: getActor() })
       linkEventToCase(e.id, c.id)
-      nav(`/history/${c.id}`)
+      nav(`/cases/${c.id}`)
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -45,7 +45,7 @@ export default function EventList({ events, limit = 6 }: { events: VillageEvent[
               </span>
             </div>
             {e.caseId ? (
-              <Link to={`/history/${e.caseId}`} className="mono small">{e.caseId}</Link>
+              <Link to={`/cases/${e.caseId}`} className="mono small">{e.caseId}</Link>
             ) : (
               <button className="btn btn-sm" disabled={busy === e.id} onClick={() => register(e)}>
                 {busy === e.id ? '등록 중…' : '사건 등록'}

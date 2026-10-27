@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
-import { BrowserRouter, Link, NavLink, Route, Routes, useLocation } from 'react-router-dom'
-import { IconAnalysis, IconDashboard, IconShieldCheck, IconDatabase, IconHistory, IconLive, IconLogo, IconMenu, IconSettings, IconVillage } from './components/Icons'
+import { BrowserRouter, Link, Navigate, NavLink, Route, Routes, useLocation, useParams } from 'react-router-dom'
+import { IconAnalysis, IconDashboard, IconShieldCheck, IconDatabase, IconLive, IconLogo, IconMenu, IconSettings, IconVillage } from './components/Icons'
 import { Dot, PageSkeleton } from './components/ui'
 import { useActor } from './lib/actor'
 import { useBackendHealth } from './lib/backend'
@@ -37,12 +37,17 @@ const NAV: { label: string; items: { to: string; label: string; icon: ReactNode;
   {
     label: '관리',
     items: [
-      { to: '/history', label: '사건·검토 이력', icon: <IconHistory /> },
       { to: '/admin', label: '관리자', icon: <IconShieldCheck /> },
       { to: '/settings', label: '설정', icon: <IconSettings /> },
     ],
   },
 ]
+
+/** 예전 주소(/history/:id)로 들어와도 사건 화면으로 보냄 */
+function HistoryRedirect() {
+  const { id = '' } = useParams()
+  return <Navigate to={`/cases/${id}`} replace />
+}
 
 /** 사이드바 하단: 데이터 출처와 연결 상태를 한 곳에서만 보여줌 */
 function DeviceStatus() {
@@ -123,12 +128,12 @@ function Shell() {
               <Route path="/village" element={<Village />} />
               <Route path="/village/loads" element={<VillageLoads />} />
               <Route path="/live" element={<LiveData />} />
-              <Route path="/cases" element={<CaseList mode="waveform" />} />
+              <Route path="/cases" element={<CaseList />} />
               <Route path="/cases/new" element={<NewCase />} />
               <Route path="/cases/:id" element={<CaseDetail />} />
               <Route path="/public-data" element={<PublicData />} />
-              <Route path="/history" element={<CaseList mode="all" />} />
-              <Route path="/history/:id" element={<CaseDetail />} />
+              <Route path="/history" element={<Navigate to="/cases" replace />} />
+              <Route path="/history/:id" element={<HistoryRedirect />} />
               <Route path="/settings" element={<Settings />} />
             </Routes>
           </Suspense>

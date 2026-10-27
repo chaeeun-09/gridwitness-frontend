@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useLocation, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { api } from '../api'
 import { DiagnosisBadge, StageBadge, Steps, WAVEFORM_STEPS, waveformStepsDone } from '../components/Badges'
 import FaultAnalysis from '../components/FaultAnalysis'
@@ -12,9 +12,9 @@ import { SOURCE_LABEL, type AnalysisType, type AnyCase, type ChannelFeatures, ty
 
 type Tab = 'analysis' | 'diagnosis' | 'review' | 'source'
 const TABS: [Tab, string][] = [
-  ['analysis', '분석'],
+  ['analysis', '파형·AI 분석'],
   ['diagnosis', '입력 진단'],
-  ['review', '검토·보고'],
+  ['review', '검토·이력'],
   ['source', '원본 정보'],
 ]
 
@@ -35,12 +35,11 @@ export default function CaseDetail() {
 
 function WaveformCaseView({ c, onChange }: { c: IncidentCase; onChange: (c: AnyCase) => void }) {
   const [tab, setTab] = useState<Tab>(c.diagnosis.status === 'REJECTED' ? 'diagnosis' : 'analysis')
-  const fromHistory = useLocation().pathname.startsWith('/history')
   const ai = c.analysis
   return (
     <>
       <PageHeader
-        crumbs={[fromHistory ? { label: '사건·검토 이력', to: '/history' } : { label: '고장파형 분석', to: '/cases' }, { label: c.id }]}
+        crumbs={[{ label: '고장파형 분석', to: '/cases' }, { label: c.id }]}
         title={c.title}
         meta={
           <>

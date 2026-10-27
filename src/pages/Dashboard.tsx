@@ -59,7 +59,7 @@ export default function Dashboard() {
         )}
       </Section>
 
-      <Section title="최근 사건" actions={<Link to="/history" className="small">전체 보기 →</Link>}>
+      <Section title="최근 사건" actions={<Link to="/cases" className="small">전체 보기 →</Link>}>
         {error ? (
           <ErrorState message={error} onRetry={load} />
         ) : !cases ? (
@@ -74,7 +74,7 @@ export default function Dashboard() {
               </thead>
               <tbody>
                 {cases.slice(0, 4).map((c) => (
-                  <tr key={c.id} className="clickable" onClick={() => nav(`/${c.caseType === 'IOT' ? 'history' : 'cases'}/${c.id}`)}>
+                  <tr key={c.id} className="clickable" onClick={() => nav(`/cases/${c.id}`)}>
                     <td><span className="strong">{c.title}</span></td>
                     <td><DiagnosisBadge status={c.diagnosisStatus} /></td>
                     <td><StageBadge stage={c.stage} /></td>
