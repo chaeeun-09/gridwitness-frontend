@@ -6,8 +6,8 @@ import { IconBars, IconBrain, IconPerson, IconSearch, IconShieldCheck, IconWave 
 export function BrandMark() {
   return (
     <svg className="land-mark" viewBox="0 0 150 64" fill="none" aria-hidden>
-      <path d="M0 40h22l6-18 10 36 9-30 6 12h20" stroke="#2f62d6" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
-      <g stroke="#1b3aa8" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
+      <path className="bm-wave" pathLength={1} d="M0 40h22l6-18 10 36 9-30 6 12h20" stroke="#2f62d6" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
+      <g className="bm-tower" stroke="#1b3aa8" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
         <path d="M112 4v8M102 12h20M106 12l-7 48M118 12l7 48M104 28h16M101 44h22M106 12l12 16M118 12l-12 16M104 28l16 16M120 28l-16 16" />
       </g>
     </svg>
@@ -52,7 +52,7 @@ export function IntroFlow({ children }: { children?: ReactNode }) {
       </div>
       <ol>
         {FLOW.map((f, k) => (
-          <li key={f.title}>
+          <li key={f.title} style={{ ['--i' as string]: k }}>
             <span className="land-step-no">{k + 1}</span>
             <div className="land-step-body">
               <strong>{f.title}</strong>

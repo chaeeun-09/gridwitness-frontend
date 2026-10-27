@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import FaultAnalysis from '../components/FaultAnalysis'
 import { IconArrowRight, IconBars, IconPerson, IconWave } from '../components/Icons'
 import { BrandMark, IntroFeatures, IntroFlow } from '../components/Intro'
+import LandingDemo, { Reveal } from '../components/LandingDemo'
 import { computeFeatures, PREPROCESS_VERSION, synthesize } from '../lib/waveform'
 import type { AnalysisResult } from '../types'
 
@@ -87,7 +88,8 @@ export default function Landing() {
       <section className="land-hero">
         <div className="land-copy">
           <h1 className="land-wordmark">
-            Grid<span>Witness</span>
+            <em className="wm-a">Grid</em>
+            <span className="wm-b">Witness</span>
             <BrandMark />
           </h1>
           <p className="land-lead">AI가 읽는 전력의 이상, 더 안전한 오늘을 만듭니다.</p>
@@ -105,34 +107,24 @@ export default function Landing() {
       </section>
 
       <section className="land-stage">
-        <div className="land-laptop">
-          <div className="laptop-screen">
-            <div className="laptop-bar">
-              <span className="laptop-logo">GridWitness</span>
-              <span className="laptop-tabs">
-                <i>대시보드</i>
-                <i className="on">파형 분석</i>
-                <i>AI 분석 결과</i>
-                <i>이력 관리</i>
-              </span>
-              <span className="laptop-user"><IconPerson /></span>
-            </div>
-            <div className="laptop-body">
+        <Reveal className="land-laptop tilt">
+          <LandingDemo
+            casesView={
               <ScaleToFit width={1060}>
                 <div style={{ padding: 16 }}>
                   <FaultAnalysis matrix={matrix} fs={4096} hz={50} analysis={analysis} compact />
                 </div>
               </ScaleToFit>
-            </div>
-          </div>
+            }
+          />
           <div className="laptop-base" />
           <div className="land-caption">합성 데이터 화면입니다. 실제 계측 자료가 아닙니다.</div>
-        </div>
+        </Reveal>
 
-        <aside className="land-signals">
+        <aside className="land-signals reveal-group">
           <div className="land-signals-head">AI가 찾는 전력계통의 이상 신호</div>
-          {SIGNALS.map((s) => (
-            <div key={s.title} className="land-signal">
+          {SIGNALS.map((s, k) => (
+            <div key={s.title} className="land-signal" style={{ animationDelay: `${0.5 + k * 0.18}s` }}>
               <span className="land-sicon">{s.icon}</span>
               <div>
                 <strong>{s.title}</strong>
@@ -143,7 +135,9 @@ export default function Landing() {
         </aside>
       </section>
 
-      <IntroFlow />
+      <Reveal className="land-flow-wrap">
+        <IntroFlow />
+      </Reveal>
 
       <footer className="land-foot">
         <span>2026 빛가람 AI·ICT 경진대회 · 팀 시험기간</span>
