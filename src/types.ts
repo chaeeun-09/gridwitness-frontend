@@ -135,7 +135,7 @@ export interface IncidentCase {
   analysis: AnalysisResult | null
   reviews: Review[]
   history: HistoryEvent[]
-  /** 백엔드 모드에서 서버가 부여한 ID. Mock 사건에는 없음 */
+  /** 서버가 부여한 ID. 서버에 올리지 못한 사건에는 없음 */
   backend?: { incidentId: string; validationId: string | null; analysisId: string | null }
 }
 

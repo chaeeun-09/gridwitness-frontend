@@ -1,6 +1,6 @@
 import { SOURCE_LABEL, type AnyCase, type CaseSummary } from '../types'
 
-/** 목록에 보여줄 요약 (Mock·백엔드 공통) */
+/** 목록에 보여줄 요약 */
 export function summarize(c: AnyCase): CaseSummary {
   return {
     caseType: c.caseType,

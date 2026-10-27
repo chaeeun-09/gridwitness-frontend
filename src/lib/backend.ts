@@ -1,11 +1,9 @@
 import { useSyncExternalStore } from 'react'
 
-// 분석 서버 연결 설정. 기본은 Mock(브라우저 안에서만 동작)이고, 설정에서 백엔드로 바꾸면 FastAPI 서버를 호출한다.
+// 분석 서버(FastAPI) 연결 설정.
 
 export const DEFAULT_API = 'https://gridwitness-api.https.gsmsv.site'
-export type ApiMode = 'MOCK' | 'BACKEND'
 
-const MODE_KEY = 'gridwitness.api.mode'
 const URL_KEY = 'gridwitness.api.url'
 
 function read(key: string): string | null {
@@ -16,25 +14,9 @@ function read(key: string): string | null {
   }
 }
 
-export function apiMode(): ApiMode {
-  const env = import.meta.env.VITE_API_MODE as string | undefined
-  const v = read(MODE_KEY) ?? env
-  return v === 'BACKEND' ? 'BACKEND' : 'MOCK'
-}
-
 export function apiBase(): string {
   const raw = read(URL_KEY) ?? (import.meta.env.VITE_API_BASE as string | undefined) ?? DEFAULT_API
   return raw.replace(/\/+$/, '')
-}
-
-/** 모드를 바꾸면 화면의 데이터가 통째로 달라지므로 새로고침해서 적용 */
-export function setApiMode(mode: ApiMode) {
-  try {
-    localStorage.setItem(MODE_KEY, mode)
-  } catch {
-    // 저장 불가 환경은 무시
-  }
-  location.reload()
 }
 
 export function setApiBase(url: string) {
@@ -86,5 +68,5 @@ export function useBackendHealth(): Health {
   )
 }
 
-// 백엔드 모드로 시작했으면 한 번 확인
-if (apiMode() === 'BACKEND') void checkHealth()
+// 시작할 때 한 번 확인
+void checkHealth()

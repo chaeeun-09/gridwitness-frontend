@@ -3,7 +3,7 @@ import { parseComtrade } from '../lib/comtrade'
 import { diagnose, parseCsv, toCsv, type ParsedCsv } from '../lib/waveform'
 import { CHANNELS, type DiagnosisIssue, type InputDiagnosis, type SourceRecord } from '../types'
 
-/** 업로드한 파일(CSV 또는 COMTRADE)을 읽어 브라우저에서 할 수 있는 처리를 한 결과. Mock·백엔드 방식이 함께 씀 */
+/** 업로드한 파일(CSV 또는 COMTRADE)을 읽어 브라우저에서 할 수 있는 처리를 한 결과. */
 export interface Ingested {
   parsed: ParsedCsv
   samplingRateHz: number

@@ -3,7 +3,7 @@ import { BrowserRouter, Link, NavLink, Route, Routes, useLocation } from 'react-
 import { IconAnalysis, IconDashboard, IconShieldCheck, IconDatabase, IconHistory, IconLive, IconLogo, IconMenu, IconSettings, IconVillage } from './components/Icons'
 import { Dot, PageSkeleton } from './components/ui'
 import { useActor } from './lib/actor'
-import { apiMode, useBackendHealth } from './lib/backend'
+import { useBackendHealth } from './lib/backend'
 import { DEVICE_INFO, useVillage } from './lib/village'
 import CaseDetail from './pages/CaseDetail'
 import CaseList from './pages/CaseList'
@@ -54,13 +54,12 @@ function DeviceStatus() {
   const ago = snap.lastPacketAt ? Math.max(0, Math.round((now - snap.lastPacketAt) / 1000)) : null
   const live = snap.connected && ago !== null && ago < 3
   const health = useBackendHealth()
-  const server = apiMode() === 'BACKEND'
   return (
     <>
     <Link to="/settings" className="device-status" title="분석 서버 설정">
-      <Dot tone={!server ? 'neutral' : health.state === 'ok' ? 'ok' : health.state === 'down' ? 'err' : 'warn'} />
-      <strong>{server ? '서버 연결' : 'Mock 분석'}</strong>
-      <span>{server ? (health.state === 'ok' ? '서버 정상' : health.state === 'down' ? '연결 안 됨' : '확인 중') : '브라우저에서만 처리'}</span>
+      <Dot tone={health.state === 'ok' ? 'ok' : health.state === 'down' ? 'err' : 'warn'} />
+      <strong>분석 서버</strong>
+      <span>{health.state === 'ok' ? '서버 정상' : health.state === 'down' ? '연결 안 됨' : '확인 중'}</span>
     </Link>
     <Link to="/settings" className="device-status" title="데이터 출처 설정">
       <Dot tone={live ? 'ok' : snap.connected ? 'warn' : 'err'} live={live} />

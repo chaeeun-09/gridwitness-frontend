@@ -1,7 +1,7 @@
 import { DEVICE_INFO, FAULT_LABEL, IOT_MODEL, LED_A, NOMINAL_V, STATUS_LABEL, THRESHOLDS, TICK_MS, type VillageEvent } from '../lib/village'
 import type { DiagnosisIssue, IotCase } from '../types'
 
-/** 마을 이상 이벤트 구간으로 IoT 사건을 만든다 (Mock·백엔드 방식 공통). 계측 기록 그대로 보존하고 교류 파형으로 바꾸지 않음. */
+/** 마을 이상 이벤트 구간으로 IoT 사건을 만든다 . 계측 기록 그대로 보존하고 교류 파형으로 바꾸지 않음. */
 export function buildIotCase(e: VillageEvent, actor: string, id: string): IotCase {
     const t = new Date().toISOString()
     const w = e.window

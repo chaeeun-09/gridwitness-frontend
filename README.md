@@ -1,7 +1,7 @@
 # GridWitness Frontend
 
 전력 고장파형 분석 지원 시스템 GridWitness의 웹 화면 (React + TypeScript + Recharts + three.js).
-기본은 브라우저 안의 **Mock**으로 동작합니다 (사건은 localStorage에 저장). **설정 → 분석 서버**에서 '서버 연결'로 바꾸면 FastAPI 서버(`https://gridwitness-api.https.gsmsv.site`)에 등록·입력 진단·분석·검토 기록을 남깁니다.
+FastAPI 서버(`https://gridwitness-api.https.gsmsv.site`)에 연결되어 등록·입력 진단·분석·검토 기록을 남깁니다. 서버 주소는 설정에서 바꿀 수 있습니다. 사건 목록은 서버에 조회 API가 없어 브라우저에 보관합니다.
 
 ```bash
 npm install
@@ -18,7 +18,7 @@ npm run dev          # http://localhost:5173
 | 고장파형 분석 | `/cases`, `/cases/new`, `/cases/:id` | CSV·**COMTRADE(.cfg+.dat, ASCII/BINARY)** 업로드 → 7채널 입력 검사 → AI 4종 분류/보류 → 3D·2D 파형 → 사람 검토. 입력 예시 시나리오 15종 |
 | 공공데이터 분석 | `/public-data` | 한전 지역·시간대별 전력사용량 패턴, CSV 가져오기·점검, 패턴을 마을 부하 시나리오로 재생 |
 | 사건·검토 이력 | `/history`, `/history/:id` | IoT 이상 이벤트 / 고장파형 사건을 유형별로 구분 |
-| 설정 | `/settings` | 분석 서버(Mock / 서버 연결·상태 확인), 데이터 출처(Mock / 실측 Arduino), 회로 구성(부품·배선), AI 모델, 작업자, 데이터 초기화 |
+| 설정 | `/settings` | 분석 서버(주소·상태 확인), 데이터 출처(Mock / 실측 Arduino), 회로 구성(부품·배선), AI 모델, 작업자, 데이터 초기화 |
 
 ## 데이터와 AI 분리
 
@@ -70,7 +70,7 @@ Chrome·Edge에서 **설정 → 실측 장치**를 누르면 Web Serial로 모�
 
 ## 분석 서버 연결
 
-- 구현: `src/api/backend.ts` (인터페이스는 `src/api/index.ts`의 `GridWitnessApi`, 모드·주소·상태는 `src/lib/backend.ts`). 모드를 바꾸면 페이지를 새로 불러옵니다. 빌드 때 `VITE_API_MODE=BACKEND`, `VITE_API_BASE=<주소>`로 기본값을 바꿀 수 있습니다.
+- 구현: `src/api/backend.ts` (인터페이스는 `src/api/index.ts`의 `GridWitnessApi`, 모드·주소·상태는 `src/lib/backend.ts`). 빌드 때 `VITE_API_BASE=<주소>`로 기본 주소를 바꿀 수 있습니다.
 - 사용하는 엔드포인트: `POST /incidents`, `POST /incidents/{id}/validation`, `POST /incidents/{id}/analysis`, `POST /incidents/{id}/reviews`, `GET /incidents/{id}/audit`, `POST /energy/iot/summary`, `GET /energy/kepco/usage`(공공데이터 화면).
 - 서버에 사건 목록·조회 API가 없어서 목록과 파형은 이 브라우저(`gridwitness.cases.backend.v1`)에 보관합니다. 다른 브라우저의 사건은 볼 수 없습니다.
 - 서버에 분석 모델이 연결되어 있지 않아(`MODEL_NOT_CONFIGURED`) 이벤트 유형은 항상 '판단 보류'이고 특징값만 표시됩니다. 서버가 `classification`을 내려주기 시작하면 화면이 결과를 표시하도록 대비해 두었지만 그 응답 모양은 확인하지 못했습니다.

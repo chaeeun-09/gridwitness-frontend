@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useLocation, useParams } from 'react-router-dom'
-import { api, isMock } from '../api'
+import { api } from '../api'
 import { DiagnosisBadge, StageBadge, Steps, WAVEFORM_STEPS, waveformStepsDone } from '../components/Badges'
 import FaultAnalysis from '../components/FaultAnalysis'
 import IotCaseView from '../components/IotCaseView'
@@ -179,7 +179,7 @@ function AnalysisTab({ c, onChange, onReview }: { c: IncidentCase; onChange: (c:
         busy={busy}
         analysisType={type}
         onType={setType}
-        types={isMock ? undefined : ['EVENT_TYPE']}
+        types={['EVENT_TYPE']}
         onRun={run}
         onReview={onReview}
       />

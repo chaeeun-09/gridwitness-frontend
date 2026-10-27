@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api'
-import { Badge, Empty, ErrorState, Metric, Metrics, NODE_TONE, PageHeader, Section, Segmented, Status, TableSkeleton } from '../components/ui'
+import { Empty, ErrorState, Metric, Metrics, NODE_TONE, PageHeader, Section, Segmented, Status, TableSkeleton } from '../components/ui'
 import { fmtTime } from '../lib/actor'
 import { DEFAULT_THRESHOLDS, DEVICE_INFO, resetThresholds, setThresholds, SOURCE_LABEL, STATUS_LABEL, TICK_MS, useVillage } from '../lib/village'
 import { CASE_TYPE_LABEL, type ActivityItem, type CaseSummary, type CaseType } from '../types'
@@ -84,7 +84,7 @@ export default function Admin() {
 
   async function exportAll() {
     const all = await api.exportCases()
-    const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), note: '시연용 합성·Mock 데이터 포함', cases: all }, null, 2)], { type: 'application/json' })
+    const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), note: '이 브라우저에 보관된 사건 (서버 기록 중 목록에 있는 것)', cases: all }, null, 2)], { type: 'application/json' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
     a.download = `gridwitness-cases-${new Date().toISOString().slice(0, 10)}.json`
@@ -206,11 +206,10 @@ export default function Admin() {
         )}
       </Section>
 
-      <Section title="데이터 관리" description="사건·검토 기록은 이 브라우저에만 저장됩니다.">
+      <Section title="데이터 관리" description="사건 목록은 이 브라우저에 보관되고, 등록·진단·분석·검토 기록은 서버에 남습니다.">
         <div className="cluster">
           <button className="btn" onClick={exportAll} disabled={!cases?.length}>사건 전체 내보내기 (JSON)</button>
-          <Link to="/settings" className="btn btn-ghost">예시로 되돌리기 · 모두 비우기 (설정)</Link>
-          <Badge outline>예시 사건 {cases?.filter((c) => c.title.startsWith('[예시]')).length ?? 0}건 포함</Badge>
+          <Link to="/settings" className="btn btn-ghost">목록 비우기 (설정)</Link>
         </div>
       </Section>
     </>
