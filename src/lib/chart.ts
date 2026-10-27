@@ -2,7 +2,7 @@
 export const CHART = {
   ink: '#1c1e24',
   secondary: '#a6aab3',
-  accent: '#3157e0',
+  accent: '#197e25',
   warn: '#b86400',
   err: '#cf3434',
   grid: '#eeeff2',

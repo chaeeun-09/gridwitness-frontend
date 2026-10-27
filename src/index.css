@@ -36,9 +36,9 @@
   --err-tint: #fcecec;
   --off: #9aa0aa;
 
-  --r-sm: 12px;
-  --r: 16px;
-  --r-lg: 24px;
+  --r-sm: 8px;
+  --r: 10px;
+  --r-lg: 14px;
   --h-sm: 28px;
   --h: 32px;
   --h-lg: 36px;
@@ -743,67 +743,71 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 @media (min-width: 1100px) { .app { zoom: 1.12; } }
 @media (min-width: 1700px) { .app { zoom: 1.2; } }
 
-/* Mobbin 스타일 (DESIGN.md 참고): 흰 캔버스 + 먹색 + 알약 컨트롤 + 24px 카드. 그림자 대신 옅은 회색 톤으로 위계를 만든다. 상태색은 상태 표시에만. */
+/* mydealz 스타일 (DESIGN.md 참고): 쿨그레이 바탕 위에 흰 카드를 쌓고, 초록 브랜드색 알약 버튼, 굵은 제목. 상태색(빨강·주황·초록)은 상태 표시에만. */
 :root {
+  --canvas: #ffffff;
+  --page: #f3f5f7;
   --sidebar: #ffffff;
-  --fill: #f3f3f3;
-  --fill-2: #ebebeb;
-  --line: #f0f0f0;
-  --line-strong: #e0e0e0;
-  --ink: #141414;
-  --text: #141414;
-  --text-2: #262626;
-  --muted: #707070;
-  --faint: #adadad;
-  --accent: #0066ff;
-  --accent-hover: #0052cc;
-  --accent-tint: #eef4ff;
-  --accent-ring: rgba(0, 102, 255, 0.22);
+  --fill: #f3f5f7;
+  --fill-2: #e9ecef;
+  --line: #e7e9ec;
+  --line-strong: #dfe1e4;
+  --ink: #000000;
+  --text: #16181a;
+  --text-2: #3b3d40;
+  --muted: #6b6d70;
+  --faint: #a7a9ac;
+  --accent: #197e25;
+  --accent-hover: #136219;
+  --accent-tint: #e6f7e9;
+  --accent-ring: rgba(48, 168, 60, 0.28);
+  --brand: #30a83c;
+  --brand-hover: #2a9535;
+  --ok: #197e25;
+  --ok-tint: #defde4;
   --h-sm: 32px;
-  --h: 40px;
-  --h-lg: 48px;
-  font-weight: 456;
+  --h: 38px;
+  --h-lg: 46px;
+  font-weight: 500;
 }
-body { background: #fff; }
-h1, h2, h3, strong, th { font-weight: 600; }
-.page { padding-top: 48px; }
-.page-title { font-size: 34px; font-weight: 650; letter-spacing: -0.02em; line-height: 1.13; }
-.page-head { margin-bottom: 44px; }
-.section { margin-top: 64px; }
-.section-title { font-size: 22px; font-weight: 650; letter-spacing: -0.01em; }
-.section-desc { font-size: 14px; margin-top: 4px; }
-.section-head { margin-bottom: 22px; }
+body { background: var(--page); }
+h1, h2, h3, strong, th { font-weight: 700; }
+.page { padding-top: 40px; }
+.page-title { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; }
+.page-head { margin-bottom: 28px; }
+.section { margin-top: 20px; }
+.section-title { font-size: 19px; font-weight: 700; letter-spacing: -0.01em; }
+.section-head { margin-bottom: 18px; }
 
-.sidebar { background: #fff; backdrop-filter: none; box-shadow: none; border-right: 1px solid var(--line); }
-.side-link { border-radius: 9999px; }
-.side-link.active { background: var(--fill); box-shadow: none; color: var(--ink); font-weight: 600; }
+.sidebar { background: #fff; box-shadow: none; border-right: 1px solid var(--line-strong); }
+.side-link { border-radius: 9999px; font-weight: 600; }
+.side-link.active { background: var(--accent-tint); color: var(--accent); box-shadow: none; font-weight: 700; }
+.side-link.active svg { color: var(--brand); }
 
-.section-card { background: #fff; border: 1px solid var(--line); border-radius: 24px; box-shadow: none; padding: 32px; }
-.metrics { background: var(--fill); border: 0; border-radius: 24px; box-shadow: none; padding: 12px 32px; }
-.metric + .metric { border-left-color: rgba(20, 20, 20, 0.08); }
+.section-card { background: #fff; border: 1px solid var(--line); border-radius: 14px; box-shadow: none; padding: 24px 26px; }
+.metrics { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 8px 26px; }
+.metric + .metric { border-left-color: var(--line); }
 
-.btn { border-radius: 9999px; padding: 0 20px; border-color: var(--line-strong); font-weight: 600; }
-.btn:hover { background: var(--fill); border-color: var(--line-strong); }
-.btn-primary { background: var(--ink); border-color: var(--ink); }
-.btn-primary:hover { background: #262626; border-color: #262626; }
-.btn-sm { padding: 0 14px; border-radius: 9999px; }
+.btn { border-radius: 9999px; padding: 0 18px; border-color: var(--line-strong); font-weight: 700; }
+.btn:hover { background: var(--fill); border-color: #c8cbd0; }
+.btn-primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+.btn-primary:hover { background: var(--brand-hover); border-color: var(--brand-hover); }
+.btn-primary:disabled { background: var(--brand); }
+.btn-sm { padding: 0 14px; }
 .btn-icon { padding: 0; }
 .btn-ghost { border-color: transparent; }
-.btn-danger { border-color: #efc4c4; }
-input, select, textarea { background-color: #f0f0f0; border-color: transparent; border-radius: 16px; }
-input:hover, select:hover, textarea:hover { border-color: var(--line-strong); }
-input:focus, select:focus, textarea:focus { background-color: #fff; border-color: var(--ink); box-shadow: none; }
+input, select, textarea { background-color: #fff; border-color: var(--line-strong); border-radius: 10px; }
+input:focus, select:focus, textarea:focus { border-color: var(--brand); box-shadow: 0 0 0 3px var(--accent-ring); }
 input[type='range'] { background: transparent; border: 0; }
-input[type='checkbox'], input[type='radio'] { border-radius: revert; }
-.seg { border-radius: 9999px; padding: 4px; background: var(--fill); }
-.seg button { height: 32px; padding: 0 16px; border-radius: 9999px; font-weight: 600; }
-.seg button.on { background: #fff; box-shadow: none; }
+.seg { border-radius: 9999px; padding: 3px; background: #e9ecef; }
+.seg button { height: 30px; padding: 0 14px; border-radius: 9999px; font-weight: 700; }
+.seg button.on { background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); }
 .badge, .tag { border-radius: 9999px; }
-.tabs { gap: 28px; border-bottom-color: var(--line); }
-.tabs button { font-size: 15px; font-weight: 600; }
-.tabs button.on::after { height: 3px; }
-th { background: transparent; }
-.page > .table-wrap, .page > .split > .table-wrap { background: #fff; border: 1px solid var(--line); border-radius: 24px; padding: 12px 28px 20px; }
-.empty, .empty-state { border-radius: 24px; }
-.scene-canvas, .scene { border-radius: 24px; }
-@media print { .metrics { background: transparent; padding: 0; } .section-card { border: 0; padding: 0; } }
+.tabs { gap: 26px; border-bottom-color: var(--line-strong); }
+.tabs button { font-size: 14.5px; font-weight: 700; }
+.tabs button.on { color: var(--accent); }
+.tabs button.on::after { height: 3px; background: var(--brand); }
+a { color: var(--accent); }
+.page > .table-wrap, .page > .split > .table-wrap { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 10px 24px 16px; }
+.scene-canvas, .scene { border-radius: 14px; }
+@media print { body { background: #fff; } .metrics { border: 0; padding: 0; } .section-card { border: 0; padding: 0; } }
