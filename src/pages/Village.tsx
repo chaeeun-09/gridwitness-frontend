@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import Channels from '../components/Channels'
 import EventList from '../components/EventList'
 import { IconMoon, IconPower, IconSun, IconX } from '../components/Icons'
 import PartPanel from '../components/PartPanel'
@@ -207,18 +206,10 @@ export default function Village() {
         )}
       </div>
 
-      <div className="split section">
-        <Section title="부하" description="LED 5개가 병렬로 연결되어 릴레이 하나로 함께 켜지고 꺼집니다." actions={<Link to="/settings" className="small">회로 구성 →</Link>}>
-          <Channels snap={snap} selected={selected} onSelect={setSelected} />
-        </Section>
-        <Section title="이상 이벤트" description="이상 점수가 기준을 넘으면 기록되고, 사건으로 등록할 수 있습니다.">
-          <EventList events={snap.events} limit={4} />
-        </Section>
-      </div>
-
+<div className="section">
       <Section
         title="고장 시뮬레이션"
-        description="계측값만으로 판정하는지 확인하는 Mock 전용 기능입니다. 위 장면의 집이 상황에 맞게 말합니다."
+        description="계측값만으로 판정하는지 확인하는 시뮬레이터 전용 기능입니다. 위 장면의 집이 상황에 맞게 말합니다."
         actions={!mock && <Badge>실측 모드에서는 사용 안 함</Badge>}
       >
         <div className="sim-grid">
@@ -258,6 +249,13 @@ export default function Village() {
           </div>
         </div>
       </Section>
+</div>
+
+      <div className="section">
+        <Section title="이상 이벤트" description="이상 점수가 기준을 넘으면 기록되고, 사건으로 등록할 수 있습니다." actions={<Link to="/village/loads" className="small">부하(LED 5개) 현황 →</Link>}>
+          <EventList events={snap.events} limit={4} />
+        </Section>
+      </div>
     </>
   )
 }

@@ -14,6 +14,7 @@ import LiveData from './pages/LiveData'
 import NewCase from './pages/NewCase'
 import PublicData from './pages/PublicData'
 import Settings from './pages/Settings'
+import VillageLoads from './pages/VillageLoads'
 
 const Village = lazy(() => import('./pages/Village'))
 
@@ -63,7 +64,7 @@ function DeviceStatus() {
     </Link>
     <Link to="/settings" className="device-status" title="데이터 출처 설정">
       <Dot tone={live ? 'ok' : snap.connected ? 'warn' : 'err'} live={live} />
-      <strong>{snap.source === 'MOCK' ? 'Mock 시뮬레이터' : '실측 장치'}</strong>
+      <strong>{snap.source === 'MOCK' ? '시뮬레이터' : '실측 장치'}</strong>
       <span>
         {snap.connected ? DEVICE_INFO[snap.source].deviceId : '연결 끊김'}
         {ago !== null && snap.connected && ` · ${ago}초 전`}
@@ -120,6 +121,7 @@ function Shell() {
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/admin" element={<Admin />} />
               <Route path="/village" element={<Village />} />
+              <Route path="/village/loads" element={<VillageLoads />} />
               <Route path="/live" element={<LiveData />} />
               <Route path="/cases" element={<CaseList mode="waveform" />} />
               <Route path="/cases/new" element={<NewCase />} />

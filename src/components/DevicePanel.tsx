@@ -3,7 +3,7 @@ import { serialSupported } from '../lib/serial'
 import { connectSerial, DEVICE_INFO, setConnected, switchToMock, TICK_MS, type VillageSnapshot } from '../lib/village'
 import { Status } from './ui'
 
-/** 데이터 출처(Mock / 실측) 선택과 장치 연결 상태 */
+/** 데이터 출처(시뮬레이터 / 실측) 선택과 장치 연결 상태 */
 export default function DevicePanel({ snap }: { snap: VillageSnapshot }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -28,7 +28,7 @@ export default function DevicePanel({ snap }: { snap: VillageSnapshot }) {
     <div>
       <div className="source-switch" role="radiogroup" aria-label="데이터 출처">
         <button role="radio" aria-checked={snap.source === 'MOCK'} className={`source-opt ${snap.source === 'MOCK' ? 'on' : ''}`} onClick={() => switchToMock()}>
-          <strong>Mock 시뮬레이터</strong>
+          <strong>시뮬레이터</strong>
           <span>브라우저에서 계측값을 만들고 고장을 주입합니다</span>
         </button>
         <button role="radio" aria-checked={snap.source === 'SERIAL'} className={`source-opt ${snap.source === 'SERIAL' ? 'on' : ''}`} onClick={connect} disabled={!supported || busy}>

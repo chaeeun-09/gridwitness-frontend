@@ -34,7 +34,7 @@ export const IOT_CHANNELS: ChannelDef[] = [
 ]
 
 export const SOURCE_LABEL: Record<DataSource, string> = {
-  MOCK: 'Mock 시뮬레이터',
+  MOCK: '시뮬레이터',
   SERIAL: '실측 · Arduino',
 }
 
@@ -61,7 +61,7 @@ export const DEVICE_INFO: Record<DataSource, { deviceId: string; sensor: string;
   MOCK: { deviceId: 'arduino-sim-01', sensor: 'INA219 ×1 (시뮬레이터)', port: 'SIM' },
   SERIAL: { deviceId: 'arduino-village', sensor: 'INA219 ×1', port: 'Web Serial 115200' },
 }
-export const IOT_MODEL = 'iot-anomaly-MOCK-0.2 (전체 전류 잔차)'
+export const IOT_MODEL = 'iot-anomaly-0.2 (전체 전류 잔차)'
 export const NOMINAL_V = 5
 /** LED 1개(저항 포함) 정격 전류 A — 5개 합 ≈ 0.28 A */
 export const LED_A = 0.056
@@ -508,7 +508,8 @@ export function lightView(led: LedState, snap: VillageSnapshot): { status: NodeS
   if (!snap.relay) return led.lit ? { status: 'FAULT', text: '차단했는데 켜짐' } : { status: 'OFF', text: '차단됨' }
   if (snap.status === 'OUTAGE') return { status: 'OUTAGE', text: '정전' }
   if (!led.lit) return { status: 'OFF', text: snap.scenario ? '꺼짐 · 시나리오' : snap.source === 'SERIAL' ? '꺼짐 (추정)' : '꺼짐' }
-  const status = snap.status === 'WARNING' || snap.status === 'FAULT' ? snap.status : 'NORMAL'
+  // 전체 전류 이상(LED 하나가 끊긴 경우 등)이 멀쩡한 LED의 색까지 바꾸면 고장 난 곳을 구분할 수 없으므로, 전원 쪽 고장일 때만 전체 색을 따른다
+  const status = snap.supplyFault && (snap.status === 'WARNING' || snap.status === 'FAULT') ? snap.status : 'NORMAL'
   return { status, text: snap.source === 'SERIAL' ? '켜짐 (추정)' : '켜짐' }
 }
 

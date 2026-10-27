@@ -10,7 +10,7 @@ export function buildIotCase(e: VillageEvent, actor: string, id: string): IotCas
     const gaps = w.slice(1).filter((p, k) => p.t - w[k].t > TICK_MS * 1.8).length
     if (w.length < 10) issues.push({ code: 'SHORT_WINDOW', severity: 'warning', message: `기록 구간이 ${w.length}개 샘플로 짧습니다.`, fix: '이벤트 전후 구간이 더 쌓인 뒤 등록하세요.' })
     if (gaps > 0) issues.push({ code: 'PACKET_GAP', severity: 'warning', message: `수신 간격이 끊긴 구간 ${gaps}곳이 있습니다.`, fix: '장치 연결 상태를 확인하세요.' })
-    if (e.source === 'MOCK') issues.push({ code: 'SIMULATED', severity: 'info', message: 'Mock 시뮬레이터 계측값입니다. 실제 INA219 기록이 아닙니다.' })
+    if (e.source === 'MOCK') issues.push({ code: 'SIMULATED', severity: 'info', message: '시뮬레이터 계측값입니다. 실제 INA219 기록이 아닙니다.' })
     else issues.push({ code: 'MEASURED', severity: 'info', message: '실제 모형(Arduino + INA219)에서 받은 계측값입니다.' })
     const status = issues.some((i) => i.severity === 'warning') ? 'LIMITED' : 'ACCEPTED'
 

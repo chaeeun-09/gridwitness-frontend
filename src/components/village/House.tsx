@@ -375,7 +375,7 @@ export default function House({
       {showLabel && <Label
         lines={[
           h.name,
-          `LED ${h.ch} · ${view.text}`,
+          `${h.fault ? '⚠ ' : ''}LED ${h.ch} · ${view.text}`,
         ]}
         position={[0, labelY, 0]}
         bg={LABEL_BG[view.status]}

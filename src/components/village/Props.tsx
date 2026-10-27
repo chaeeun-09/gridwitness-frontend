@@ -221,7 +221,7 @@ export function StreetLamp({ c, view, pos, rot, night, selected, onSelect, showL
         </mesh>
       )}
       {showLabel && <Label
-        lines={[c.name, `LED ${c.ch} · ${view.text}`]}
+        lines={[c.name, `${c.fault ? '⚠ ' : ''}LED ${c.ch} · ${view.text}`]}
         position={[0, 3.55, 0]}
         bg={LAMP_LABEL_BG[view.status]}
         border="rgba(255,255,255,0.14)"

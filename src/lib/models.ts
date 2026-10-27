@@ -14,7 +14,7 @@ export const AI_MODELS = [
   },
   {
     name: '고장파형 분류',
-    version: 'rf-baseline-MOCK-0.0',
+    version: '서버 모델 연결 전',
     input: `7채널 교류 파형 ${MODEL_SCOPE.rows}×${MODEL_SCOPE.cols} · ${MODEL_SCOPE.samplingRateHz}Hz`,
     output: '이벤트 유형 4종 (SIF·MIF·PF·TD) 또는 판단 보류',
     data: '공개 고장파형 데이터 (Xiong et al.)',

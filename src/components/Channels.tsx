@@ -4,7 +4,7 @@ import { Status, type Tone } from './ui'
 
 /**
  * 마을 부하(LED 5개) 목록. 개별 전류는 측정하지 않으므로 켜짐 여부만 보여줌.
- * Mock은 시뮬레이터가 아는 실제 상태, 실측은 전체 전류로 추정한 켜진 개수.
+ * 시뮬레이터는 시뮬레이터가 아는 실제 상태, 실측은 전체 전류로 추정한 켜진 개수.
  */
 export default function Channels({ snap, selected, onSelect }: { snap: VillageSnapshot; selected?: ChannelId | null; onSelect?: (id: ChannelId) => void }) {
   const measured = snap.source === 'SERIAL'
