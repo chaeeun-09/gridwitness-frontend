@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import FaultAnalysis from '../components/FaultAnalysis'
-import { IconArrowRight, IconBars, IconBrain, IconPerson, IconSearch, IconShieldCheck, IconWave } from '../components/Icons'
+import { IconArrowRight, IconBars, IconPerson, IconWave } from '../components/Icons'
+import { BrandMark, IntroFeatures, IntroFlow } from '../components/Intro'
 import { computeFeatures, PREPROCESS_VERSION, synthesize } from '../lib/waveform'
 import type { AnalysisResult } from '../types'
 
@@ -40,37 +41,12 @@ function Tower({ className }: { className?: string }) {
   )
 }
 
-function BrandMark() {
-  return (
-    <svg className="land-mark" viewBox="0 0 150 64" fill="none" aria-hidden>
-      <path d="M0 40h22l6-18 10 36 9-30 6 12h20" stroke="#2f62d6" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
-      <g stroke="#1b3aa8" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
-        <path d="M112 4v8M102 12h20M106 12l-7 48M118 12l7 48M104 28h16M101 44h22M106 12l12 16M118 12l-12 16M104 28l16 16M120 28l-16 16" />
-      </g>
-    </svg>
-  )
-}
-
-const FEATURES = [
-  { icon: <IconShieldCheck />, text: '데이터 품질부터\n꼼꼼하게' },
-  { icon: <IconBrain />, text: '파형을 분석하고\n이벤트 유형 판단' },
-  { icon: <IconBars />, text: '판단의 근거를\n함께 제시' },
-  { icon: <IconPerson />, text: '사람의 검토로\n더 신뢰할 수 있게' },
-]
-
 const SIGNALS = [
   { icon: <IconWave />, title: '이벤트 유형 판단', text: 'SIF·MIF·PF·TD 4종으로 분류하고, 근거가 부족하면 판단을 보류합니다' },
   { icon: <IconBars />, title: '신뢰할 수 있는 근거 제시', text: '피크값, RMS, 사건 시점 등 파형에서 직접 계산한 수치와 그래프를 함께 보여줍니다' },
   { icon: <IconPerson />, title: '사람의 최종 검토', text: 'AI 결과는 그대로 보존하고, 담당자의 판단과 조사 내용을 따로 기록합니다' },
 ]
 
-const FLOW = [
-  { icon: <IconWave />, title: '고장파형 입력', text: '계측된 전압·전류 파형\n(CSV·COMTRADE) 입력' },
-  { icon: <IconSearch />, title: '품질 검사', text: '결측, 채널 순서, 샘플링\n조건을 자동 점검' },
-  { icon: <IconBrain />, title: 'AI 판단', text: '품질이 확인된 파형만\n이벤트 유형 분석' },
-  { icon: <IconBars />, title: '근거 제시', text: '피크값, RMS, 사건 시점\n등 근거 제공' },
-  { icon: <IconPerson />, title: '사람 검토', text: '전문가가 결과를 검토하여\n최종 판단' },
-]
 
 export default function Landing() {
   // 소개 화면용 합성 예시 (실제 계측 자료가 아님)
@@ -124,14 +100,7 @@ export default function Landing() {
             <Link to="/village" className="btn btn-xl">스마트 마을 보기</Link>
           </div>
         </div>
-        <ul className="land-features">
-          {FEATURES.map((f, k) => (
-            <li key={k}>
-              <span className="land-ficon">{f.icon}</span>
-              <span>{f.text}</span>
-            </li>
-          ))}
-        </ul>
+        <IntroFeatures />
         <p className="land-quote">전력의 안정,<br />사람의 일상을 지키는 기술</p>
       </section>
 
@@ -174,24 +143,7 @@ export default function Landing() {
         </aside>
       </section>
 
-      <section className="land-flow">
-        <div className="land-flow-brand">
-          <span>Grid<b>Witness</b></span>
-          <small>분석이 아닌, 신뢰할 수 있는 판단으로</small>
-        </div>
-        <ol>
-          {FLOW.map((f, k) => (
-            <li key={f.title}>
-              <span className="land-step-no">{k + 1}</span>
-              <div className="land-step-body">
-                <strong>{f.title}</strong>
-                <p>{f.text}</p>
-              </div>
-              <span className="land-step-icon">{f.icon}</span>
-            </li>
-          ))}
-        </ol>
-      </section>
+      <IntroFlow />
 
       <footer className="land-foot">
         <span>2026 빛가람 AI·ICT 경진대회 · 팀 시험기간</span>

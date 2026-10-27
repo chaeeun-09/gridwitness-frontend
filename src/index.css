@@ -738,3 +738,10 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .laptop-tabs i { white-space: nowrap; }
 @media (max-width: 700px) { .laptop-tabs { display: none; } .laptop-bar { justify-content: space-between; } }
 .legend-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin: 0 5px 0 2px; vertical-align: middle; }
+
+/* 개요: 소개 화면과 같은 분위기의 상단 */
+.dash-intro { margin: -8px 0 40px; padding: 28px 28px 8px; border-radius: var(--r-lg); background: linear-gradient(180deg, #e8f0fc 0%, #f5f8fe 60%, #ffffff 100%); box-shadow: 0 0 0 1px rgba(27, 43, 94, 0.08); }
+.dash-hero { padding: 4px 0 22px; }
+.dash-hero .land-wordmark { font-size: clamp(36px, 5vw, 60px); }
+.dash-intro .land-features { margin: 0; }
+.dash-intro .land-flow { max-width: none; padding: 0; margin: 28px 0 20px; }

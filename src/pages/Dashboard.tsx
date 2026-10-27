@@ -4,8 +4,9 @@ import { api } from '../api'
 import { DiagnosisBadge, StageBadge } from '../components/Badges'
 import EventList from '../components/EventList'
 import { IconHistory } from '../components/Icons'
+import { BrandMark, IntroFeatures, IntroFlow } from '../components/Intro'
 import Sparkline from '../components/Sparkline'
-import { Empty, ErrorState, Metric, Metrics, NODE_TONE, PageHeader, Section, Status, TableSkeleton } from '../components/ui'
+import { Empty, ErrorState, Metric, Metrics, NODE_TONE, Section, Status, TableSkeleton } from '../components/ui'
 import { fmtTime } from '../lib/actor'
 import { STATUS_LABEL, useVillage } from '../lib/village'
 import type { CaseSummary } from '../types'
@@ -28,16 +29,22 @@ export default function Dashboard() {
 
   return (
     <>
-      <PageHeader
-        title="개요"
-        description="마을 전력 상태와 최근 사건"
-        actions={
-          <>
-            <Link to="/cases/new" className="btn">고장파형 등록</Link>
-            <Link to="/village" className="btn btn-primary">스마트 마을 열기</Link>
-          </>
-        }
-      />
+      <div className="dash-intro">
+        <section className="dash-hero">
+          <h1 className="land-wordmark">
+            Grid<span>Witness</span>
+            <BrandMark />
+          </h1>
+          <p className="land-lead">AI가 읽는 전력의 이상, 더 안전한 오늘을 만듭니다.</p>
+          <p className="land-sub">고장파형을 올바르게 보고, 근거로 판단하는 AI 기반 전력계통 고장 분석 시스템</p>
+          <div className="land-cta">
+            <Link to="/cases/new" className="btn btn-xl btn-primary">고장파형 등록</Link>
+            <Link to="/village" className="btn btn-xl">스마트 마을 열기</Link>
+          </div>
+        </section>
+        <IntroFeatures />
+        <IntroFlow />
+      </div>
 
       <Metrics>
         <Metric
