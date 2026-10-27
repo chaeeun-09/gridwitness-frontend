@@ -10,7 +10,8 @@ function liveOf(id: PartId, snap: VillageSnapshot): [Tone, string] {
   const lit = LOAD_LINES.filter((l) => l.board === id && snap.leds[l.led].lit).map((l) => l.name)
   switch (id) {
     case 'adapter':
-      return supplyOk ? ['ok', `5V 공급 중${snap.supplyFault === 'SAG' ? ' · 전압 강하' : ''}`] : ['err', '출력 없음']
+      if (!supplyOk) return ['err', '출력 없음']
+      return [snap.relay || snap.supplyFault === 'STUCK' ? 'ok' : 'off', `5V 출력${snap.supplyFault === 'SAG' ? ' · 전압 강하' : ''}${contactClosed(snap) ? '' : ' · 릴레이가 열려 있어 전류는 흐르지 않음'}`]
     case 'relay':
       if (snap.supplyFault === 'STUCK' && !snap.relay) return ['err', 'IN = LOW인데 접점이 붙어 있음 (고착) · 전원이 차단되지 않음']
       return snap.relay ? ['ok', 'IN = HIGH · 접점 닫힘 (COM → NO 연결)'] : ['off', 'IN = LOW · 접점 열림 (마을 전체 차단)']

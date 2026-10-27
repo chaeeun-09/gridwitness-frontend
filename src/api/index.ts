@@ -1,5 +1,7 @@
 import type { VillageEvent } from '../lib/village'
 import type { ActivityItem, AnalysisType, AnyCase, CaseSummary, IncidentCase, IotCase, Review, SourceType } from '../types'
+import { apiMode } from '../lib/backend'
+import { backendApi } from './backend'
 import { mockApi } from './mock'
 
 export interface RegisterCaseInput {
@@ -29,6 +31,6 @@ export interface GridWitnessApi {
   submitReview(id: string, review: Omit<Review, 'reviewedAt'>): Promise<AnyCase>
 }
 
-// 시연용: 브라우저 목 API(localStorage)로만 동작
-export const api: GridWitnessApi = mockApi
-export const isMock = true
+// 설정의 모드에 따라 브라우저 Mock 또는 FastAPI 서버. 모드를 바꾸면 페이지를 새로 불러온다.
+export const isMock = apiMode() === 'MOCK'
+export const api: GridWitnessApi = isMock ? mockApi : backendApi

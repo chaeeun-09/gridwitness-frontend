@@ -21,6 +21,8 @@ interface Props {
   busy?: boolean
   analysisType?: AnalysisType
   onType?: (t: AnalysisType) => void
+  /** 고를 수 있는 분석 종류 (기본: 전체) */
+  types?: AnalysisType[]
   onRun?: () => void
   onReview?: () => void
   /** 소개 화면 등에서 조작 없이 작게 보여줄 때 */
@@ -86,7 +88,7 @@ function ScoreBars({ scores, highlight }: { scores: Record<EventLabel, number>; 
   )
 }
 
-export default function FaultAnalysis({ matrix, fs, hz, analysis, blocked, busy, analysisType = 'EVENT_TYPE', onType, onRun, onReview, compact }: Props) {
+export default function FaultAnalysis({ matrix, fs, hz, analysis, blocked, busy, analysisType = 'EVENT_TYPE', onType, types, onRun, onReview, compact }: Props) {
   const [view, setView] = useState<'2d' | '3d'>('2d')
   const features = useMemo(() => analyzeWaveform(matrix, fs, hz), [matrix, fs, hz])
   const data = useMemo(() => {
@@ -144,7 +146,7 @@ export default function FaultAnalysis({ matrix, fs, hz, analysis, blocked, busy,
               {!compact && (
                 <>
                   <select value={analysisType} onChange={(e) => onType?.(e.target.value as AnalysisType)} disabled={blocked || busy}>
-                    {Object.entries(ANALYSIS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                    {(Object.entries(ANALYSIS_LABEL) as [AnalysisType, string][]).filter(([k]) => !types || types.includes(k)).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                   </select>
                   <button className="btn btn-primary" onClick={onRun} disabled={blocked || busy}>{busy ? '확인 중…' : '지원 여부 확인 후 실행'}</button>
                 </>
@@ -164,7 +166,7 @@ export default function FaultAnalysis({ matrix, fs, hz, analysis, blocked, busy,
               {!compact && (
                 <div className="fa-actions">
                   <select value={analysisType} onChange={(e) => onType?.(e.target.value as AnalysisType)} disabled={busy}>
-                    {Object.entries(ANALYSIS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                    {(Object.entries(ANALYSIS_LABEL) as [AnalysisType, string][]).filter(([k]) => !types || types.includes(k)).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                   </select>
                   <button className="btn btn-sm" onClick={onRun} disabled={busy}>{busy ? '실행 중…' : '다시 실행'}</button>
                   {onReview && <button className="btn btn-sm btn-primary" onClick={onReview}>검토 기록</button>}
@@ -184,7 +186,7 @@ export default function FaultAnalysis({ matrix, fs, hz, analysis, blocked, busy,
               {!compact && (
                 <div className="fa-actions">
                   <select value={analysisType} onChange={(e) => onType?.(e.target.value as AnalysisType)} disabled={busy}>
-                    {Object.entries(ANALYSIS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                    {(Object.entries(ANALYSIS_LABEL) as [AnalysisType, string][]).filter(([k]) => !types || types.includes(k)).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                   </select>
                   <button className="btn btn-sm" onClick={onRun} disabled={busy}>{busy ? '실행 중…' : '다시 실행'}</button>
                   {onReview && <button className="btn btn-sm btn-primary" onClick={onReview}>검토 기록</button>}

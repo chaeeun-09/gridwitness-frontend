@@ -573,8 +573,8 @@ export default function Underground({
       })}
 
       {/* 전류·신호 흐름 */}
-      {supplyOk && <Flow curves={[curveOf('n-supply')]} color="#ffd43b" />}
-      {powered && <Flow curves={['n-switched', 'n-measured', 'n-bb12p', 'n-bb23p'].map(curveOf)} color="#ffd43b" />}
+      {/* 전류 점은 회로가 닫혀 흐를 때만. 릴레이가 열리면 어댑터 쪽 선에 전압은 있어도 전류는 없음 */}
+      {powered && <Flow curves={['n-supply', 'n-switched', 'n-measured', 'n-bb12p', 'n-bb23p'].map(curveOf)} color="#ffd43b" />}
       {powered && <Flow curves={loads.filter((l) => snap.leds[l.line.led].lit).map((l) => l.curve)} color="#ffb347" speed={0.4} />}
       {connected && snap.relay && <Flow curves={[curveOf('n-d2')]} color="#69db7c" speed={0.25} size={0.06} />}
       {connected && <Flow curves={[curveOf('n-sda'), curveOf('n-scl')]} color="#a5d8ff" speed={0.9} size={0.05} />}

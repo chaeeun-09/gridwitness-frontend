@@ -735,3 +735,4 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .land-laptop { min-width: 0; }
 .laptop-tabs i { white-space: nowrap; }
 @media (max-width: 700px) { .laptop-tabs { display: none; } .laptop-bar { justify-content: space-between; } }
+.legend-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin: 0 5px 0 2px; vertical-align: middle; }

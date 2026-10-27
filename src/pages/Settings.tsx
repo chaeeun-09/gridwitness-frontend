@@ -1,9 +1,12 @@
 import { useState, type ReactNode } from 'react'
+import { isMock } from '../api'
+import { clearBackendCache } from '../api/backend'
 import { resetCases } from '../api/mock'
 import ChannelMap from '../components/ChannelMap'
 import DevicePanel from '../components/DevicePanel'
 import { PageHeader } from '../components/ui'
 import { useActor } from '../lib/actor'
+import { apiBase, apiMode, checkHealth, DEFAULT_API, setApiBase, setApiMode, useBackendHealth } from '../lib/backend'
 import { AI_MODELS } from '../lib/models'
 import { NOMINAL_V, useVillage } from '../lib/village'
 
@@ -24,9 +27,12 @@ export default function Settings() {
   const [actor, setActor] = useActor()
   const [confirming, setConfirming] = useState<null | 'examples' | 'empty'>(null)
   const [done, setDone] = useState<string | null>(null)
+  const health = useBackendHealth()
+  const [url, setUrl] = useState(apiBase)
 
   async function reset(withExamples: boolean) {
-    await resetCases(withExamples)
+    if (isMock) await resetCases(withExamples)
+    else clearBackendCache()
     setConfirming(null)
     setDone(withExamples ? '예시 사건을 다시 넣었습니다.' : '사건을 모두 비웠습니다.')
   }
@@ -34,6 +40,33 @@ export default function Settings() {
   return (
     <>
       <PageHeader title="설정" description="데이터 출처와 회로 구성, 분석 모델, 작업자 정보를 관리합니다." />
+
+      <Row
+        title="분석 서버"
+        description="기본은 이 브라우저 안의 Mock입니다. 서버 연결로 바꾸면 파일 등록·입력 진단·분석·검토 기록이 FastAPI 서버에 저장됩니다."
+      >
+        <div className="stack" style={{ gap: 14 }}>
+          <div className="cluster">
+            <button className={`btn ${apiMode() === 'MOCK' ? 'btn-primary' : ''}`} aria-pressed={apiMode() === 'MOCK'} onClick={() => apiMode() !== 'MOCK' && setApiMode('MOCK')}>Mock (브라우저)</button>
+            <button className={`btn ${apiMode() === 'BACKEND' ? 'btn-primary' : ''}`} aria-pressed={apiMode() === 'BACKEND'} onClick={() => apiMode() !== 'BACKEND' && (setApiBase(url), setApiMode('BACKEND'))}>서버 연결</button>
+          </div>
+          <label className="field" style={{ maxWidth: 480 }}>
+            서버 주소
+            <input value={url} onChange={(e) => setUrl(e.target.value)} onBlur={() => setApiBase(url)} spellCheck={false} />
+          </label>
+          <div className="cluster">
+            <button className="btn btn-sm" onClick={() => { setApiBase(url); void checkHealth() }} disabled={health.state === 'checking'}>{health.state === 'checking' ? '확인 중…' : '연결 확인'}</button>
+            {health.state !== 'idle' && health.state !== 'checking' && (
+              <span className="small" style={{ color: health.state === 'ok' ? 'var(--ok)' : 'var(--err)' }} role="status">{health.detail}</span>
+            )}
+            {url !== DEFAULT_API && <button className="btn btn-sm btn-ghost" onClick={() => setUrl(DEFAULT_API)}>기본 주소</button>}
+          </div>
+          <p className="hint">
+            서버에 사건 목록 조회 기능이 아직 없어서 목록과 파형은 이 브라우저에 보관합니다. 지금 서버에는 분석 모델이 연결되어 있지 않아 이벤트 유형은 '판단 보류'로 나오고 특징값만 계산됩니다.
+            모드를 바꾸면 사건 목록이 서로 달라집니다(Mock 사건과 서버 사건은 따로 보관).
+          </p>
+        </div>
+      </Row>
 
       <Row title="데이터 출처" description="실제 모형이 없으면 Mock 시뮬레이터로 같은 화면을 시연할 수 있습니다.">
         <DevicePanel snap={snap} />
@@ -71,7 +104,7 @@ export default function Settings() {
         </label>
       </Row>
 
-      <Row title="사건 데이터" description="사건과 검토 기록은 이 브라우저(localStorage)에만 저장됩니다. 처음 열면 [예시] 사건 8건이 들어 있습니다.">
+      <Row title="사건 데이터" description={<>사건 목록은 이 브라우저(localStorage)에 저장됩니다. Mock에서는 처음 열면 [예시] 사건 8건이 들어 있습니다.{!isMock && ' 서버 연결 모드의 \'모두 비우기\'는 이 브라우저의 목록만 지우며 서버에 남은 기록은 삭제되지 않습니다.'}</>}>
         {confirming ? (
           <div className="alert alert-err" style={{ margin: 0, alignItems: 'center' }}>
             <span style={{ flex: 1 }}>
@@ -82,7 +115,7 @@ export default function Settings() {
           </div>
         ) : (
           <div className="cluster">
-            <button className="btn" onClick={() => setConfirming('examples')}>예시 사건으로 되돌리기</button>
+            {isMock && <button className="btn" onClick={() => setConfirming('examples')}>예시 사건으로 되돌리기</button>}
             <button className="btn btn-danger" onClick={() => setConfirming('empty')}>모두 비우기</button>
             {done && <span className="small" style={{ color: 'var(--ok)' }} role="status">{done}</span>}
           </div>

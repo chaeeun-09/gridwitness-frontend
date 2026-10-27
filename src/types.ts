@@ -135,6 +135,8 @@ export interface IncidentCase {
   analysis: AnalysisResult | null
   reviews: Review[]
   history: HistoryEvent[]
+  /** 백엔드 모드에서 서버가 부여한 ID. Mock 사건에는 없음 */
+  backend?: { incidentId: string; validationId: string | null; analysisId: string | null }
 }
 
 // ── IoT (Arduino + INA219 모형) ─────────────────────────

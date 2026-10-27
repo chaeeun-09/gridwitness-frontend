@@ -164,7 +164,9 @@ export default function Village() {
             {(Object.keys(NET_KIND_LABEL) as NetKind[]).map((k) => (
               <span key={k}><i style={{ background: NET_COLOR[k] }} />{NET_KIND_LABEL[k]}</span>
             ))}
-            <span className="muted" style={{ marginLeft: 'auto' }}>부품 클릭: 상세 · 선 위에 마우스: 연결</span>
+            <span className="muted" style={{ marginLeft: 'auto' }}>
+              <i className="legend-dot" style={{ background: '#ffd43b' }} />전류 (릴레이가 닫혔을 때만) · <i className="legend-dot" style={{ background: '#a5d8ff' }} />통신 신호 · 부품 클릭: 상세
+            </span>
           </div>
         ) : (
           <div className={`scene-hud glass ${alarm ? 'alarm' : ''}`} aria-live="polite">

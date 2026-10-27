@@ -212,7 +212,8 @@ function mockLit(id: ChannelId): boolean {
 }
 
 function mockMeasure(): { v: number; i: number } {
-  if (!contactClosed({ relay, supplyFault }) || supplyFault === 'OUTAGE') return { v: Math.abs(noise(0.01)), i: Math.abs(noise(0.002)) }
+  // 회로가 열려 있으면 INA219는 0 V·0 A (표시 자릿수 아래의 잡음만)
+  if (!contactClosed({ relay, supplyFault }) || supplyFault === 'OUTAGE') return { v: Math.abs(noise(0.004)), i: Math.abs(noise(0.0004)) }
   const vSupply = supplyFault === 'SAG' ? 4.25 + noise(0.05) : 5.03 + noise(0.015)
   let i = 0
   for (const c of IOT_CHANNELS) {
