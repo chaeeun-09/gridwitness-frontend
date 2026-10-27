@@ -157,7 +157,7 @@ export default function Landing() {
             </div>
           </div>
           <div className="laptop-base" />
-          <div className="land-caption">합성 예시 화면입니다. 실제 계측 자료가 아닙니다.</div>
+          <div className="land-caption">합성 데이터 화면입니다. 실제 계측 자료가 아닙니다.</div>
         </div>
 
         <aside className="land-signals">

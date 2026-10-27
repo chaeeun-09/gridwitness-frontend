@@ -136,7 +136,7 @@ export default function Admin() {
           <p className="hint">현재 이상 점수 <b className="num">{snap.score.toFixed(2)}</b> → {STATUS_LABEL[snap.status]} · 기준을 너무 낮추면 정상 변동도 이상으로 기록됩니다.</p>
         </Section>
 
-        <Section title="사용자와 권한" description="시연용 목록입니다. 실제 로그인은 연결되어 있지 않습니다.">
+        <Section title="사용자와 권한" description="실제 로그인은 연결되어 있지 않습니다.">
           <div className="table-wrap">
             <table>
               <thead><tr><th>이름</th><th>역할</th><th>최근 활동</th></tr></thead>
@@ -206,7 +206,7 @@ export default function Admin() {
         )}
       </Section>
 
-      <Section title="데이터 관리" description="사건 목록은 이 브라우저에 보관되고, 등록·진단·분석·검토 기록은 서버에 남습니다.">
+      <Section title="데이터 관리" description="등록·진단·분석·검토 기록은 서버에 남고, 원본 파형은 등록한 브라우저에 보관됩니다.">
         <div className="cluster">
           <button className="btn" onClick={exportAll} disabled={!cases?.length}>사건 전체 내보내기 (JSON)</button>
           <Link to="/settings" className="btn btn-ghost">목록 비우기 (설정)</Link>

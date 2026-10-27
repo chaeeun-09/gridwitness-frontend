@@ -65,7 +65,7 @@ export default function CaseList({ mode }: { mode: 'waveform' | 'all' }) {
           <Empty
             icon={<IconAnalysis />}
             title={mode === 'waveform' ? '분석한 고장파형이 없습니다' : '등록된 사건이 없습니다'}
-            description="CSV 파형을 올리면 해시를 남기고 입력 진단부터 시작합니다. 합성 예시로 바로 시험해 볼 수도 있습니다."
+            description="CSV 파형을 올리면 해시를 남기고 입력 진단부터 시작합니다. 합성 샘플로 바로 시험해 볼 수도 있습니다."
             action={<Link to="/cases/new" className="btn btn-primary">고장파형 등록</Link>}
           />
         )

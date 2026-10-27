@@ -57,7 +57,7 @@ export function Section({
   style?: CSSProperties
 }) {
   return (
-    <section className="section" style={style}>
+    <section className="section section-card" style={style}>
       {(title || actions) && (
         <div className="section-head">
           <div>

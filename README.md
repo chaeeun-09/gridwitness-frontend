@@ -1,7 +1,7 @@
 # GridWitness Frontend
 
 전력 고장파형 분석 지원 시스템 GridWitness의 웹 화면 (React + TypeScript + Recharts + three.js).
-FastAPI 서버(`https://gridwitness-api.https.gsmsv.site`)에 연결되어 등록·입력 진단·분석·검토 기록을 남깁니다. 서버 주소는 설정에서 바꿀 수 있습니다. 사건 목록은 서버에 조회 API가 없어 브라우저에 보관합니다.
+FastAPI 서버(`https://gridwitness-api.https.gsmsv.site`)에 연결되어 등록·입력 진단·분석·검토 기록을 남깁니다. 서버 주소는 설정에서 바꿀 수 있습니다. 사건 목록은 서버(`GET /incidents`)에서 불러오고, 원본 파형은 등록한 브라우저에만 보관합니다.
 
 ```bash
 npm install
@@ -72,6 +72,6 @@ Chrome·Edge에서 **설정 → 실측 장치**를 누르면 Web Serial로 모�
 
 - 구현: `src/api/backend.ts` (인터페이스는 `src/api/index.ts`의 `GridWitnessApi`, 모드·주소·상태는 `src/lib/backend.ts`). 빌드 때 `VITE_API_BASE=<주소>`로 기본 주소를 바꿀 수 있습니다.
 - 사용하는 엔드포인트: `POST /incidents`, `POST /incidents/{id}/validation`, `POST /incidents/{id}/analysis`, `POST /incidents/{id}/reviews`, `GET /incidents/{id}/audit`, `POST /energy/iot/summary`, `GET /energy/kepco/usage`(공공데이터 화면).
-- 서버에 사건 목록·조회 API가 없어서 목록과 파형은 이 브라우저(`gridwitness.cases.backend.v1`)에 보관합니다. 다른 브라우저의 사건은 볼 수 없습니다.
+- 사건 목록은 `GET /incidents`로 받습니다. 서버에 원본·진단·분석 결과를 다시 받는 API가 없어, 파형과 진단 상세는 등록한 브라우저(`gridwitness.cases.backend.v1`)에만 있고 다른 브라우저에서는 목록·이력·검토만 보입니다.
 - 서버에 분석 모델이 연결되어 있지 않아(`MODEL_NOT_CONFIGURED`) 이벤트 유형은 항상 '판단 보류'이고 특징값만 표시됩니다. 서버가 `classification`을 내려주기 시작하면 화면이 결과를 표시하도록 대비해 두었지만 그 응답 모양은 확인하지 못했습니다.
 - CORS는 서버에서 `https://jyx-07.github.io`와 `http://localhost:5173`만 허용합니다.

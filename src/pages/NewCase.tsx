@@ -144,7 +144,7 @@ export default function NewCase() {
             {pickError && <div className={`alert ${file ? 'alert-warn' : 'alert-err'}`}>{pickError}</div>}
 
             <label className="field" style={{ marginTop: 16 }}>
-              예시 시나리오로 시험하기
+              샘플 시나리오로 시험하기
               <select value={scenario} onChange={(e) => loadScenario(e.target.value)}>
                 <option value="">선택하세요</option>
                 {groups.map((g) => (

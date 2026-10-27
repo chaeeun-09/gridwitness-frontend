@@ -181,12 +181,96 @@ function fromAudit(events: AuditEvent[], local: HistoryEvent[]): HistoryEvent[] 
   })
 }
 
+interface ServerIncident {
+  incident_id: string
+  original_filename: string
+  sha256: string
+  source: string
+  dataset_id: string | null
+  sampling_rate_hz: number
+  system_frequency_hz: number
+  status: string
+  created_at: string
+}
+
+const SOURCE_FROM_CODE = Object.fromEntries(Object.entries(SOURCE_CODE).map(([k, v]) => [v, k])) as Record<string, SourceType>
+
+/** 서버 목록에만 있는 사건(다른 브라우저에서 등록한 것)을 파형 없는 기록으로 만든다 */
+function stub(i: ServerIncident): IncidentCase {
+  const st = i.status
+  const status = st.includes('rejected') ? 'REJECTED' : st.includes('limited') ? 'LIMITED' : 'ACCEPTED'
+  const stage = st.includes('review') ? 'REVIEWED' : st.includes('analy') || st.includes('deferred') ? 'WITHHELD' : st === 'registered' ? 'REGISTERED' : 'DIAGNOSED'
+  return {
+    caseType: 'WAVEFORM',
+    id: `GW-${i.incident_id.slice(0, 8).toUpperCase()}`,
+    title: i.original_filename,
+    createdAt: i.created_at,
+    stage,
+    source: {
+      fileName: i.original_filename,
+      fileSize: 0,
+      sha256: i.sha256,
+      sourceType: SOURCE_FROM_CODE[i.source] ?? 'UNKNOWN',
+      datasetId: i.dataset_id ?? '',
+      samplingRateHz: i.sampling_rate_hz,
+      systemFrequencyHz: i.system_frequency_hz === 60 ? 60 : 50,
+      channelOrder: [...CHANNELS],
+      labelMeaning: '',
+    },
+    diagnosis: {
+      status,
+      rows: 0,
+      cols: CHANNELS.length,
+      issues: [{ code: 'REMOTE_RECORD', severity: 'info', message: '다른 곳에서 등록된 사건입니다. 이 브라우저에는 원본 파형이 없어 파형과 진단 상세를 표시하지 않습니다. 이력과 검토 기록은 서버에서 불러옵니다.' }],
+      checkedAt: i.created_at,
+    },
+    waveform: null,
+    analysis: null,
+    reviews: [],
+    history: [],
+    backend: { incidentId: i.incident_id, validationId: null, analysisId: null },
+  }
+}
+
+/** 서버의 사건 목록을 받아 이 브라우저 기록에 없는 것을 채운다. 서버에 닿지 않으면 보관된 목록만 쓴다 */
+let syncing: Promise<void> | null = null
+function syncList(): Promise<void> {
+  // 화면 여러 곳이 동시에 부르므로 진행 중인 요청을 같이 기다린다
+  syncing ??= pull().finally(() => (syncing = null))
+  return syncing
+}
+
+async function pull() {
+  try {
+    const known = new Set(store.flatMap((c) => (c.caseType === 'WAVEFORM' && c.backend ? [c.backend.incidentId] : [])))
+    let added = false
+    for (let page = 1; page <= 20; page++) {
+      const r = await call<{ items: ServerIncident[]; total_count: number; per_page: number }>(`/incidents?page=${page}&per_page=100`)
+      for (const i of r.items) {
+        if (known.has(i.incident_id)) continue
+        known.add(i.incident_id)
+        store.push(stub(i))
+        added = true
+      }
+      if (page * r.per_page >= r.total_count) break
+    }
+    if (added) {
+      store.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      save()
+    }
+  } catch {
+    // 목록 새로고침 실패는 보관된 목록으로 대체
+  }
+}
+
 export const backendApi: GridWitnessApi = {
   async listCases() {
+    await syncList()
     return store.map(summarize)
   },
 
   async listActivity() {
+    await syncList()
     return store
       .flatMap((c) => c.history.map((h) => ({ ...h, caseId: c.id, caseTitle: c.title, caseType: c.caseType })))
       .sort((a, b) => b.at.localeCompare(a.at))

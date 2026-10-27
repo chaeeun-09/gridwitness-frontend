@@ -139,13 +139,13 @@ export default function PublicData() {
       {ds.isExample ? (
         <div className="alert alert-warn" style={{ marginTop: 0 }}>
           <span>
-            <strong>예시 데이터를 보고 있습니다.</strong> 실제 한전 수치가 아닌 화면 확인용 값입니다. 공공데이터포털·한전 전력데이터 개방포털에서 받은 CSV를 가져오면 실제 값으로 바뀝니다.
+            <strong>기본 데이터를 보고 있습니다.</strong> 실제 한전 수치가 아닌 화면 확인용 값입니다. 공공데이터포털·한전 전력데이터 개방포털에서 받은 CSV를 가져오면 실제 값으로 바뀝니다.
           </span>
         </div>
       ) : (
         <div className="alert alert-ok" style={{ marginTop: 0, alignItems: 'center' }}>
           <span style={{ flex: 1 }}><strong>{ds.fileName}</strong> 데이터를 보고 있습니다.</span>
-          <button className="btn btn-sm" onClick={resetToExample}>예시 데이터로</button>
+          <button className="btn btn-sm" onClick={resetToExample}>기본 데이터로</button>
         </div>
       )}
 
@@ -176,7 +176,7 @@ export default function PublicData() {
       ) : (
         <>
           <Metrics>
-            <Metric label="일 사용량" value={stats.total.toLocaleString()} unit="kWh" foot={ds.isExample ? '예시 값' : region} />
+            <Metric label="일 사용량" value={stats.total.toLocaleString()} unit="kWh" foot={ds.isExample ? '기본 값' : region} />
             <Metric label="피크 시간" value={`${stats.peakHour}시`} foot={`${stats.peak.toLocaleString()} kWh`} />
             <Metric label="부하율" value={(stats.loadFactor * 100).toFixed(0)} unit="%" foot="평균 ÷ 피크" />
             <Metric label="패턴" value={stats.pattern} small foot={`최저 ${stats.minHour}시 · 피크/최저 ${(stats.peak / stats.min).toFixed(2)}배`} />

@@ -83,7 +83,7 @@ export default function KepcoReal() {
   return (
     <Section
       title="한전 공공데이터 (서버 연결)"
-      description="서버가 한전 전력 판매량 공공데이터(월별·지역·계약종별)를 가져옵니다. 아래 표는 위의 예시 데이터와 달리 실제 공공데이터입니다."
+      description="서버가 한전 전력 판매량 공공데이터(월별·지역·계약종별)를 가져옵니다. 아래는 실제 공공데이터입니다."
       actions={<button className="btn btn-sm" onClick={load} disabled={busy}>{busy ? '불러오는 중…' : data ? '다시 불러오기' : '서버에서 불러오기'}</button>}
     >
       {error && <ErrorState message={error} onRetry={load} />}

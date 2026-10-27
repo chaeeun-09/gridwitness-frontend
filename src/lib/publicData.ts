@@ -28,7 +28,7 @@ export interface UsageDataset {
   rows: UsageRow[] | null
 }
 
-export const EXAMPLE_DATASET: UsageDataset = { label: '예시 데이터 (실제 한전 수치 아님)', isExample: true, regions: [...REGIONS], rows: null }
+export const EXAMPLE_DATASET: UsageDataset = { label: '기본 데이터 (실제 한전 수치 아님)', isExample: true, regions: [...REGIONS], rows: null }
 
 // ── 예시 데이터 생성 (형태만 그럴듯하게, 규모는 상대값) ──────────
 const REGION_SCALE: Record<string, number> = {

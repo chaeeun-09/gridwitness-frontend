@@ -31,7 +31,7 @@ export default function Settings() {
   function reset() {
     clearBackendCache()
     setConfirming(false)
-    setDone('이 브라우저의 사건 목록을 비웠습니다.')
+    setDone('이 브라우저에 보관한 사건 기록과 파형을 비웠습니다.')
   }
 
   return (
@@ -55,7 +55,7 @@ export default function Settings() {
             {url !== DEFAULT_API && <button className="btn btn-sm btn-ghost" onClick={() => setUrl(DEFAULT_API)}>기본 주소</button>}
           </div>
           <p className="hint">
-            서버에 사건 목록 조회 기능이 아직 없어서 목록과 파형은 이 브라우저에 보관합니다. 지금 서버에는 분석 모델이 연결되어 있지 않아 이벤트 유형은 '판단 보류'로 나오고 특징값만 계산됩니다.
+            사건 목록은 서버에서 불러오고, 원본 파형은 등록한 브라우저에만 보관합니다. 지금 서버에는 분석 모델이 연결되어 있지 않아 이벤트 유형은 '판단 보류'로 나오고 특징값만 계산됩니다.
           </p>
         </div>
       </Row>
@@ -96,16 +96,16 @@ export default function Settings() {
         </label>
       </Row>
 
-      <Row title="사건 데이터" description="사건 목록은 이 브라우저(localStorage)에 저장됩니다. '비우기'는 이 브라우저의 목록만 지우며 서버에 남은 기록은 삭제되지 않습니다.">
+      <Row title="사건 데이터" description="원본 파형과 작업 기록은 이 브라우저(localStorage)에 저장됩니다. '비우기'는 이 브라우저의 보관본만 지우며 서버 기록은 삭제되지 않고, 목록에는 다시 나타납니다(파형 제외).">
         {confirming ? (
           <div className="alert alert-err" style={{ margin: 0, alignItems: 'center' }}>
-            <span style={{ flex: 1 }}>이 브라우저의 사건 목록을 모두 지웁니다. 서버 기록은 남지만 이 화면에서는 다시 볼 수 없습니다.</span>
+            <span style={{ flex: 1 }}>이 브라우저에 보관한 파형과 기록을 지웁니다. 서버 기록은 남고 목록에는 다시 나타나지만 파형은 다시 등록해야 볼 수 있습니다.</span>
             <button className="btn btn-sm" onClick={() => setConfirming(false)}>취소</button>
             <button className="btn btn-sm btn-danger on" onClick={reset}>진행</button>
           </div>
         ) : (
           <div className="cluster">
-            <button className="btn btn-danger" onClick={() => setConfirming(true)}>목록 비우기</button>
+            <button className="btn btn-danger" onClick={() => setConfirming(true)}>보관본 비우기</button>
             {done && <span className="small" style={{ color: 'var(--ok)' }} role="status">{done}</span>}
           </div>
         )}

@@ -164,7 +164,11 @@ function AnalysisTab({ c, onChange, onReview }: { c: IncidentCase; onChange: (c:
   }
 
   if (!c.waveform) {
-    return <ErrorState message="입력 진단에서 거부된 자료라 파형을 표시하지 않습니다. 입력 진단 탭의 수정 방법을 확인하세요." />
+    return c.diagnosis.status === 'REJECTED' ? (
+      <ErrorState message="입력 진단에서 거부된 자료라 파형을 표시하지 않습니다. 입력 진단 탭의 수정 방법을 확인하세요." />
+    ) : (
+      <ErrorState message="이 브라우저에는 원본 파형이 없어 표시할 수 없습니다. 같은 파일을 다시 등록하면 파형을 볼 수 있습니다." />
+    )
   }
   const features = c.analysis?.features
   return (

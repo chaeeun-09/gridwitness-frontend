@@ -25,7 +25,7 @@ export interface InputScenario {
 }
 
 const csv = (name: string, text: string) => new File([text], name, { type: 'text/csv' })
-const meta = (title: string, fs = 4096, hz: 50 | 60 = 50) => ({ title: `[예시] ${title}`, sourceType: 'SYNTHETIC' as const, samplingRateHz: fs, systemFrequencyHz: hz })
+const meta = (title: string, fs = 4096, hz: 50 | 60 = 50) => ({ title, sourceType: 'SYNTHETIC' as const, samplingRateHz: fs, systemFrequencyHz: hz })
 
 export const INPUT_SCENARIOS: InputScenario[] = [
   { id: 'a-ground', group: '정상 입력', label: 'A상 지락', expect: 'ACCEPTED', note: 'A상 전류 급증 · 전압 강하', build: () => ({ file: csv('a_ground.csv', toCsv(synthesize({ phase: 0 }))), ...meta('A상 지락') }) },
