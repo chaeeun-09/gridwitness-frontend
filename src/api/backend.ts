@@ -1,6 +1,7 @@
 import type { GridWitnessApi } from '.'
 import { apiBase } from '../lib/backend'
-import { computeFeatures, diagnose, parseCsv, PREPROCESS_VERSION, sha256Hex, synthesize, toCsv } from '../lib/waveform'
+import { buildSampleCase, SAMPLE_ID } from '../lib/sample'
+import { diagnose, parseCsv, PREPROCESS_VERSION, sha256Hex } from '../lib/waveform'
 import { ingest } from './ingest'
 import { buildIotCase } from './iotCase'
 import { summarize } from './util'
@@ -233,42 +234,10 @@ function stub(i: ServerIncident): IncidentCase {
 }
 
 /** 서버의 사건 목록을 받아 이 브라우저 기록에 없는 것을 채운다. 서버에 닿지 않으면 보관된 목록만 쓴다 */
-const SAMPLE_ID = 'GW-SAMPLE01'
-
-/** 서버 없이도 그래프를 볼 수 있는 합성 샘플 사건. 이 브라우저에만 있고 서버에는 올라가지 않는다 */
+/** 샘플 사건은 이 브라우저에만 있고 서버에는 올라가지 않는다 */
 async function ensureSample() {
   if (store.some((c) => c.id === SAMPLE_ID)) return
-  const matrix = synthesize({ phase: 0, seed: 101, currentGain: 6.2 })
-  const csv = toCsv(matrix)
-  const bytes = new TextEncoder().encode(csv)
-  const sha256 = await sha256Hex(bytes.buffer as ArrayBuffer)
-  const samplingRateHz = 4096
-  const systemFrequencyHz = 50
-  const { diagnosis } = diagnose(parseCsv(csv), bytes.length, { samplingRateHz, systemFrequencyHz, sourceType: 'SYNTHETIC' })
-  const t = now()
-  store.push({
-    caseType: 'WAVEFORM',
-    id: SAMPLE_ID,
-    title: 'A상 지락 합성 샘플',
-    createdAt: t,
-    stage: 'WITHHELD',
-    source: { fileName: 'sample_a_ground.csv', fileSize: bytes.length, sha256, sourceType: 'SYNTHETIC', datasetId: '', samplingRateHz, systemFrequencyHz, channelOrder: [...CHANNELS], labelMeaning: '', format: 'CSV' },
-    diagnosis,
-    waveform: matrix,
-    analysis: {
-      kind: 'WITHHELD',
-      analysisType: 'EVENT_TYPE',
-      reasons: ['서버에 분석 모델이 아직 연결되지 않아 유형 판단은 보류합니다. 아래 근거는 파형에서 직접 계산한 값입니다.'],
-      neededInfo: ['서버에 분석 모델 설정'],
-      features: computeFeatures(matrix),
-      scores: null,
-      modelVersion: null,
-      preprocessVersion: PREPROCESS_VERSION,
-      executedAt: t,
-    },
-    reviews: [],
-    history: [{ at: t, actor: 'system', action: '샘플 생성', detail: '합성 파형 · 이 브라우저에만 있고 서버에는 올리지 않음' }],
-  })
+  store.push(await buildSampleCase())
   store.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   save()
 }

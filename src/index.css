@@ -867,3 +867,5 @@ body { background: linear-gradient(180deg, #e6effc 0%, #f1f6fd 380px, #f6f9fe 10
   .land-mark .bm-tower { animation: none; opacity: 1; }
   .embed-app .fa-panel .recharts-wrapper { animation: none; clip-path: none; }
 }
+
+.laptop-wait { min-height: 440px; }
