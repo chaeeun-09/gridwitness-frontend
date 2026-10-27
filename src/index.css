@@ -36,9 +36,9 @@
   --err-tint: #fcecec;
   --off: #9aa0aa;
 
-  --r-sm: 8px;
-  --r: 10px;
-  --r-lg: 16px;
+  --r-sm: 12px;
+  --r: 16px;
+  --r-lg: 24px;
   --h-sm: 28px;
   --h: 32px;
   --h-lg: 36px;
@@ -739,28 +739,71 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 @media (max-width: 700px) { .laptop-tabs { display: none; } .laptop-bar { justify-content: space-between; } }
 .legend-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin: 0 5px 0 2px; vertical-align: middle; }
 
-/* 개요: 소개 화면과 같은 분위기의 상단 */
-.dash-intro { margin: -8px 0 40px; padding: 28px 28px 8px; border-radius: var(--r-lg); background: linear-gradient(180deg, #e8f0fc 0%, #f5f8fe 60%, #ffffff 100%); box-shadow: 0 0 0 1px rgba(27, 43, 94, 0.08); }
-.dash-hero { padding: 4px 0 22px; }
-.dash-hero .land-wordmark { font-size: clamp(36px, 5vw, 60px); }
-.dash-intro .land-features { margin: 0; }
-.dash-intro .land-flow { max-width: none; padding: 0; margin: 28px 0 20px; }
-
 /* 화면 전체를 조금 크게: 넓은 화면에서만 */
 @media (min-width: 1100px) { .app { zoom: 1.12; } }
 @media (min-width: 1700px) { .app { zoom: 1.2; } }
 
-/* 숨통 트이는 톤: 소개 화면과 같은 연한 푸른 바탕 위에 흰 카드를 띄움 */
-:root { --page: #eef4fd; --card-shadow: 0 1px 2px rgba(27, 43, 94, 0.04), 0 8px 28px -10px rgba(27, 43, 94, 0.14); }
-body { background: linear-gradient(180deg, #e6effc 0%, #f1f6fd 380px, #f6f9fe 100%) fixed; }
-.sidebar { background: rgba(255, 255, 255, 0.78); backdrop-filter: blur(14px); border-right: 0; box-shadow: 1px 0 0 rgba(27, 43, 94, 0.06); }
-.page { padding-top: 40px; }
-.section { margin-top: 36px; }
-.section-card { border: 0; background: #fff; border-radius: 18px; box-shadow: var(--card-shadow); padding: 28px 30px; }
-.metrics { background: #fff; border: 0; border-radius: 18px; box-shadow: var(--card-shadow); padding: 10px 28px; }
-.metric { padding-top: 20px; padding-bottom: 20px; }
-.metric + .metric { border-left-color: rgba(27, 43, 94, 0.08); }
-.dash-intro { border-radius: 22px; box-shadow: var(--card-shadow); background: linear-gradient(180deg, #dfeafb 0%, #f1f6fd 55%, #ffffff 100%); padding: 32px 32px 10px; }
-.page-head { margin-bottom: 32px; }
-@media print { body { background: #fff; } .metrics { box-shadow: none; padding: 0; } }
-.page > .table-wrap, .page > .split > .table-wrap { background: #fff; border-radius: 18px; box-shadow: var(--card-shadow); padding: 10px 24px 16px; }
+/* Mobbin 스타일 (DESIGN.md 참고): 흰 캔버스 + 먹색 + 알약 컨트롤 + 24px 카드. 그림자 대신 옅은 회색 톤으로 위계를 만든다. 상태색은 상태 표시에만. */
+:root {
+  --sidebar: #ffffff;
+  --fill: #f3f3f3;
+  --fill-2: #ebebeb;
+  --line: #f0f0f0;
+  --line-strong: #e0e0e0;
+  --ink: #141414;
+  --text: #141414;
+  --text-2: #262626;
+  --muted: #707070;
+  --faint: #adadad;
+  --accent: #0066ff;
+  --accent-hover: #0052cc;
+  --accent-tint: #eef4ff;
+  --accent-ring: rgba(0, 102, 255, 0.22);
+  --h-sm: 32px;
+  --h: 40px;
+  --h-lg: 48px;
+  font-weight: 456;
+}
+body { background: #fff; }
+h1, h2, h3, strong, th { font-weight: 600; }
+.page { padding-top: 48px; }
+.page-title { font-size: 34px; font-weight: 650; letter-spacing: -0.02em; line-height: 1.13; }
+.page-head { margin-bottom: 44px; }
+.section { margin-top: 64px; }
+.section-title { font-size: 22px; font-weight: 650; letter-spacing: -0.01em; }
+.section-desc { font-size: 14px; margin-top: 4px; }
+.section-head { margin-bottom: 22px; }
+
+.sidebar { background: #fff; backdrop-filter: none; box-shadow: none; border-right: 1px solid var(--line); }
+.side-link { border-radius: 9999px; }
+.side-link.active { background: var(--fill); box-shadow: none; color: var(--ink); font-weight: 600; }
+
+.section-card { background: #fff; border: 1px solid var(--line); border-radius: 24px; box-shadow: none; padding: 32px; }
+.metrics { background: var(--fill); border: 0; border-radius: 24px; box-shadow: none; padding: 12px 32px; }
+.metric + .metric { border-left-color: rgba(20, 20, 20, 0.08); }
+
+.btn { border-radius: 9999px; padding: 0 20px; border-color: var(--line-strong); font-weight: 600; }
+.btn:hover { background: var(--fill); border-color: var(--line-strong); }
+.btn-primary { background: var(--ink); border-color: var(--ink); }
+.btn-primary:hover { background: #262626; border-color: #262626; }
+.btn-sm { padding: 0 14px; border-radius: 9999px; }
+.btn-icon { padding: 0; }
+.btn-ghost { border-color: transparent; }
+.btn-danger { border-color: #efc4c4; }
+input, select, textarea { background-color: #f0f0f0; border-color: transparent; border-radius: 16px; }
+input:hover, select:hover, textarea:hover { border-color: var(--line-strong); }
+input:focus, select:focus, textarea:focus { background-color: #fff; border-color: var(--ink); box-shadow: none; }
+input[type='range'] { background: transparent; border: 0; }
+input[type='checkbox'], input[type='radio'] { border-radius: revert; }
+.seg { border-radius: 9999px; padding: 4px; background: var(--fill); }
+.seg button { height: 32px; padding: 0 16px; border-radius: 9999px; font-weight: 600; }
+.seg button.on { background: #fff; box-shadow: none; }
+.badge, .tag { border-radius: 9999px; }
+.tabs { gap: 28px; border-bottom-color: var(--line); }
+.tabs button { font-size: 15px; font-weight: 600; }
+.tabs button.on::after { height: 3px; }
+th { background: transparent; }
+.page > .table-wrap, .page > .split > .table-wrap { background: #fff; border: 1px solid var(--line); border-radius: 24px; padding: 12px 28px 20px; }
+.empty, .empty-state { border-radius: 24px; }
+.scene-canvas, .scene { border-radius: 24px; }
+@media print { .metrics { background: transparent; padding: 0; } .section-card { border: 0; padding: 0; } }
