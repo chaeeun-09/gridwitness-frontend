@@ -869,3 +869,27 @@ body { background: linear-gradient(180deg, #e6effc 0%, #f1f6fd 380px, #f6f9fe 10
 }
 
 .laptop-wait { min-height: 440px; }
+
+/* ── 앱 안에도 소개 화면과 같은 파란색 ─────────────── */
+:root { --accent: #1f5fe0; --accent-hover: #1a4fc4; --accent-tint: #e8f0fe; --accent-ring: rgba(31, 95, 224, 0.28); --navy: #1a3a8f; --navy-2: #12296f; }
+.btn-primary { background: var(--accent); border-color: var(--accent); }
+.btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn-primary:disabled { background: var(--accent); }
+.landing .btn-primary, .land-nav .btn-primary { background: var(--ink); border-color: var(--ink); }
+.landing .btn-primary:hover, .land-nav .btn-primary:hover { background: #2a2d35; border-color: #2a2d35; }
+
+.app .sidebar { background: linear-gradient(180deg, var(--navy) 0%, var(--navy-2) 100%); box-shadow: none; backdrop-filter: none; }
+.sidebar .brand, .sidebar .brand:hover { color: #fff; }
+.sidebar .brand-mark { background: rgba(255, 255, 255, 0.16); color: #fff; }
+.sidebar .side-label { color: #8fa6e6; }
+.sidebar .side-link { color: #d3dcf7; }
+.sidebar .side-link svg { color: #8fa6e6; }
+.sidebar .side-link:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
+.sidebar .side-link:hover svg { color: #fff; }
+.sidebar .side-link.active { background: rgba(255, 255, 255, 0.17); color: #fff; box-shadow: none; }
+.sidebar .side-link.active svg { color: #fff; }
+.sidebar .side-foot { border-top-color: rgba(255, 255, 255, 0.14); }
+.sidebar .device-status:hover { background: rgba(255, 255, 255, 0.08); }
+.sidebar .device-status strong { color: #fff; }
+.sidebar .device-status span, .sidebar .side-user { color: #9fb4ea; }
+.mobile-bar .brand-name { color: var(--ink); }
