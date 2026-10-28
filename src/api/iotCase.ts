@@ -18,14 +18,17 @@ export function buildIotCase(e: VillageEvent, actor: string, id: string): IotCas
     const minV = Math.min(...w.map((p) => p.v))
     const findings: string[] = []
     const relayOn = w.some((p) => p.expected > 0)
-    if (relayOn && minV < 1) findings.push(`릴레이가 켜져 있는데 전압이 ${minV.toFixed(2)}V까지 떨어졌습니다. 어댑터 전원이 끊긴 것으로 보입니다.`)
-    else if (relayOn && minV < THRESHOLDS.vMin) findings.push(`전압이 정격 ${NOMINAL_V}V 대비 ${minV.toFixed(2)}V까지 낮아졌습니다 (어댑터·배선 접촉 확인).`)
+    // 전원 이상 판단은 릴레이가 닫혀 있어야 할 때의 전압만 본다 (의도한 차단 중 0V는 이상이 아님)
+    const minVOn = Math.min(...w.filter((p) => p.expected > 0).map((p) => p.v), Infinity)
+    if (relayOn && minVOn < 1) findings.push(`릴레이가 켜져 있는데 전압이 ${minVOn.toFixed(2)}V까지 떨어졌습니다. 어댑터 전원이 끊긴 것으로 보입니다.`)
+    else if (relayOn && minVOn < THRESHOLDS.vMin) findings.push(`전압이 정격 ${NOMINAL_V}V 대비 ${minVOn.toFixed(2)}V까지 낮아졌습니다 (어댑터·배선 접촉 확인).`)
     // 과전류 판단은 릴레이가 닫혀 있어야 할 때만 (차단 후 흐르는 전류는 아래 고착 항목에서 따로 봄)
     const overA = Math.max(0, ...w.filter((p) => p.expected > 0).map((p) => p.i - p.expected))
     if (overA > LED_A) findings.push(`실제 전류가 예상보다 최대 ${overA.toFixed(2)}A 많습니다 (누설·단락 가능성).`)
     const missing = Math.max(0, ...w.map((p) => (p.expected > 0 && p.v > 4 ? Math.round((p.expected - p.i) / LED_A) : 0)))
     if (missing > 0) findings.push(`전체 전류가 LED ${missing}개 분량만큼 적습니다 (LED 단선·접촉 불량 가능성). INA219가 1개라 어느 LED인지는 알 수 없습니다.`)
     if (w.some((p) => p.expected === 0 && p.i > 0.03)) findings.push('릴레이를 차단(D2 LOW)했는데도 전류가 계속 흐릅니다. 릴레이 접점 고착이나 우회 배선을 확인하세요.')
+    findings.push(...(e.notes ?? []))
     if (findings.length === 0) findings.push('일시적인 편차로, 뚜렷한 원인 패턴은 없습니다.')
 
     const c: IotCase = {

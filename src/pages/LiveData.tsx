@@ -1,5 +1,6 @@
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import EventList from '../components/EventList'
+import HardwareFlow from '../components/HardwareFlow'
 import { Metric, Metrics, NODE_TONE, PageHeader, Section, Status } from '../components/ui'
 import { CHART } from '../lib/chart'
 import { IOT_MODEL, LED_A, STATUS_LABEL, THRESHOLDS, TICK_MS, useVillage } from '../lib/village'
@@ -92,6 +93,8 @@ export default function LiveData() {
       <Section title="경고 이력" description="이상 구간을 사건으로 등록하면 계측 기록 그대로 검토 단계로 넘어갑니다.">
         <EventList events={snap.events} limit={20} />
       </Section>
+
+      <HardwareFlow />
     </>
   )
 }

@@ -127,6 +127,8 @@ export interface VillageEvent {
   window: IotPoint[]
   clearedAt: string | null
   caseId: string | null
+  /** 사건 근거에 덧붙일 설명 (시험 시나리오로 만든 이벤트 등) */
+  notes?: string[]
 }
 
 export interface Scenario {
