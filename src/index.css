@@ -747,8 +747,11 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .dash-intro .land-flow { max-width: none; padding: 0; margin: 28px 0 20px; }
 
 /* 화면 전체를 조금 크게: 넓은 화면에서만 */
-@media (min-width: 1100px) { .app { zoom: 1.12; } }
-@media (min-width: 1700px) { .app { zoom: 1.2; } }
+@media (min-width: 1100px) { .app { zoom: 1.12; --z: 1.12; } }
+@media (min-width: 1700px) { .app { zoom: 1.2; --z: 1.2; } }
+/* 확대(zoom)된 만큼 100vh도 커지므로 나눠서 화면 높이에 맞춤. 안 그러면 사이드바가 화면보다 길어져 같이 스크롤됨 */
+.app { min-height: calc(100vh / var(--z, 1)); }
+.app .sidebar { height: calc(100vh / var(--z, 1)); }
 
 /* 숨통 트이는 톤: 소개 화면과 같은 연한 푸른 바탕 위에 흰 카드를 띄움 */
 :root { --page: #eef4fd; --card-shadow: 0 1px 2px rgba(27, 43, 94, 0.04), 0 8px 28px -10px rgba(27, 43, 94, 0.14); }
@@ -850,7 +853,7 @@ body { background: linear-gradient(180deg, #e6effc 0%, #f1f6fd 380px, #f6f9fe 10
 
 /* 노트북 안: 실제 앱 화면. 뷰포트가 좁아도 데스크톱 배치를 유지하고 클릭은 막음 */
 .embed-app { width: 100%; height: 100%; overflow: hidden; pointer-events: none; user-select: none; background: var(--bg, #fff); }
-.embed-app .app { zoom: 1; height: 100%; min-height: 0; grid-template-columns: var(--sidebar-w) minmax(0, 1fr); }
+.embed-app .app { zoom: 1; --z: 1; height: 100%; min-height: 0; grid-template-columns: var(--sidebar-w) minmax(0, 1fr); }
 .embed-app .main { overflow: hidden; height: 100%; }
 .embed-app .sidebar { position: static; height: 100%; transform: none; width: auto; box-shadow: 1px 0 0 rgba(27, 43, 94, 0.06); }
 .embed-app .mobile-bar, .embed-app .scrim { display: none; }
