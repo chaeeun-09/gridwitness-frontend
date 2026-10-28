@@ -893,3 +893,14 @@ body { background: linear-gradient(180deg, #e6effc 0%, #f1f6fd 380px, #f6f9fe 10
 .sidebar .device-status strong { color: #fff; }
 .sidebar .device-status span, .sidebar .side-user { color: #9fb4ea; }
 .mobile-bar .brand-name { color: var(--ink); }
+
+/* ── 반응형 보강 ───────────────────────────────── */
+/* 폰: 열이 많은 표는 찌그러뜨리지 않고 옆으로 밀어서 봄 */
+@media (max-width: 700px) {
+  .table-wrap table { min-width: 620px; }
+  .table-wrap { -webkit-overflow-scrolling: touch; }
+}
+/* 소개 화면 노트북 (폰): 사이드바 없이 페이지만 */
+.embed-narrow .app { grid-template-columns: 1fr; }
+.embed-narrow .sidebar { display: none; }
+.embed-narrow .page { padding: 24px 28px 28px; }

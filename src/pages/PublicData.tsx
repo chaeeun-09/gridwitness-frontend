@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useMedia } from '../lib/useMedia'
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -52,6 +53,7 @@ const DATA_SOURCES = [
 ]
 
 export default function PublicData() {
+  const narrow = useMedia('(max-width: 600px)')
   const nav = useNavigate()
   const [ds, setDs] = useState<UsageDataset>(EXAMPLE_DATASET)
   const [importResult, setImportResult] = useState<ImportResult | null>(null)
@@ -212,7 +214,7 @@ export default function PublicData() {
                 <ResponsiveContainer width="100%" height={260}>
                   <BarChart data={barData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }} onMouseLeave={() => setHover(null)}>
                     <CartesianGrid stroke={CHART.grid} vertical={false} />
-                    <XAxis dataKey="region" interval={0} {...axis} tick={{ ...CHART.tick, fontSize: 10.5 }} />
+                    <XAxis dataKey="region" interval={0} {...axis} tick={{ ...CHART.tick, fontSize: 10.5 }} angle={narrow ? -90 : 0} textAnchor={narrow ? 'end' : 'middle'} height={narrow ? 40 : 30} />
                     <YAxis {...axis} width={48} />
                     <Tooltip cursor={{ fill: 'rgba(49,87,224,0.07)' }} formatter={(v) => [`${Number(v).toLocaleString()} kWh`, '일 사용량']} />
                     <Bar dataKey="total" name="일 사용량" radius={[4, 4, 0, 0]} isAnimationActive={false} cursor="pointer" onClick={pickRegion} onMouseEnter={(d: unknown) => setHover((d as { region?: string })?.region ?? null)}>

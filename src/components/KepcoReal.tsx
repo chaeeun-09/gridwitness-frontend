@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useMedia } from '../lib/useMedia'
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { apiBase } from '../lib/backend'
 import { CHART } from '../lib/chart'
@@ -47,6 +48,7 @@ async function fetchAll(): Promise<Loaded> {
 }
 
 export default function KepcoReal() {
+  const narrow = useMedia('(max-width: 600px)')
   const [data, setData] = useState<Loaded | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -98,7 +100,7 @@ export default function KepcoReal() {
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={byRegion} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid stroke={CHART.grid} vertical={false} />
-                <XAxis dataKey="label" interval={0} axisLine={false} tickLine={false} tick={{ ...CHART.tick, fontSize: 10.5 }} />
+                <XAxis dataKey="label" interval={0} axisLine={false} tickLine={false} tick={{ ...CHART.tick, fontSize: 10.5 }} angle={narrow ? -90 : 0} textAnchor={narrow ? 'end' : 'middle'} height={narrow ? 40 : 30} />
                 <YAxis axisLine={false} tickLine={false} tick={CHART.tick} width={64} tickFormatter={(v) => `${(Number(v) / 1e6).toFixed(0)}M`} />
                 <Tooltip cursor={{ fill: 'rgba(49,87,224,0.07)' }} formatter={(v) => [fmt(Number(v)), '판매량']} labelFormatter={(_, p) => (p?.[0]?.payload as { name?: string })?.name ?? ''} />
                 <Bar dataKey="total" radius={[4, 4, 0, 0]} isAnimationActive={false} cursor="pointer" onClick={(d: unknown) => setRegion((d as { name?: string })?.name ?? null)}>

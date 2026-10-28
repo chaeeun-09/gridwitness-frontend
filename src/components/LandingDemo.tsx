@@ -4,6 +4,7 @@ import { MemoryRouter, Route } from 'react-router-dom'
 import { Shell } from '../AppShell'
 import { WaveformCaseView } from '../pages/CaseDetail'
 import type { IncidentCase } from '../types'
+import { useMedia } from '../lib/useMedia'
 import { IconPerson } from './Icons'
 
 // 소개 화면의 노트북. 실제 앱 화면(사이드바 + 고장파형 분석·스마트 마을·실시간 분석)을 그대로 띄운다.
@@ -18,6 +19,9 @@ const TABS: { id: TabId; label: string; path: string }[] = [
 /** 앱 화면을 이 폭으로 그린 뒤 노트북 폭에 맞게 줄임 */
 const EMBED_W = 1180
 const EMBED_H = 780
+/** 폰에서는 사이드바를 빼고 더 좁게 그려 글자가 읽히게 함 */
+const NARROW_W = 800
+const NARROW_H = 600
 const CYCLE_MS = 7000
 
 const reduceMotion = () => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
@@ -52,6 +56,7 @@ export function Reveal({ children, delay = 0, className = '' }: { children: Reac
 }
 
 export default function LandingDemo({ demoCase }: { demoCase: IncidentCase }) {
+  const narrow = useMedia('(max-width: 700px)')
   const [active, setActive] = useState<TabId>('cases')
   const [auto, setAuto] = useState(true)
 
@@ -82,8 +87,8 @@ export default function LandingDemo({ demoCase }: { demoCase: IncidentCase }) {
       </div>
       <div className="laptop-body">
         <div key={active} className="laptop-panel">
-          <ScaleToFit width={EMBED_W}>
-            <EmbeddedApp path={TABS.find((t) => t.id === active)!.path} demoCase={demoCase} />
+          <ScaleToFit width={narrow ? NARROW_W : EMBED_W} height={narrow ? NARROW_H : EMBED_H}>
+            <EmbeddedApp narrow={narrow} path={TABS.find((t) => t.id === active)!.path} demoCase={demoCase} />
           </ScaleToFit>
         </div>
       </div>
@@ -92,7 +97,7 @@ export default function LandingDemo({ demoCase }: { demoCase: IncidentCase }) {
 }
 
 /** 안쪽 화면을 고정 폭으로 그린 뒤 컨테이너 폭에 맞게 줄여서 보여줌 */
-function ScaleToFit({ width, children }: { width: number; children: ReactNode }) {
+function ScaleToFit({ width, height, children }: { width: number; height: number; children: ReactNode }) {
   const box = useRef<HTMLDivElement>(null)
   const [scale, setScale] = useState(1)
   useEffect(() => {
@@ -105,14 +110,14 @@ function ScaleToFit({ width, children }: { width: number; children: ReactNode })
     return () => ro.disconnect()
   }, [width])
   return (
-    <div ref={box} style={{ width: '100%', height: EMBED_H * scale, overflow: 'hidden' }}>
-      <div style={{ width, height: EMBED_H, transform: `scale(${scale})`, transformOrigin: 'top left' }}>{children}</div>
+    <div ref={box} style={{ width: '100%', height: height * scale, overflow: 'hidden' }}>
+      <div style={{ width, height, transform: `scale(${scale})`, transformOrigin: 'top left' }}>{children}</div>
     </div>
   )
 }
 
 /** 앱을 별도 React 루트로 띄움. 소개 화면이 이미 라우터 안이라 라우터를 겹쳐 쓸 수 없기 때문 */
-function EmbeddedApp({ path, demoCase }: { path: string; demoCase: IncidentCase }) {
+function EmbeddedApp({ path, demoCase, narrow }: { path: string; demoCase: IncidentCase; narrow: boolean }) {
   const host = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const el = host.current
@@ -133,5 +138,5 @@ function EmbeddedApp({ path, demoCase }: { path: string; demoCase: IncidentCase 
       })
     }
   }, [path, demoCase])
-  return <div ref={host} className="embed-app" inert aria-hidden />
+  return <div ref={host} className={`embed-app ${narrow ? 'embed-narrow' : ''}`} inert aria-hidden />
 }
