@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { DiagnosisBadge, StageBadge } from '../components/Badges'
 import { IconAnalysis, IconPlus } from '../components/Icons'
-import { Empty, ErrorState, PageHeader, TableSkeleton } from '../components/ui'
+import { Badge, Empty, ErrorState, PageHeader, TableSkeleton } from '../components/ui'
 import { fmtTime } from '../lib/actor'
 import type { CaseSummary } from '../types'
 
@@ -77,7 +77,7 @@ export default function CaseList() {
                 <tr key={c.id} className="clickable" onClick={() => nav(pathOf(c))}>
                   <td>
                     <Link to={pathOf(c)} className="strong" style={{ color: 'var(--ink)' }} onClick={(e) => e.stopPropagation()}>{c.title}</Link>
-                    <div className="mono xs faint">{c.id}</div>
+                    <div className="mono xs faint">{c.id}{c.needsWaveform && <> · <Badge tone="warn">원본 CSV 필요</Badge></>}</div>
                   </td>
                   <td className="muted">{c.source}</td>
                   <td><DiagnosisBadge status={c.diagnosisStatus} /></td>

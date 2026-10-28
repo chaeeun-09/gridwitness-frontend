@@ -7,7 +7,7 @@ import { Badge, Section, Segmented } from './ui'
 const VERDICT_TONE: Record<Review['verdict'], 'ok' | 'warn' | 'accent'> = { AGREE: 'ok', DISAGREE: 'warn', NEEDS_INVESTIGATION: 'accent' }
 
 /** 사람 검토 — AI 출력과 사람 판단을 분리해 기록 (사건 유형 공통) */
-export default function ReviewPanel({ c, aiSummary, onChange }: { c: AnyCase; aiSummary: ReactNode; onChange: (c: AnyCase) => void }) {
+export default function ReviewPanel({ c, aiSummary, onChange, locked }: { c: AnyCase; aiSummary: ReactNode; onChange: (c: AnyCase) => void; /** 검토를 막는 이유 */ locked?: ReactNode }) {
   const [verdict, setVerdict] = useState<Review['verdict']>('AGREE')
   const [finalJudgment, setFinal] = useState('')
   const [additionalInvestigation, setInv] = useState('')
@@ -57,27 +57,33 @@ export default function ReviewPanel({ c, aiSummary, onChange }: { c: AnyCase; ai
         </div>
       </div>
 
-      <Section title="검토 기록 추가" description="AI 결과는 바뀌지 않고, 사람의 판단이 별도로 쌓입니다.">
-        <form className="form no-print" onSubmit={submit} style={{ maxWidth: 640 }}>
-          <div className="field">
-            AI 결과에 대한 판단
-            <Segmented value={verdict} onChange={setVerdict} options={(Object.keys(VERDICT_LABEL) as Review['verdict'][]).map((v) => ({ value: v, label: VERDICT_LABEL[v] }))} />
-          </div>
-          <label className="field">
-            최종 판단
-            <textarea rows={2} value={finalJudgment} onChange={(e) => setFinal(e.target.value)} placeholder="AI 결과와 별개로 담당자가 내린 판단" />
-          </label>
-          <label className="field">
-            추가 조사 <span className="field-hint">현장 조사, 설비 이력 확인 등</span>
-            <textarea rows={2} value={additionalInvestigation} onChange={(e) => setInv(e.target.value)} />
-          </label>
-          {error && <div className="alert alert-err">{error}</div>}
-          <div className="row gap">
-            <button className="btn btn-primary" disabled={busy}>{busy ? '저장 중…' : '검토 저장'}</button>
-            {saved && <span className="small" style={{ color: 'var(--ok)' }} role="status">저장했습니다</span>}
-          </div>
-        </form>
-      </Section>
+      {locked ? (
+        <Section title="검토 기록 추가">
+          <div className="alert alert-warn" style={{ margin: 0 }}><span>{locked}</span></div>
+        </Section>
+      ) : (
+        <Section title="검토 기록 추가" description="AI 결과는 바뀌지 않고, 사람의 판단이 별도로 쌓입니다.">
+          <form className="form no-print" onSubmit={submit} style={{ maxWidth: 640 }}>
+            <div className="field">
+              AI 결과에 대한 판단
+              <Segmented value={verdict} onChange={setVerdict} options={(Object.keys(VERDICT_LABEL) as Review['verdict'][]).map((v) => ({ value: v, label: VERDICT_LABEL[v] }))} />
+            </div>
+            <label className="field">
+              최종 판단
+              <textarea rows={2} value={finalJudgment} onChange={(e) => setFinal(e.target.value)} placeholder="AI 결과와 별개로 담당자가 내린 판단" />
+            </label>
+            <label className="field">
+              추가 조사 <span className="field-hint">현장 조사, 설비 이력 확인 등</span>
+              <textarea rows={2} value={additionalInvestigation} onChange={(e) => setInv(e.target.value)} />
+            </label>
+            {error && <div className="alert alert-err">{error}</div>}
+            <div className="row gap">
+              <button className="btn btn-primary" disabled={busy}>{busy ? '저장 중…' : '검토 저장'}</button>
+              {saved && <span className="small" style={{ color: 'var(--ok)' }} role="status">저장했습니다</span>}
+            </div>
+          </form>
+        </Section>
+      )}
 
       <Section title="실행 이력" description="원본 등록부터 검토까지 이 사건에서 일어난 일">
         <ol className="timeline">

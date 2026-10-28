@@ -186,6 +186,10 @@ export interface IotCase {
 
 export type AnyCase = IncidentCase | IotCase
 
+/** 원본 CSV(파형)가 이 브라우저에 없어 분석·검토를 할 수 없는 고장파형 사건.
+ *  입력 진단에서 거부된 사건은 원래 파형을 쓰지 않으므로 제외 */
+export const needsWaveform = (c: AnyCase) => c.caseType === 'WAVEFORM' && !c.waveform && c.diagnosis.status !== 'REJECTED'
+
 export interface CaseSummary {
   caseType: CaseType
   id: string
@@ -194,6 +198,8 @@ export interface CaseSummary {
   stage: CaseStage
   source: string
   diagnosisStatus: DiagnosisStatus
+  /** 원본 CSV를 다시 연결해야 분석·검토할 수 있음 */
+  needsWaveform?: boolean
 }
 
 /** 모든 사건의 실행 이력을 시간순으로 펼친 항목 (관리자 활동 기록용) */

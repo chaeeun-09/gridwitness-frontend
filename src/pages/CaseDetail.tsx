@@ -8,7 +8,7 @@ import IssueList from '../components/IssueList'
 import ReviewPanel from '../components/ReviewPanel'
 import { ErrorState, PageHeader, PageSkeleton, Section } from '../components/ui'
 import { fmtTime, getActor } from '../lib/actor'
-import { SOURCE_LABEL, type AnalysisType, type AnyCase, type ChannelFeatures, type IncidentCase } from '../types'
+import { needsWaveform, SOURCE_LABEL, type AnalysisType, type AnyCase, type ChannelFeatures, type IncidentCase } from '../types'
 
 type Tab = 'analysis' | 'diagnosis' | 'review' | 'source'
 const TABS: [Tab, string][] = [
@@ -36,6 +36,7 @@ export default function CaseDetail() {
 export function WaveformCaseView({ c, onChange }: { c: IncidentCase; onChange: (c: AnyCase) => void }) {
   const [tab, setTab] = useState<Tab>(c.diagnosis.status === 'REJECTED' ? 'diagnosis' : 'analysis')
   const ai = c.analysis
+  const missing = needsWaveform(c)
   return (
     <>
       <PageHeader
@@ -53,6 +54,14 @@ export function WaveformCaseView({ c, onChange }: { c: IncidentCase; onChange: (
         actions={<button className="btn no-print" onClick={() => window.print()}>PDF로 내보내기</button>}
       />
       <Steps steps={WAVEFORM_STEPS} done={waveformStepsDone(c.stage)} />
+      {missing && (
+        <div className="alert alert-warn no-print" style={{ marginTop: 20 }}>
+          <span>
+            <strong>원본 CSV가 없어 분석과 검토를 할 수 없습니다.</strong> 서버 기록만 있는 사건입니다. 등록할 때 쓴 원본 CSV를 연결하면 파형을 보고 분석·검토할 수 있습니다.{' '}
+            {tab !== 'analysis' && <button className="btn btn-sm" onClick={() => setTab('analysis')}>원본 CSV 연결하기</button>}
+          </span>
+        </div>
+      )}
 
       <div className="tabs no-print" role="tablist">
         {TABS.map(([k, label]) => (
@@ -68,6 +77,7 @@ export function WaveformCaseView({ c, onChange }: { c: IncidentCase; onChange: (
           <ReviewPanel
             c={c}
             onChange={onChange}
+            locked={missing ? '원본 CSV를 연결해 파형을 확인한 뒤에 검토를 남길 수 있습니다. 파형·AI 분석 탭에서 원본 CSV를 선택하세요.' : undefined}
             aiSummary={
               !ai ? (
                 <span className="muted">분석 기록 없음</span>

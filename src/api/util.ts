@@ -1,4 +1,4 @@
-import { SOURCE_LABEL, type AnyCase, type CaseSummary } from '../types'
+import { needsWaveform, SOURCE_LABEL, type AnyCase, type CaseSummary } from '../types'
 
 /** 목록에 보여줄 요약 */
 export function summarize(c: AnyCase): CaseSummary {
@@ -10,5 +10,6 @@ export function summarize(c: AnyCase): CaseSummary {
     stage: c.stage,
     source: c.caseType === 'IOT' ? `IoT 모형 · ${c.device.scope}` : SOURCE_LABEL[c.source.sourceType],
     diagnosisStatus: c.diagnosis.status,
+    needsWaveform: needsWaveform(c) || undefined,
   }
 }

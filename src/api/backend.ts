@@ -21,6 +21,7 @@ import {
   type IotCase,
   type Review,
   type SourceType,
+  needsWaveform,
 } from '../types'
 
 // 실제 FastAPI 서버(/api/v1)를 호출하는 구현.
@@ -375,6 +376,7 @@ export const backendApi: GridWitnessApi = {
   async runAnalysis(id, analysisType, actor) {
     if (analysisType !== 'EVENT_TYPE') throw new Error('서버 연결 모드에서는 이벤트 유형 분석만 지원합니다.')
     const c = findWaveform(id)
+    if (needsWaveform(c)) throw new Error('원본 CSV가 이 브라우저에 없어 분석할 수 없습니다. 사건 화면에서 등록할 때 쓴 원본 CSV를 먼저 연결하세요.')
     if (!c.backend) throw new Error('이 사건은 서버에 등록되지 않은 샘플이라 서버 분석을 할 수 없습니다. 고장파형 등록으로 올리면 서버 분석이 됩니다.')
     if (c.diagnosis.status === 'REJECTED') throw new Error('입력 진단에서 거부된 자료는 분석할 수 없습니다.')
     const a = await call<Analysis>(`/incidents/${c.backend.incidentId}/analysis`, { method: 'POST' })
@@ -427,6 +429,7 @@ export const backendApi: GridWitnessApi = {
 
   async submitReview(id, review) {
     const c = find(id)
+    if (needsWaveform(c)) throw new Error('원본 CSV가 이 브라우저에 없어 검토할 수 없습니다. 파형을 보지 않고 판단하지 않도록 원본 CSV를 먼저 연결하세요.')
     if (c.caseType === 'WAVEFORM' && c.backend) {
       let analysisId = c.backend.analysisId
       if (!analysisId) {
