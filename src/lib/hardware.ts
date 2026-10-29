@@ -3,7 +3,13 @@
 
 import type { ChannelId } from './village'
 
-export type PartId = 'adapter' | 'relay' | 'arduino' | 'ina219' | 'bb1' | 'bb2' | 'bb3'
+// 채널 릴레이 구성 (도면 기준)
+//   5V 어댑터 → 전체 릴레이(D2, COM→NC) ┬→ INA219 ① 0x40 → 채널 릴레이 ①②③ (D3·D4·D5) → 주택 1~3 LED
+//                                        └→ INA219 ② 0x41 → 채널 릴레이 ④⑤ (D6·D7)      → 가로등 1~2 LED
+//   Arduino: A4 SDA · A5 SCL (INA219 두 개 공통), 5V는 릴레이·INA219 전원, GND는 모든 모듈 공통
+
+export type ChPartId = 'ch1' | 'ch2' | 'ch3' | 'ch4' | 'ch5'
+export type PartId = 'adapter' | 'relay' | 'arduino' | 'inaH' | 'inaL' | ChPartId
 export type NetKind = 'power' | 'gnd' | 'ctrl' | 'sda' | 'scl' | 'ledPlus' | 'ledMinus'
 
 export interface Part {
@@ -13,6 +19,23 @@ export interface Part {
   spec: string
   /** 핀 이름 → 설명 */
   pins: Record<string, string>
+}
+
+const CH_PARTS: { id: ChPartId; led: ChannelId; ledNo: number; name: string; pin: string; zone: 'inaH' | 'inaL' }[] = [
+  { id: 'ch1', led: 'h1', ledNo: 1, name: '주택 1', pin: 'D3', zone: 'inaH' },
+  { id: 'ch2', led: 'h2', ledNo: 2, name: '주택 2', pin: 'D4', zone: 'inaH' },
+  { id: 'ch3', led: 'h3', ledNo: 3, name: '주택 3', pin: 'D5', zone: 'inaH' },
+  { id: 'ch4', led: 'l1', ledNo: 4, name: '가로등 1', pin: 'D6', zone: 'inaL' },
+  { id: 'ch5', led: 'l2', ledNo: 5, name: '가로등 2', pin: 'D7', zone: 'inaL' },
+]
+
+const inaPins = {
+  VCC: '센서 전원 5V',
+  GND: 'GND',
+  SCL: 'I2C 클럭 (두 INA219 공통)',
+  SDA: 'I2C 데이터 (두 INA219 공통)',
+  'VIN+': '측정 입력 (전체 릴레이 쪽)',
+  'VIN−': '측정 출력 (채널 릴레이 쪽)',
 }
 
 export const PARTS: Part[] = [
@@ -25,46 +48,41 @@ export const PARTS: Part[] = [
   },
   {
     id: 'relay',
-    name: '1채널 릴레이 모듈',
-    role: '마을 전체 전원 ON/OFF',
-    spec: '5V 코일 · 접점 NO/COM/NC',
-    pins: { IN: '제어 입력 (HIGH = 접점 닫힘)', VCC: '모듈 전원 5V', GND: '모듈 GND', COM: '공통 접점 (5V 입력)', NO: '평상시 열림 → 닫히면 출력', NC: '평상시 닫힘 (사용 안 함)' },
+    name: '전체 릴레이 (1채널)',
+    role: '마을 전체 전원 ON/OFF (정전 발생·복구)',
+    spec: '5V 코일 · COM→NC 사용 (코일이 꺼져 있을 때 전원이 들어감)',
+    pins: { IN: '제어 입력 (D2)', VCC: '모듈 전원 5V', GND: '모듈 GND', COM: '공통 접점 (5V 입력)', NO: '평상시 열림 (사용 안 함)', NC: '평상시 닫힘 → 두 INA219 입력 (사용)' },
   },
   {
     id: 'arduino',
     name: 'Arduino UNO R3',
-    role: '릴레이 제어 · INA219 측정 · 웹 통신',
+    role: '릴레이 6개 제어 · INA219 2개 측정 · 웹 통신',
     spec: 'ATmega328P · USB(Web Serial 115200)',
-    pins: { D2: '릴레이 제어 출력', '5V': '모듈 전원 공급', GND: '공통 GND', A4: 'I2C SDA', A5: 'I2C SCL', USB: '노트북 연결 (전원·통신)' },
+    pins: { D2: '전체 릴레이 제어', D3: '채널 ① 주택 1', D4: '채널 ② 주택 2', D5: '채널 ③ 주택 3', D6: '채널 ④ 가로등 1', D7: '채널 ⑤ 가로등 2', '5V': '릴레이·INA219 전원 공급', GND: '공통 GND', A4: 'I2C SDA', A5: 'I2C SCL', USB: '노트북 연결 (전원·통신)' },
   },
   {
-    id: 'ina219',
-    name: 'INA219',
-    role: '마을 전체 전압·전류 측정',
+    id: 'inaH',
+    name: 'INA219 ① 주택 구간',
+    role: '주택 1~3 구간 전압·전류 측정',
     spec: 'I2C 0x40 · 션트 0.1Ω · 최대 3.2A',
-    pins: { VCC: '센서 전원 5V', GND: 'GND', SCL: 'I2C 클럭', SDA: 'I2C 데이터', 'VIN+': '측정 입력 (릴레이 쪽)', 'VIN−': '측정 출력 (부하 쪽)' },
+    pins: inaPins,
   },
   {
-    id: 'bb1',
-    name: '브레드보드 1',
-    role: '전원 분배',
-    spec: '+ / − 레일',
-    pins: { '+in': '+ 레일 입력', '−in': '− 레일 입력', '+out': '+ 레일 출력', '−out': '− 레일 출력' },
+    id: 'inaL',
+    name: 'INA219 ② 가로등 구간',
+    role: '가로등 1~2 구간 전압·전류 측정',
+    spec: 'I2C 0x41 · 션트 0.1Ω · 최대 3.2A',
+    pins: inaPins,
   },
-  {
-    id: 'bb2',
-    name: '브레드보드 2',
-    role: '주택 3채 LED',
-    spec: '나사 단자 3쌍 → 집 내부 LED 1~3',
-    pins: { '+in': '+ 레일 입력', '−in': '− 레일 입력', '+out': '+ 레일 출력', '−out': '− 레일 출력', 'h1+': '주택 1 LED +', 'h1−': '주택 1 LED −', 'h2+': '주택 2 LED +', 'h2−': '주택 2 LED −', 'h3+': '주택 3 LED +', 'h3−': '주택 3 LED −' },
-  },
-  {
-    id: 'bb3',
-    name: '브레드보드 3',
-    role: '가로등 2개 LED',
-    spec: '나사 단자 2쌍 → 가로등 내부 LED 4~5',
-    pins: { '+in': '+ 레일 입력', '−in': '− 레일 입력', 'l1+': '가로등 1 LED +', 'l1−': '가로등 1 LED −', 'l2+': '가로등 2 LED +', 'l2−': '가로등 2 LED −' },
-  },
+  ...CH_PARTS.map(
+    (c, k): Part => ({
+      id: c.id,
+      name: `채널 릴레이 ${'①②③④⑤'[k]} (${c.name})`,
+      role: `${c.name} LED ${c.ledNo} 켜기·끄기`,
+      spec: `1채널 릴레이 · ${c.pin} 제어 · COM→NO 사용 (코일이 켜져야 LED가 켜짐)`,
+      pins: { IN: `제어 입력 (${c.pin})`, VCC: '모듈 전원 5V', GND: '모듈 GND', COM: `공통 접점 (${c.zone === 'inaH' ? 'INA219 ①' : 'INA219 ②'} 출력)`, NO: `${c.name} LED + (코일이 켜지면 연결)`, NC: '평상시 닫힘 (사용 안 함)' },
+    }),
+  ),
 ]
 
 export const PART_BY_ID = Object.fromEntries(PARTS.map((p) => [p.id, p])) as Record<PartId, Part>
@@ -80,39 +98,38 @@ export interface Net {
   signal: string
 }
 
+const pins = (id: string, a: PinRef, b: PinRef, kind: NetKind, signal: string): Net => ({ id, a, b, kind, signal })
+
 export const NETS: Net[] = [
-  { id: 'n-supply', a: 'adapter.+', b: 'relay.COM', kind: 'power', signal: '5V 입력' },
-  { id: 'n-switched', a: 'relay.NO', b: 'ina219.VIN+', kind: 'power', signal: '릴레이를 거친 5V' },
-  { id: 'n-measured', a: 'ina219.VIN−', b: 'bb1.+in', kind: 'power', signal: '측정을 거친 5V → 분배' },
-  { id: 'n-bb12p', a: 'bb1.+out', b: 'bb2.+in', kind: 'power', signal: '5V 분배' },
-  { id: 'n-bb23p', a: 'bb2.+out', b: 'bb3.+in', kind: 'power', signal: '5V 분배' },
-  { id: 'n-gnd-supply', a: 'adapter.−', b: 'bb1.−in', kind: 'gnd', signal: '전원 GND' },
-  { id: 'n-bb12g', a: 'bb1.−out', b: 'bb2.−in', kind: 'gnd', signal: 'GND 분배' },
-  { id: 'n-bb23g', a: 'bb2.−out', b: 'bb3.−in', kind: 'gnd', signal: 'GND 분배' },
-  { id: 'n-common-gnd', a: 'arduino.GND', b: 'bb1.−in', kind: 'gnd', signal: '공통 접지 (제어부 ↔ 전원부)' },
-  { id: 'n-d2', a: 'arduino.D2', b: 'relay.IN', kind: 'ctrl', signal: 'D2 제어 신호' },
-  { id: 'n-relay-vcc', a: 'arduino.5V', b: 'relay.VCC', kind: 'power', signal: '릴레이 모듈 전원 (Arduino 5V)' },
-  { id: 'n-relay-gnd', a: 'arduino.GND', b: 'relay.GND', kind: 'gnd', signal: '릴레이 모듈 GND' },
-  { id: 'n-ina-vcc', a: 'arduino.5V', b: 'ina219.VCC', kind: 'power', signal: 'INA219 전원 (Arduino 5V)' },
-  { id: 'n-ina-gnd', a: 'arduino.GND', b: 'ina219.GND', kind: 'gnd', signal: 'INA219 GND' },
-  { id: 'n-sda', a: 'arduino.A4', b: 'ina219.SDA', kind: 'sda', signal: 'I2C 데이터 (SDA)' },
-  { id: 'n-scl', a: 'arduino.A5', b: 'ina219.SCL', kind: 'scl', signal: 'I2C 클럭 (SCL)' },
+  pins('n-supply', 'adapter.+', 'relay.COM', 'power', '5V 입력'),
+  pins('n-sw-h', 'relay.NC', 'inaH.VIN+', 'power', '전체 릴레이를 거친 5V → 주택 구간'),
+  pins('n-sw-l', 'relay.NC', 'inaL.VIN+', 'power', '전체 릴레이를 거친 5V → 가로등 구간'),
+  ...CH_PARTS.map((c) => pins(`n-meas-${c.id}`, `${c.zone}.VIN−`, `${c.id}.COM`, 'power', `측정을 거친 5V → ${c.name} 채널 릴레이`)),
+  pins('n-gnd-supply', 'adapter.−', 'arduino.GND', 'gnd', '전원 GND ↔ 제어부 공통 접지'),
+  pins('n-gnd-relay', 'arduino.GND', 'relay.GND', 'gnd', '전체 릴레이 GND'),
+  pins('n-gnd-inaH', 'arduino.GND', 'inaH.GND', 'gnd', 'INA219 ① GND'),
+  pins('n-gnd-inaL', 'arduino.GND', 'inaL.GND', 'gnd', 'INA219 ② GND'),
+  ...CH_PARTS.map((c) => pins(`n-gnd-${c.id}`, 'arduino.GND', `${c.id}.GND`, 'gnd', `${c.name} 채널 릴레이 GND`)),
+  pins('n-vcc-relay', 'arduino.5V', 'relay.VCC', 'power', '전체 릴레이 모듈 전원 (Arduino 5V)'),
+  pins('n-vcc-inaH', 'arduino.5V', 'inaH.VCC', 'power', 'INA219 ① 전원 (Arduino 5V)'),
+  pins('n-vcc-inaL', 'arduino.5V', 'inaL.VCC', 'power', 'INA219 ② 전원 (Arduino 5V)'),
+  ...CH_PARTS.map((c) => pins(`n-vcc-${c.id}`, 'arduino.5V', `${c.id}.VCC`, 'power', `${c.name} 채널 릴레이 모듈 전원`)),
+  pins('n-d2', 'arduino.D2', 'relay.IN', 'ctrl', 'D2 제어 신호 (마을 전체)'),
+  ...CH_PARTS.map((c) => pins(`n-${c.pin.toLowerCase()}`, `arduino.${c.pin}` as PinRef, `${c.id}.IN`, 'ctrl', `${c.pin} 제어 신호 (${c.name})`)),
+  pins('n-sda-h', 'arduino.A4', 'inaH.SDA', 'sda', 'I2C 데이터 (SDA) → INA219 ①'),
+  pins('n-sda-l', 'arduino.A4', 'inaL.SDA', 'sda', 'I2C 데이터 (SDA) → INA219 ②'),
+  pins('n-scl-h', 'arduino.A5', 'inaH.SCL', 'scl', 'I2C 클럭 (SCL) → INA219 ①'),
+  pins('n-scl-l', 'arduino.A5', 'inaL.SCL', 'scl', 'I2C 클럭 (SCL) → INA219 ②'),
 ]
 
-/** 브레드보드 단자 → 집·가로등 내부 LED (LED와 220Ω 저항은 지면 위 건물 안에 있음) */
+/** 채널 릴레이 → 집·가로등 내부 LED (LED와 220Ω 저항은 지면 위 건물 안에 있음). LED +는 릴레이 NO, LED −는 공통 GND */
 export interface LoadLine {
   led: ChannelId
-  board: PartId
+  board: ChPartId
   ledNo: number
   name: string
 }
-export const LOAD_LINES: LoadLine[] = [
-  { led: 'h1', board: 'bb2', ledNo: 1, name: '주택 1' },
-  { led: 'h2', board: 'bb2', ledNo: 2, name: '주택 2' },
-  { led: 'h3', board: 'bb2', ledNo: 3, name: '주택 3' },
-  { led: 'l1', board: 'bb3', ledNo: 4, name: '가로등 1' },
-  { led: 'l2', board: 'bb3', ledNo: 5, name: '가로등 2' },
-]
+export const LOAD_LINES: LoadLine[] = CH_PARTS.map((c) => ({ led: c.led, board: c.id, ledNo: c.ledNo, name: c.name }))
 
 /** 도면 '7. 배선 색상 규칙' */
 export const NET_COLOR: Record<NetKind, string> = {
@@ -127,7 +144,7 @@ export const NET_COLOR: Record<NetKind, string> = {
 export const NET_KIND_LABEL: Record<NetKind, string> = {
   power: '빨간색 · 5V 전원 (+)',
   gnd: '검정색 · GND (−)',
-  ctrl: '초록색 · D2 (릴레이 제어)',
+  ctrl: '초록색 · D2~D7 (릴레이 제어)',
   sda: '파란색 · SDA (INA219)',
   scl: '노란색 · SCL (INA219)',
   ledPlus: '주황색 · LED (+)',

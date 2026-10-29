@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import Channels from '../components/Channels'
 import EventList from '../components/EventList'
 import { IconMoon, IconPower, IconSun, IconX } from '../components/Icons'
 import PartPanel from '../components/PartPanel'
@@ -15,11 +16,15 @@ import {
   injectFault,
   IOT_CHANNELS,
   lightView,
+  setChannel,
   setConnected,
   setRelay,
   STATUS_LABEL,
   stopScenario,
   useVillage,
+  ZONE_LABEL,
+  ZONE_SENSOR,
+  zoneChannels,
   type ChannelId,
   type FaultKind,
   type VillageSnapshot,
@@ -195,15 +200,35 @@ export default function Village() {
             </div>
             <Status tone={NODE_TONE[selView.status]}>{selView.text}</Status>
             <dl className="kv" style={{ marginTop: 14 }}>
-              <div><dt>위치</dt><dd>{sel.board}</dd></div>
-              <div><dt>연결</dt><dd>저항 직렬 · 병렬</dd></div>
-              <div><dt>마을 전류</dt><dd>{snap.i.toFixed(3)} A</dd></div>
-              <div><dt>켜진 LED</dt><dd>{snap.estLit} / 5</dd></div>
+              <div><dt>제어</dt><dd>{sel.relay}</dd></div>
+              <div><dt>측정</dt><dd>{ZONE_SENSOR[sel.kind]}</dd></div>
+              <div><dt>{ZONE_LABEL[sel.kind]} 전류</dt><dd>{snap.zones ? `${snap.zones[sel.kind].i.toFixed(3)} A` : `${snap.i.toFixed(3)} A (마을 전체)`}</dd></div>
+              <div><dt>켜진 LED</dt><dd>{snap.zones ? `${snap.zones[sel.kind].estLit} / ${zoneChannels(sel.kind).length}` : `${snap.estLit} / 5`}</dd></div>
             </dl>
-            <p className="hint">INA219가 1개라 LED별 전류는 측정하지 않습니다. 전체 전류로 켜진 개수를 추정합니다.</p>
-            <button className="btn btn-sm" style={{ marginTop: 12, width: '100%' }} onClick={() => setUnderground(true)}>지하 배선에서 보기</button>
+            <p className="hint">LED별 전류는 따로 재지 않고 구간 전류로 추정합니다.</p>
+            <div className="row gap" style={{ marginTop: 12 }}>
+              <button
+                className="btn btn-sm btn-primary"
+                style={{ flex: 1 }}
+                disabled={!snap.canControl || !snap.connected || snap.channelPending[sel.id] !== undefined}
+                onClick={() => setChannel(sel.id, !sel.channelOn)}
+              >
+                {snap.channelPending[sel.id] !== undefined ? '전송 중…' : sel.channelOn ? '이 LED 끄기' : '이 LED 켜기'}
+              </button>
+              <button className="btn btn-sm" style={{ flex: 1 }} onClick={() => setUnderground(true)}>지하 배선</button>
+            </div>
           </div>
         )}
+      </div>
+
+<div className="section">
+        <Section
+          title="LED 채널 제어"
+          description="채널 릴레이(D3~D7)로 LED를 하나씩 끄고 켭니다. 실측 장치가 연결되어 있으면 실제 LED가 꺼집니다."
+          actions={<Link to="/village/loads" className="small">채널 점검 →</Link>}
+        >
+          <Channels snap={snap} selected={selected} onSelect={setSelected} controls />
+        </Section>
       </div>
 
 <div className="section">

@@ -38,14 +38,14 @@ export default function ChannelMap() {
             {LOAD_LINES.flatMap((l) => [
               <tr key={`${l.led}+`}>
                 <td><span className="wire-chip" style={{ background: NET_COLOR.ledPlus }} /></td>
-                <td className="small">{PART_BY_ID[l.board].name} 단자 +</td>
+                <td className="small">{PART_BY_ID[l.board].name} NO</td>
                 <td className="small">{l.name} LED {l.ledNo} (+) · 220Ω 건물 안</td>
                 <td className="small muted">LED 전원</td>
               </tr>,
               <tr key={`${l.led}−`}>
                 <td><span className="wire-chip" style={{ background: NET_COLOR.ledMinus }} /></td>
                 <td className="small">{l.name} LED {l.ledNo} (−)</td>
-                <td className="small">{PART_BY_ID[l.board].name} 단자 −</td>
+                <td className="small">공통 GND (Arduino GND)</td>
                 <td className="small muted">LED 귀선</td>
               </tr>,
             ])}

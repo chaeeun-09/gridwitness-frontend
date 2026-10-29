@@ -907,3 +907,9 @@ body { background: linear-gradient(180deg, #e6effc 0%, #f1f6fd 380px, #f6f9fe 10
 .embed-narrow .app { grid-template-columns: 1fr; }
 .embed-narrow .sidebar { display: none; }
 .embed-narrow .page { padding: 24px 28px 28px; }
+
+/* ── 채널(LED별) 제어 ─────────────────────────────── */
+.channels.with-ctl .channel.load { grid-template-columns: minmax(150px, 1.4fr) minmax(110px, 1fr) minmax(120px, 1.1fr) 150px 44px; }
+@media (max-width: 860px) { .channels.with-ctl .channel.load { grid-template-columns: 1fr auto auto; } }
+.check-table td.ok { color: var(--ok); }
+.check-table td.bad { color: var(--err); font-weight: 600; }

@@ -147,6 +147,11 @@ export interface IotPoint {
   i: number
   expected: number
   score: number
+  /** 구간별 전류·예상 전류 (INA219 두 개 구성). 예전 기록에는 없음 */
+  ih?: number
+  il?: number
+  eh?: number
+  el?: number
 }
 
 export interface IotDetection {
@@ -170,7 +175,7 @@ export interface IotCase {
   device: {
     deviceId: string
     sensor: string
-    /** 측정 범위 (INA219 1개 → 마을 전체) */
+    /** 측정 범위 (INA219 2개 → 주택·가로등 구간, 예전 장치는 1개 → 마을 전체) */
     scope: string
     nominalV: number
     expectedA: number

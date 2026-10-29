@@ -1,19 +1,35 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import ChannelCheckPanel from '../components/ChannelCheckPanel'
 import Channels from '../components/Channels'
-import { PageHeader, Section } from '../components/ui'
-import { type ChannelId, useVillage } from '../lib/village'
+import { Metric, Metrics, PageHeader, Section } from '../components/ui'
+import { type ChannelId, useVillage, ZONE_LABEL, ZONE_SENSOR, zoneChannels } from '../lib/village'
 
 export default function VillageLoads() {
   const snap = useVillage()
   const [selected, setSelected] = useState<ChannelId | null>(null)
   return (
     <>
-      <PageHeader crumbs={[{ label: '스마트 마을', to: '/village' }, { label: '부하' }]} title="부하" description="LED 5개가 병렬로 연결되어 릴레이 하나로 함께 켜지고 꺼집니다." />
-      <Section title="LED 상태" actions={<Link to="/settings" className="small">회로 구성 →</Link>}>
-        <Channels snap={snap} selected={selected} onSelect={setSelected} />
-        <p className="hint">INA219가 1개라 LED별 전류는 측정하지 않습니다. 전체 전류로 켜진 개수를 추정합니다.</p>
+      <PageHeader
+        crumbs={[{ label: '스마트 마을', to: '/village' }, { label: '부하' }]}
+        title="부하"
+        description="LED 5개마다 채널 릴레이(D3~D7)가 있어 웹에서 하나씩 끄고 켤 수 있습니다. 전류는 주택 구간과 가로등 구간을 INA219 두 개로 따로 잽니다."
+      />
+      {snap.zones && (
+        <Metrics cols={2}>
+          {(['HOUSE', 'LAMP'] as const).map((k) => {
+            const z = snap.zones![k]
+            return (
+              <Metric key={k} label={`${ZONE_LABEL[k]} · ${ZONE_SENSOR[k]}`} value={z.i.toFixed(3)} unit="A" foot={`예상 ${z.expected.toFixed(3)} A · ${z.v.toFixed(2)} V · 켜진 LED ${z.estLit}/${zoneChannels(k).length}`} />
+            )
+          })}
+        </Metrics>
+      )}
+      <Section title="LED 채널" description={snap.canControl ? '스위치로 LED 하나씩 끄고 켭니다. 장치가 상태를 보고하면 확정됩니다.' : '이 장치는 채널 상태를 보고하지 않아 조종할 수 없습니다.'} actions={<Link to="/settings" className="small">회로 구성 →</Link>}>
+        <Channels snap={snap} selected={selected} onSelect={setSelected} controls />
+        <p className="hint">LED별 전류는 따로 재지 않습니다. 구간 전류로 켜진 개수를 추정하고, 어느 LED인지는 채널 점검으로 확인합니다.</p>
       </Section>
+      <ChannelCheckPanel snap={snap} />
     </>
   )
 }

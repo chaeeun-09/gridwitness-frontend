@@ -2,67 +2,79 @@ import { Line, RoundedBox } from '@react-three/drei'
 import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import { memo, useMemo, useRef, useState, type ReactNode } from 'react'
 import { CatmullRomCurve3, TubeGeometry, Vector3, type Mesh } from 'three'
-import { LOAD_LINES, NET_COLOR, NETS, PART_BY_ID, pinLabel, splitPin, type Net, type PartId, type PinRef } from '../../lib/hardware'
+import { LOAD_LINES, NET_COLOR, NETS, PART_BY_ID, pinLabel, splitPin, type ChPartId, type Net, type PartId, type PinRef } from '../../lib/hardware'
 import { contactClosed, type ChannelId, type VillageSnapshot } from '../../lib/village'
 import Label from '../three/Label'
 import { BOX_FLOOR, PART_Z, type V3 } from './layout'
-import { ARDUINO_PIN, ARDUINO_SIZE, arduinoTexture, breadboardTexture, INA_SIZE, inaTexture, RELAY_SIZE, relayTexture } from './textures'
+import { ARDUINO_PIN, ARDUINO_SIZE, arduinoTexture, INA_SIZE, inaTexture, RELAY_SIZE, relayTexture } from './textures'
 
-// 바닥판 내부 배선 — 도면 "1. 바닥판 내부 전체 사진(위에서 본 모습)" 배치 그대로.
-// 왼쪽부터 5V 어댑터 → 릴레이 → Arduino → INA219 → 브레드보드 1(분배) → 2(주택 LED) → 3(가로등 LED).
+// 바닥판 내부 배선 — 채널 릴레이 구성 도면 배치.
+// 왼쪽부터 5V 어댑터 → 전체 릴레이 → Arduino → INA219 ①(주택) → INA219 ②(가로등) → 채널 릴레이 ①~⑤.
 // 배선은 뒤쪽 배선 통로로 묶여 지나가고, LED 선은 천장 관통부로 올라가 건물 안 LED(220Ω 포함)에 연결됨.
 
 const Y = BOX_FLOOR
-const BB = { w: 5.4, d: 3.6 }
+/** 전체 릴레이·채널 릴레이는 RELAY_SIZE 기준 모듈을 줄여서 한 줄에 배치 */
+const MASTER_SIZE = { w: 3.5, d: 1.9 }
+const CH_SIZE = { w: 2.6, d: 2.2 }
+const MASTER_SCALE: [number, number, number] = [MASTER_SIZE.w / RELAY_SIZE.w, 1, MASTER_SIZE.d / RELAY_SIZE.d]
+const CH_SCALE: [number, number, number] = [CH_SIZE.w / RELAY_SIZE.w, 1, CH_SIZE.d / RELAY_SIZE.d]
 
-/** 부품 중심 x, 크기, 윗면 높이(바닥 기준) */
-export const PLACE: Record<PartId, { x: number; w: number; d: number; top: number }> = {
-  adapter: { x: -19.2, w: 3.2, d: 2.0, top: 0.9 },
-  relay: { x: -13.4, ...RELAY_SIZE, top: 0.35 },
-  arduino: { x: -6.2, ...ARDUINO_SIZE, top: 0.35 },
-  ina219: { x: -0.8, ...INA_SIZE, top: 0.35 },
-  bb1: { x: 4.8, ...BB, top: 0.45 },
-  bb2: { x: 11.0, ...BB, top: 0.45 },
-  bb3: { x: 17.2, ...BB, top: 0.45 },
+/** 부품 중심 x, 크기, 윗면 높이(바닥 기준). 왼쪽부터 같은 간격으로 한 줄 배치 */
+const ROW: [PartId, { w: number; d: number; top: number }][] = [
+  ['adapter', { w: 3.2, d: 2.0, top: 0.9 }],
+  ['relay', { ...MASTER_SIZE, top: 0.35 }],
+  ['arduino', { ...ARDUINO_SIZE, top: 0.35 }],
+  ['inaH', { ...INA_SIZE, top: 0.35 }],
+  ['inaL', { ...INA_SIZE, top: 0.35 }],
+  ...(['ch1', 'ch2', 'ch3', 'ch4', 'ch5'] as const).map((id): [PartId, { w: number; d: number; top: number }] => [id, { ...CH_SIZE, top: 0.35 }]),
+]
+const GAP = 0.8
+const ROW_W = ROW.reduce((sum, [, p]) => sum + p.w, 0) + GAP * (ROW.length - 1)
+export const PLACE = (() => {
+  let x = -ROW_W / 2
+  const out = {} as Record<PartId, { x: number; w: number; d: number; top: number }>
+  for (const [id, p] of ROW) {
+    out[id] = { x: x + p.w / 2, ...p }
+    x += p.w + GAP
+  }
+  return out
+})()
+
+/** 릴레이 모듈 핀 로컬 좌표 [x, z] (전체 릴레이 기준 좌표를 모듈 크기에 맞게 줄임) */
+function relayPins(id: PartId, sx: number, sz: number) {
+  const k = (x: number, z: number): [number, number] => [x * sx, z * sz]
+  PIN_LOCAL[`${id}.VCC`] = k(-2.25, -0.55)
+  PIN_LOCAL[`${id}.GND`] = k(-2.25, 0)
+  PIN_LOCAL[`${id}.IN`] = k(-2.25, 0.55)
+  PIN_LOCAL[`${id}.NO`] = k(2.1, -0.4)
+  PIN_LOCAL[`${id}.COM`] = k(2.1, 0)
+  PIN_LOCAL[`${id}.NC`] = k(2.1, 0.4)
 }
-
-/** LED 단자쌍 위치 (브레드보드 로컬 x) */
-const TERMINAL_X: Record<ChannelId, number> = { h1: -1.8, h2: 0, h3: 1.8, l1: -1.1, l2: 1.1 }
-const TERMINAL_Z = -0.45
-const RAIL_P = -1.67
-const RAIL_N = -1.36
 
 /** 핀 로컬 좌표 [x, z] */
 const PIN_LOCAL: Record<string, [number, number]> = {
   'adapter.+': [1.15, -0.2],
   'adapter.−': [1.15, 0.2],
-  'relay.VCC': [-2.25, -0.55],
-  'relay.GND': [-2.25, 0],
-  'relay.IN': [-2.25, 0.55],
-  'relay.NO': [2.1, -0.4],
-  'relay.COM': [2.1, 0],
-  'relay.NC': [2.1, 0.4],
   'arduino.D2': [ARDUINO_PIN.digitalX(13), ARDUINO_PIN.headerZ.back],
+  'arduino.D3': [ARDUINO_PIN.digitalX(12), ARDUINO_PIN.headerZ.back],
+  'arduino.D4': [ARDUINO_PIN.digitalX(11), ARDUINO_PIN.headerZ.back],
+  'arduino.D5': [ARDUINO_PIN.digitalX(10), ARDUINO_PIN.headerZ.back],
+  'arduino.D6': [ARDUINO_PIN.digitalX(9), ARDUINO_PIN.headerZ.back],
+  'arduino.D7': [ARDUINO_PIN.digitalX(8), ARDUINO_PIN.headerZ.back],
   'arduino.5V': [ARDUINO_PIN.powerX(3), ARDUINO_PIN.headerZ.front],
   'arduino.GND': [ARDUINO_PIN.powerX(4), ARDUINO_PIN.headerZ.front],
   'arduino.A4': [ARDUINO_PIN.analogX(4), ARDUINO_PIN.headerZ.front],
   'arduino.A5': [ARDUINO_PIN.analogX(5), ARDUINO_PIN.headerZ.front],
-  'ina219.VCC': [-0.95, 0.82],
-  'ina219.GND': [-0.57, 0.82],
-  'ina219.SCL': [-0.19, 0.82],
-  'ina219.SDA': [0.19, 0.82],
-  'ina219.VIN+': [-0.2, -0.55],
-  'ina219.VIN−': [0.2, -0.55],
 }
-for (const b of ['bb1', 'bb2', 'bb3'] as const) {
-  PIN_LOCAL[`${b}.+in`] = [-2.5, RAIL_P]
-  PIN_LOCAL[`${b}.−in`] = [-2.5, RAIL_N]
-  PIN_LOCAL[`${b}.+out`] = [2.5, RAIL_P]
-  PIN_LOCAL[`${b}.−out`] = [2.5, RAIL_N]
-}
-for (const l of LOAD_LINES) {
-  PIN_LOCAL[`${l.board}.${l.led}+`] = [TERMINAL_X[l.led] - 0.2, TERMINAL_Z]
-  PIN_LOCAL[`${l.board}.${l.led}−`] = [TERMINAL_X[l.led] + 0.2, TERMINAL_Z]
+relayPins('relay', MASTER_SCALE[0], MASTER_SCALE[2])
+for (const id of ['ch1', 'ch2', 'ch3', 'ch4', 'ch5'] as const) relayPins(id, CH_SCALE[0], CH_SCALE[2])
+for (const id of ['inaH', 'inaL'] as const) {
+  PIN_LOCAL[`${id}.VCC`] = [-0.95, 0.82]
+  PIN_LOCAL[`${id}.GND`] = [-0.57, 0.82]
+  PIN_LOCAL[`${id}.SCL`] = [-0.19, 0.82]
+  PIN_LOCAL[`${id}.SDA`] = [0.19, 0.82]
+  PIN_LOCAL[`${id}.VIN+`] = [-0.2, -0.55]
+  PIN_LOCAL[`${id}.VIN−`] = [0.2, -0.55]
 }
 
 export function pinWorld(ref: PinRef): V3 {
@@ -105,7 +117,7 @@ function laneRoute(a: V3, b: V3, lane: number, k: number): Vector3[] {
 /** LED 단자 → 천장 관통부 (위로 올라가 건물 안 LED로) */
 function exitPoint(led: ChannelId, sign: 1 | -1): V3 {
   const l = LOAD_LINES.find((x) => x.led === led)!
-  return [PLACE[l.board].x + TERMINAL_X[led] + sign * 0.09, Y + 2.4, EXIT_Z]
+  return [PLACE[l.board].x + sign * 0.09, Y + 2.4, EXIT_Z]
 }
 function loadRoute(a: V3, top: V3): Vector3[] {
   return [v(...a), v(a[0], a[1] + 0.4, a[2]), v(a[0], Y + 1.2, (a[2] + top[2]) / 2 + 0.6), v(top[0], Y + 1.3, top[2] + 0.4), v(...top)]
@@ -234,10 +246,11 @@ function Adapter({ ok }: { ok: boolean }) {
   )
 }
 
-function Relay({ on }: { on: boolean }) {
+function Relay({ id, on, scale, redLed = true }: { id: PartId; on: boolean; scale: [number, number, number]; redLed?: boolean }) {
   const map = useMemo(() => relayTexture(), [])
   return (
-    <Pcb id="relay" map={map}>
+    <Pcb id={id} map={map}>
+      <group scale={scale}>
       {/* 릴레이 본체 */}
       <mesh position={[-0.15, 0.6, 0]}>
         <boxGeometry args={[1.9, 1.2, 1.55]} />
@@ -258,8 +271,9 @@ function Relay({ on }: { on: boolean }) {
       ))}
       <Smd x={-1.55} z={-0.9} w={0.35} d={0.2} color="#2b2b2b" />
       <Smd x={-1.6} z={0.85} w={0.45} d={0.3} color="#1e1e1e" />
-      <Led x={-1.15} z={-0.95} on={on} color="#ff4040" />
+      <Led x={-1.15} z={-0.95} on={on && redLed} color="#ff4040" />
       <Led x={-1.15} z={0.95} on color="#40ff70" />
+      </group>
     </Pcb>
   )
 }
@@ -311,34 +325,16 @@ function Arduino({ blink }: { blink: boolean }) {
   )
 }
 
-function Ina219() {
+function Ina219({ id }: { id: PartId }) {
   const map = useMemo(() => inaTexture(), [])
   return (
-    <Pcb id="ina219" map={map}>
+    <Pcb id={id} map={map}>
       <Terminal x={0} z={-0.55} n={2} along="x" />
       <Header x0={-0.95} z={0.82} n={6} pitch={0.38} />
       {/* 션트 저항 R100, INA219 칩 */}
       <Smd x={0.25} z={0.15} w={0.55} d={0.3} color="#2a2a2a" h={0.1} />
       <Smd x={-0.6} z={0.15} w={0.35} d={0.35} />
     </Pcb>
-  )
-}
-
-function Breadboard({ id, children }: { id: PartId; children?: ReactNode }) {
-  const tex = useMemo(() => breadboardTexture(), [])
-  const p = PLACE[id]
-  return (
-    <group position={[p.x, Y, PART_Z]}>
-      <mesh position={[0, p.top / 2, 0]}>
-        <boxGeometry args={[p.w, p.top, p.d]} />
-        <meshStandardMaterial color="#f1efe9" roughness={0.7} />
-      </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, p.top + 0.001, 0]}>
-        <planeGeometry args={[p.w, p.d]} />
-        <meshStandardMaterial map={tex} roughness={0.7} />
-      </mesh>
-      <group position={[0, p.top, 0]}>{children}</group>
-    </group>
   )
 }
 
@@ -364,12 +360,6 @@ function Wire({
       <meshStandardMaterial color={color} roughness={0.4} transparent={dim} opacity={dim ? 0.15 : 1} />
     </mesh>
   )
-}
-
-/** 레일 → 단자 브레드보드 내부 점퍼 (빨강 +, 검정 −) */
-function Jumper({ from, to, color }: { from: [number, number]; to: [number, number]; color: string }) {
-  const pts = useMemo(() => [v(from[0], 0.02, from[1]), v((from[0] + to[0]) / 2, 0.35, (from[1] + to[1]) / 2), v(to[0], 0.02, to[1])], [from, to])
-  return <Wire points={pts} color={color} radius={0.035} />
 }
 
 /** 선 위를 흐르는 전류·신호 */
@@ -416,8 +406,8 @@ const Clips = memo(function Clips() {
           </mesh>
         </group>
       ))}
-      <mesh position={[(PLACE.bb2.x + PLACE.bb3.x) / 2, Y + 0.05, EXIT_Z]}>
-        <boxGeometry args={[12.5, 0.1, 0.6]} />
+      <mesh position={[(PLACE.ch1.x + PLACE.ch5.x) / 2, Y + 0.05, EXIT_Z]}>
+        <boxGeometry args={[PLACE.ch5.x - PLACE.ch1.x + 3, 0.1, 0.6]} />
         <meshStandardMaterial color="#9c7546" roughness={0.8} />
       </mesh>
     </>
@@ -433,6 +423,18 @@ function PartOutline({ id, color }: { id: PartId; color: string }) {
   const z0 = PART_Z - p.d / 2 - pad
   const z1 = PART_Z + p.d / 2 + pad
   return <Line points={[[x0, y, z0], [x1, y, z0], [x1, y, z1], [x0, y, z1], [x0, y, z0]]} color={color} lineWidth={2.5} />
+}
+
+/** 부품 이름표 아래 한 줄 */
+function partReadout(id: PartId, snap: VillageSnapshot): string {
+  if (id === 'inaH' || id === 'inaL') {
+    const z = snap.zones?.[id === 'inaH' ? 'HOUSE' : 'LAMP']
+    return z ? `${z.v.toFixed(2)} V · ${z.i.toFixed(3)} A` : `${snap.v.toFixed(2)} V · ${snap.i.toFixed(3)} A`
+  }
+  if (id === 'relay') return `D2 ${snap.relay ? 'LOW' : 'HIGH'} · ${contactClosed(snap) ? '공급' : '차단'}${snap.supplyFault === 'STUCK' ? ' (고착)' : ''}`
+  const line = LOAD_LINES.find((l) => l.board === id)
+  if (line) return `${PART_BY_ID[id].pins.IN.match(/D\d/)?.[0] ?? ''} ${snap.channels[line.led] ? 'ON' : 'OFF'}`
+  return PART_BY_ID[id].role
 }
 
 // ── 장면 ────────────────────────────────────────────────
@@ -468,15 +470,15 @@ export default function Underground({
   const loads = useMemo(
     () =>
       LOAD_LINES.map((l) => {
-        const plus = loadRoute(pinWorld(`${l.board}.${l.led}+` as PinRef), exitPoint(l.led, -1))
-        const minus = loadRoute(pinWorld(`${l.board}.${l.led}−` as PinRef), exitPoint(l.led, 1))
+        const plus = loadRoute(pinWorld(`${l.board}.NO` as PinRef), exitPoint(l.led, -1))
+        const minus = loadRoute(pinWorld('arduino.GND'), exitPoint(l.led, 1))
         return { line: l, plus, minus, curve: new CatmullRomCurve3(plus, false, 'centripetal') }
       }),
     [],
   )
 
   const related = (n: Net) => !selectedPart || n.a.startsWith(`${selectedPart}.`) || n.b.startsWith(`${selectedPart}.`)
-  const loadRelated = (board: PartId) => !selectedPart || selectedPart === board
+  const loadRelated = (board: ChPartId) => !selectedPart || selectedPart === board || (selectedPart === 'arduino')
   const curveOf = (id: string) => nets.find((n) => n.net.id === id)!.curve
 
   const partProps = (id: PartId) => ({
@@ -507,30 +509,12 @@ export default function Underground({
     <group>
       {/* 부품 */}
       <group {...partProps('adapter')}><Adapter ok={supplyOk} /></group>
-      <group {...partProps('relay')}><Relay on={contactClosed(snap)} /></group>
+      <group {...partProps('relay')}><Relay id="relay" on={!snap.relay && snap.supplyFault !== 'STUCK'} scale={MASTER_SCALE} /></group>
       <group {...partProps('arduino')}><Arduino blink={connected && snap.packets % 2 === 0} /></group>
-      <group {...partProps('ina219')}><Ina219 /></group>
-      <group {...partProps('bb1')}>
-        <Breadboard id="bb1">
-          <Jumper from={[-1.5, RAIL_P]} to={[-1.5, 1.65]} color="#d63a2f" />
-          <Jumper from={[1.5, RAIL_N]} to={[1.5, 1.34]} color="#1f2125" />
-        </Breadboard>
-      </group>
-      {(['bb2', 'bb3'] as const).map((b) => (
-        <group key={b} {...partProps(b)}>
-          <Breadboard id={b}>
-            {LOAD_LINES.filter((l) => l.board === b).map((l) => {
-              const x = TERMINAL_X[l.led]
-              return (
-                <group key={l.led}>
-                  <Terminal x={x} z={TERMINAL_Z} n={2} along="x" />
-                  <Jumper from={[x - 0.2, RAIL_P]} to={[x - 0.2, TERMINAL_Z - 0.3]} color="#d63a2f" />
-                  <Jumper from={[x + 0.2, RAIL_N]} to={[x + 0.2, TERMINAL_Z - 0.3]} color="#1f2125" />
-                </group>
-              )
-            })}
-          </Breadboard>
-        </group>
+      <group {...partProps('inaH')}><Ina219 id="inaH" /></group>
+      <group {...partProps('inaL')}><Ina219 id="inaL" /></group>
+      {LOAD_LINES.map((l) => (
+        <group key={l.board} {...partProps(l.board)}><Relay id={l.board} on={snap.channels[l.led]} scale={CH_SCALE} /></group>
       ))}
       <Clips />
 
@@ -555,8 +539,8 @@ export default function Underground({
         const ex = exitPoint(line.led, 1)[0] - 0.09
         return (
           <group key={line.led}>
-            <Wire points={plus} color={NET_COLOR.ledPlus} radius={0.045} dim={!loadRelated(line.board)} onHover={wireHover(`${PART_BY_ID[line.board].name} 단자 → ${line.name} LED ${line.ledNo} (+) · 220Ω는 건물 안`)} onLeave={wireLeave} />
-            <Wire points={minus} color={NET_COLOR.ledMinus} radius={0.045} dim={!loadRelated(line.board)} onHover={wireHover(`${line.name} LED ${line.ledNo} (−) → ${PART_BY_ID[line.board].name} − 레일`)} onLeave={wireLeave} />
+            <Wire points={plus} color={NET_COLOR.ledPlus} radius={0.045} dim={!loadRelated(line.board)} onHover={wireHover(`${PART_BY_ID[line.board].name} NO → ${line.name} LED ${line.ledNo} (+) · 220Ω는 건물 안`)} onLeave={wireLeave} />
+            <Wire points={minus} color={NET_COLOR.ledMinus} radius={0.045} dim={!loadRelated(line.board)} onHover={wireHover(`${line.name} LED ${line.ledNo} (−) → 공통 GND (Arduino GND)`)} onLeave={wireLeave} />
             {/* 천장 관통부 */}
             <mesh position={[ex, Y + 0.12, EXIT_Z]} rotation={[-Math.PI / 2, 0, 0]}>
               <torusGeometry args={[0.24, 0.07, 8, 20]} />
@@ -574,17 +558,18 @@ export default function Underground({
 
       {/* 전류·신호 흐름 */}
       {/* 전류 점은 회로가 닫혀 흐를 때만. 릴레이가 열리면 어댑터 쪽 선에 전압은 있어도 전류는 없음 */}
-      {powered && <Flow curves={['n-supply', 'n-switched', 'n-measured', 'n-bb12p', 'n-bb23p'].map(curveOf)} color="#ffd43b" />}
+      {powered && <Flow curves={['n-supply', 'n-sw-h', 'n-sw-l', ...LOAD_LINES.filter((l) => snap.channels[l.led]).map((l) => `n-meas-${l.board}`)].map(curveOf)} color="#ffd43b" />}
       {powered && <Flow curves={loads.filter((l) => snap.leds[l.line.led].lit).map((l) => l.curve)} color="#ffb347" speed={0.4} />}
-      {connected && snap.relay && <Flow curves={[curveOf('n-d2')]} color="#69db7c" speed={0.25} size={0.06} />}
-      {connected && <Flow curves={[curveOf('n-sda'), curveOf('n-scl')]} color="#a5d8ff" speed={0.9} size={0.05} />}
+      {connected && !snap.relay && <Flow curves={[curveOf('n-d2')]} color="#69db7c" speed={0.25} size={0.06} />}
+      {connected && <Flow curves={LOAD_LINES.filter((l) => snap.channels[l.led]).map((l) => curveOf(`n-d${l.led === 'h1' ? 3 : l.led === 'h2' ? 4 : l.led === 'h3' ? 5 : l.led === 'l1' ? 6 : 7}`))} color="#69db7c" speed={0.25} size={0.06} />}
+      {connected && <Flow curves={['n-sda-h', 'n-sda-l', 'n-scl-h', 'n-scl-l'].map(curveOf)} color="#a5d8ff" speed={0.9} size={0.05} />}
 
       {/* 부품 이름 (앞쪽). 확대 중에는 패널이 대신 보여줌 */}
       {!selectedPart && (Object.keys(PLACE) as PartId[]).map((id) => (
         <Label
           key={id}
-          lines={[PART_BY_ID[id].name, id === 'ina219' ? `${snap.v.toFixed(2)} V · ${snap.i.toFixed(3)} A` : id === 'relay' ? `D2 ${snap.relay ? 'HIGH' : 'LOW'} · ${contactClosed(snap) ? '닫힘' : '열림'}${snap.supplyFault === 'STUCK' ? ' (고착)' : ''}` : PART_BY_ID[id].role]}
-          position={[PLACE[id].x, Y + 0.6, PART_Z + PLACE[id].d / 2 + 1.25]}
+          lines={[PART_BY_ID[id].name, partReadout(id, snap)]}
+          position={[PLACE[id].x, Y + 0.6, PART_Z + PLACE[id].d / 2 + 1.25 + ((Object.keys(PLACE) as PartId[]).indexOf(id) % 2) * 1.05]}
           bg="rgba(20,22,27,0.86)"
           lineHeight={0.5}
         />

@@ -66,7 +66,7 @@ export default function Settings() {
 
       <Row
         title="회로 구성"
-        description={<>최종 구성도 기준. 5V DC 전원을 릴레이 하나로 마을 전체에 공급하고, INA219 하나로 전체 전압·전류를 측정합니다. LED 5개는 저항과 함께 병렬로 연결됩니다 (정격 {NOMINAL_V} V).</>}
+        description={<>채널 릴레이 구성. 5V DC 전원을 전체 릴레이(D2, COM→NC)로 마을에 공급하고, INA219 두 개(0x40 주택 · 0x41 가로등)가 구간 전압·전류를 잽니다. LED 5개는 각자 채널 릴레이(D3~D7)와 저항을 거쳐 연결됩니다 (정격 {NOMINAL_V} V).</>}
       >
         <ChannelMap />
       </Row>

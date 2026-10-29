@@ -7,12 +7,14 @@ import IssueList from '../components/IssueList'
 import Sparkline from '../components/Sparkline'
 import { Badge, DIAG_LABEL, DIAG_TONE, Metric, Metrics, NODE_TONE, Section, Status } from '../components/ui'
 import { getActor } from '../lib/actor'
-import { DEVICE_INFO, IOT_MODEL, LED_A, linkEventToCase, setRelay, STATUS_LABEL, useVillage, type VillageEvent } from '../lib/village'
+import { DEVICE_INFO, IOT_CHANNELS, IOT_MODEL, LED_A, linkEventToCase, setChannel, setRelay, STATUS_LABEL, useVillage, ZONE_LABEL, type ChannelId, type VillageEvent } from '../lib/village'
 import type { IotPoint } from '../types'
 
 // 실제 하드웨어 분석 흐름:
-//   시나리오 실행(릴레이 차단) → LED 소등 → INA219 측정값 변화 → 이상 사건 등록 → 입력 적합성 검사 → DC 데이터라 AI 고장파형 분석 보류
-// 모형에는 릴레이가 하나뿐이라 웹에서 실행할 수 있는 실물 시나리오는 "마을 전체 전원 차단 → 복구"다.
+//   시나리오 실행(전체 전원 차단 또는 LED 하나 끄기) → LED 소등 → INA219 측정값 변화 → 이상 사건 등록 → 입력 적합성 검사 → DC 데이터라 AI 고장파형 분석 보류
+// 전체 릴레이(D2)로는 마을 전체를, 채널 릴레이(D3~D7)로는 LED 하나를 끄고, 해당 구간 INA219 전류 변화를 본다.
+
+type Target = 'ALL' | ChannelId
 
 const STEPS = ['장치 연결', '시나리오 실행', 'LED 소등', 'INA219 변화', '사건 등록', '적합성 검사', 'AI 분석 판단']
 const BASELINE_SAMPLES = 4
@@ -33,16 +35,16 @@ interface Run {
 const L = { textAlign: 'left' } as const
 const IDLE: Run = { phase: 'idle', startedAt: 0, cutAt: 0, holdAt: 0, restoreAt: 0, recoverAt: 0, error: null }
 
-const PHASE_TEXT: Record<Phase, string> = {
+const phaseText = (one: boolean): Record<Phase, string> => ({
   idle: '대기 중',
   baseline: '차단 전 기준값 측정 중…',
-  cutting: '릴레이 차단 명령 전송, 장치 응답 대기 중…',
-  holding: '전원 차단 상태 측정 중…',
-  restoring: '릴레이 복구 명령 전송, 장치 응답 대기 중…',
+  cutting: one ? '채널 소등 명령 전송, 장치 응답 대기 중…' : '릴레이 차단 명령 전송, 장치 응답 대기 중…',
+  holding: one ? 'LED 소등 상태 측정 중…' : '전원 차단 상태 측정 중…',
+  restoring: one ? '채널 복구 명령 전송, 장치 응답 대기 중…' : '릴레이 복구 명령 전송, 장치 응답 대기 중…',
   recovering: '복구 후 측정 중…',
   done: '시나리오 완료',
   failed: '시나리오 중단',
-}
+})
 const RUNNING: Phase[] = ['baseline', 'cutting', 'holding', 'restoring', 'recovering']
 
 interface Avg {
@@ -51,10 +53,16 @@ interface Avg {
   p: number
   leds: number
 }
-const avg = (pts: IotPoint[]): Avg => {
+/** 시나리오가 LED 하나면 그 LED가 속한 구간의 전류를, 전체면 마을 전체 전류를 봄 */
+const pickI = (target: Target, p: IotPoint): number => {
+  if (target === 'ALL') return p.i
+  const kind = IOT_CHANNELS.find((c) => c.id === target)!.kind
+  return (kind === 'HOUSE' ? p.ih : p.il) ?? p.i
+}
+const avg = (pts: IotPoint[], target: Target): Avg => {
   const n = Math.max(1, pts.length)
   const v = pts.reduce((s, x) => s + x.v, 0) / n
-  const i = pts.reduce((s, x) => s + x.i, 0) / n
+  const i = pts.reduce((s, x) => s + pickI(target, x), 0) / n
   return { v, i, p: v * i, leds: Math.max(0, Math.min(5, Math.round(i / LED_A))) }
 }
 
@@ -65,11 +73,15 @@ interface Result {
   after: Avg
   cutAt: number
   restoreAt: number
+  target: Target
 }
 
 export default function HardwareFlow() {
   const snap = useVillage()
   const nav = useNavigate()
+  const [target, setTarget] = useState<Target>('ALL')
+  const targetRef = useRef<Target>('ALL')
+  targetRef.current = target
   const [run, setRun] = useState<Run>(IDLE)
   const [result, setResult] = useState<Result | null>(null)
   const [caseId, setCaseId] = useState<string | null>(null)
@@ -81,10 +93,24 @@ export default function HardwareFlow() {
   const real = snap.source === 'SERIAL'
   const live = snap.connected && snap.status !== 'NO_DATA'
   const running = RUNNING.includes(run.phase)
-  const canStart = live && snap.relay && snap.relayPending === null && !running
+  const channelMode = target !== 'ALL'
+  const def = channelMode ? IOT_CHANNELS.find((c) => c.id === target)! : null
+  const canStart = live && snap.relay && snap.relayPending === null && !running && (!channelMode || (snap.canControl && snap.channels[target]))
+
+  // 시나리오가 끈 것(전체 또는 LED 하나)을 켜고 끔
+  const cut = () => (targetRef.current === 'ALL' ? setRelay(false) : setChannel(targetRef.current as ChannelId, false))
+  const restore = () => (targetRef.current === 'ALL' ? setRelay(true) : setChannel(targetRef.current as ChannelId, true))
+  const isCut = () => {
+    const t = targetRef.current
+    return t === 'ALL' ? !snap.relay && snap.relayPending === null : !snap.channels[t] && snap.channelPending[t] === undefined
+  }
+  const isRestored = () => {
+    const t = targetRef.current
+    return t === 'ALL' ? snap.relay && snap.relayPending === null : snap.channels[t] && snap.channelPending[t] === undefined
+  }
 
   function fail(message: string) {
-    if (phaseRef.current === 'cutting' || phaseRef.current === 'holding' || phaseRef.current === 'restoring') setRelay(true)
+    if (phaseRef.current === 'cutting' || phaseRef.current === 'holding' || phaseRef.current === 'restoring') restore()
     setRun((r) => ({ ...r, phase: 'failed', error: message }))
   }
 
@@ -99,7 +125,11 @@ export default function HardwareFlow() {
   useEffect(() => {
     return () => {
       const p = phaseRef.current
-      if (p === 'cutting' || p === 'holding' || p === 'restoring') setRelay(true)
+      if (p === 'cutting' || p === 'holding' || p === 'restoring') {
+        const t = targetRef.current
+        if (t === 'ALL') setRelay(true)
+        else setChannel(t, true)
+      }
     }
   }, [])
 
@@ -114,31 +144,32 @@ export default function HardwareFlow() {
     const since = (t: number) => now - t
     if (run.phase === 'baseline') {
       if (snap.history.filter((h) => h.t >= run.startedAt).length >= BASELINE_SAMPLES) {
-        setRelay(false)
+        cut()
         setRun({ ...run, phase: 'cutting', cutAt: now })
       }
     } else if (run.phase === 'cutting') {
-      if (!snap.relay && snap.relayPending === null) setRun({ ...run, phase: 'holding', holdAt: now })
-      else if (since(run.cutAt) > 5000) fail('릴레이 차단 명령을 장치가 확인하지 않았습니다.')
+      if (isCut()) setRun({ ...run, phase: 'holding', holdAt: now })
+      else if (since(run.cutAt) > 5000) fail('차단 명령을 장치가 확인하지 않았습니다.')
     } else if (run.phase === 'holding') {
       if (since(run.holdAt) >= HOLD_MS) {
-        setRelay(true)
+        restore()
         setRun({ ...run, phase: 'restoring', restoreAt: now })
       }
     } else if (run.phase === 'restoring') {
-      if (snap.relay && snap.relayPending === null) setRun({ ...run, phase: 'recovering', recoverAt: now })
-      else if (since(run.restoreAt) > 5000) fail('릴레이 복구 명령을 장치가 확인하지 않았습니다.')
+      if (isRestored()) setRun({ ...run, phase: 'recovering', recoverAt: now })
+      else if (since(run.restoreAt) > 5000) fail('복구 명령을 장치가 확인하지 않았습니다.')
     } else if (run.phase === 'recovering') {
       const after = snap.history.filter((h) => h.t >= run.recoverAt + SETTLE_MS)
       if (after.length >= RECOVER_SAMPLES) {
         const window: IotPoint[] = snap.history.filter((h) => h.t >= run.startedAt).map(({ p: _p, ...h }) => h)
         setResult({
           window,
-          before: avg(window.filter((h) => h.t < run.cutAt).slice(-BASELINE_SAMPLES)),
-          during: avg(window.filter((h) => h.t >= run.holdAt + SETTLE_MS && h.t < run.restoreAt)),
-          after: avg(window.filter((h) => h.t >= run.recoverAt + SETTLE_MS)),
+          before: avg(window.filter((h) => h.t < run.cutAt).slice(-BASELINE_SAMPLES), targetRef.current),
+          during: avg(window.filter((h) => h.t >= run.holdAt + SETTLE_MS && h.t < run.restoreAt), targetRef.current),
+          after: avg(window.filter((h) => h.t >= run.recoverAt + SETTLE_MS), targetRef.current),
           cutAt: run.cutAt,
           restoreAt: run.restoreAt,
+          target: targetRef.current,
         })
         setRun({ ...run, phase: 'done' })
       }
@@ -151,26 +182,31 @@ export default function HardwareFlow() {
     if (!result) return null
     const { before, during, after } = result
     const where = real ? '실측 INA219' : '시뮬레이터'
+    const one = result.target === 'ALL' ? null : IOT_CHANNELS.find((c) => c.id === result.target)!
+    const unit = one ? `${ZONE_LABEL[one.kind]} 전류` : '마을 전체 전류'
     return {
       id: Date.now() % 1_000_000_000,
       source: snap.source,
-      label: `전원 차단 시험 (${where})`,
+      label: one ? `${one.name} 소등 시험 (${where})` : `전원 차단 시험 (${where})`,
       at: new Date(result.cutAt).toISOString(),
       injected: null,
       injectedAt: new Date(result.cutAt).toISOString(),
-      status: 'OUTAGE',
+      status: one ? 'WARNING' : 'OUTAGE',
       maxScore: Math.min(1, Math.max(0, (before.i - during.i) / (LED_A * 2))),
-      relayOn: false,
+      relayOn: !!one,
       expected: before.i,
       window: result.window,
       clearedAt: new Date(result.restoreAt).toISOString(),
       caseId: null,
       notes: [
-        '시험 시나리오입니다. 웹에서 릴레이(D2)로 마을 전체 전원을 의도적으로 차단했다가 복구했습니다.',
-        `차단 전 ${before.v.toFixed(2)} V · ${before.i.toFixed(3)} A(LED 약 ${before.leds}개) → 차단 중 ${during.v.toFixed(2)} V · ${during.i.toFixed(3)} A(LED 약 ${during.leds}개) → 복구 후 ${after.v.toFixed(2)} V · ${after.i.toFixed(3)} A(LED 약 ${after.leds}개)`,
+        one
+          ? `시험 시나리오입니다. 웹에서 채널 릴레이(${one.relay})로 ${one.name}(LED ${one.ch}) 하나만 의도적으로 껐다가 켰습니다.`
+          : '시험 시나리오입니다. 웹에서 릴레이(D2)로 마을 전체 전원을 의도적으로 차단했다가 복구했습니다.',
+        `${unit}: 차단 전 ${before.i.toFixed(3)} A(LED 약 ${before.leds}개) → 차단 중 ${during.i.toFixed(3)} A(LED 약 ${during.leds}개) → 복구 후 ${after.i.toFixed(3)} A(LED 약 ${after.leds}개)`,
       ],
     }
   }, [result, real, snap.source])
+  const resultTarget = result?.target ?? target
 
   // 등록 전에 미리 보는 입력 적합성 검사 (사건 등록 때와 같은 규칙)
   const diagnosis = useMemo(() => (event ? buildIotCase(event, getActor(), 'PREVIEW').diagnosis : null), [event])
@@ -198,7 +234,7 @@ export default function HardwareFlow() {
     <>
       <div className="section">
         <h2 className="page-title" style={{ fontSize: 18 }}>하드웨어 분석 흐름</h2>
-        <p className="page-desc">모형에서 전원 차단 시나리오를 실행하고, LED와 INA219 측정값 변화를 사건으로 남긴 뒤, 입력 적합성 검사와 AI 분석 판단까지 순서대로 확인합니다.</p>
+        <p className="page-desc">모형에서 전원 차단 또는 LED 소등 시나리오를 실행하고, LED와 INA219 측정값 변화를 사건으로 남긴 뒤, 입력 적합성 검사와 AI 분석 판단까지 순서대로 확인합니다.</p>
       </div>
 
       <Steps steps={STEPS} done={done} />
@@ -217,7 +253,7 @@ export default function HardwareFlow() {
         )}
         <dl className="dl-rows">
           <div><dt>데이터 출처</dt><dd>{real ? '실측 장치' : '시뮬레이터'} · {info.deviceId}</dd></div>
-          <div><dt>센서</dt><dd>{info.sensor} · 마을 전체의 전압·전류만 측정</dd></div>
+          <div><dt>센서</dt><dd>{info.sensor} · 구간별 전압·전류를 측정</dd></div>
           <div><dt>릴레이</dt><dd>{snap.relay ? '닫힘 — 전원 공급 중' : '열림 — 마을 전체 차단'}</dd></div>
         </dl>
         <Metrics cols={4}>
@@ -229,20 +265,35 @@ export default function HardwareFlow() {
       </Section>
 
       <Section
-        title="② 시나리오 실행: 전원 차단 → 복구"
-        description={`릴레이 하나로 마을 전체 전원을 ${HOLD_MS / 1000}초간 차단했다가 자동으로 복구합니다. LED별 고장은 모형에서 만들 수 없어 시뮬레이터에서만 실행됩니다.`}
+        title={channelMode ? `② 시나리오 실행: ${def!.name} 소등 → 복구` : '② 시나리오 실행: 전원 차단 → 복구'}
+        description={`${channelMode ? `채널 릴레이로 ${def!.name}(LED ${def!.ch}) 하나만` : '전체 릴레이로 마을 전체 전원을'} ${HOLD_MS / 1000}초간 ${channelMode ? '끄고' : '차단했다가'} 자동으로 복구합니다.`}
         actions={
           <button className="btn btn-primary" onClick={start} disabled={!canStart}>
             {running ? '실행 중…' : result ? '다시 실행' : '시나리오 실행'}
           </button>
         }
       >
+        <div className="row gap" style={{ marginBottom: 12, flexWrap: 'wrap' }}>
+          <label className="field" style={{ margin: 0 }}>
+            끌 대상
+            <select value={target} onChange={(e) => setTarget(e.target.value as Target)} disabled={running}>
+              <option value="ALL">마을 전체 (전체 릴레이 D2)</option>
+              {IOT_CHANNELS.map((c) => (
+                <option key={c.id} value={c.id} disabled={!snap.canControl}>{c.name} · LED {c.ch} ({c.relay})</option>
+              ))}
+            </select>
+          </label>
+          {!snap.canControl && <span className="small muted">채널 상태를 보고하는 새 스케치가 필요합니다.</span>}
+        </div>
+        {channelMode && !snap.channels[target] && !running && live && (
+          <div className="alert alert-warn"><span>{def!.name} 채널이 꺼져 있습니다. 먼저 켜세요.</span></div>
+        )}
         {!snap.relay && !running && live && (
           <div className="alert alert-warn"><span>릴레이가 열려 있습니다. 먼저 스마트 마을에서 <Link to="/village">전력 복구</Link>를 누르세요.</span></div>
         )}
         <div className="row gap" style={{ marginTop: 4 }}>
           <Status tone={run.phase === 'failed' ? 'err' : run.phase === 'done' ? 'ok' : running ? 'accent' : 'off'} live={running}>
-            {PHASE_TEXT[run.phase]}
+            {phaseText(channelMode)[run.phase]}
           </Status>
           {running && <span className="small muted">화면을 벗어나면 전원을 자동으로 복구합니다.</span>}
         </div>
@@ -251,7 +302,7 @@ export default function HardwareFlow() {
 
       {result && event && diagnosis && (
         <>
-          <Section title="③ LED 소등과 INA219 측정값 변화" description="차단 전 · 차단 중 · 복구 후의 평균값입니다.">
+          <Section title="③ LED 소등과 INA219 측정값 변화" description={`차단 전 · 차단 중 · 복구 후의 평균값입니다.${resultTarget === 'ALL' ? ' 마을 전체 전류 기준입니다.' : ` ${ZONE_LABEL[IOT_CHANNELS.find((c) => c.id === resultTarget)!.kind]} INA219 전류 기준입니다.`}`}>
             <div className="table-wrap">
               <table>
                 <thead>
@@ -281,7 +332,7 @@ export default function HardwareFlow() {
               </div>
             </div>
             <p className="hint" style={{ marginTop: 12 }}>
-              {dropped > 0 ? `전류가 LED ${dropped}개 분량 줄었습니다.` : '전류 변화가 작습니다. 릴레이와 배선을 확인하세요.'} INA219가 1개라 어느 LED가 꺼졌는지는 구분하지 않습니다.
+              {dropped > 0 ? `전류가 LED ${dropped}개 분량 줄었습니다.` : '전류 변화가 작습니다. 릴레이와 배선을 확인하세요.'} {resultTarget === 'ALL' ? '전체 전류만 보므로 어느 LED가 꺼졌는지는 구분하지 않습니다.' : 'LED 하나를 직접 껐으므로 구간 전류 변화로 그 LED가 실제로 켜져 있었는지 확인합니다.'}
               {real && result.during.i > 0.03 ? ' 차단했는데도 전류가 흐릅니다. 릴레이 접점 고착이나 우회 배선을 확인하세요.' : ''}
             </p>
           </Section>

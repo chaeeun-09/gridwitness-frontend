@@ -1,25 +1,30 @@
-import { FAULT_LABEL, IOT_CHANNELS, type ChannelId, type VillageSnapshot } from '../lib/village'
+import { FAULT_LABEL, IOT_CHANNELS, setChannel, ZONE_SENSOR, type ChannelId, type VillageSnapshot } from '../lib/village'
 import { IconHouse, IconLamp } from './Icons'
-import { Status, type Tone } from './ui'
+import { Status, Switch, type Tone } from './ui'
 
 /**
- * 마을 부하(LED 5개) 목록. 개별 전류는 측정하지 않으므로 켜짐 여부만 보여줌.
- * 시뮬레이터는 시뮬레이터가 아는 실제 상태, 실측은 전체 전류로 추정한 켜진 개수.
+ * 마을 부하(LED 5개) 목록과 채널 스위치.
+ * 시뮬레이터는 시뮬레이터가 아는 실제 상태, 실측은 구간 전류로 추정한 켜짐 여부.
  */
-export default function Channels({ snap, selected, onSelect }: { snap: VillageSnapshot; selected?: ChannelId | null; onSelect?: (id: ChannelId) => void }) {
+export default function Channels({ snap, selected, onSelect, controls }: { snap: VillageSnapshot; selected?: ChannelId | null; onSelect?: (id: ChannelId) => void; controls?: boolean }) {
   const measured = snap.source === 'SERIAL'
   return (
-    <div className="channels" role="list">
+    <div className={`channels ${controls ? 'with-ctl' : ''}`} role="list">
       {IOT_CHANNELS.map((def) => {
         const led = snap.leds[def.id]
+        const pending = snap.channelPending[def.id] !== undefined
         const [label, tone]: [string, Tone] =
           snap.status === 'NO_DATA'
             ? ['데이터 없음', 'off']
             : led.fault
               ? [FAULT_LABEL[led.fault], led.fault === 'OPEN' ? 'warn' : 'err']
-              : led.lit
-                ? [measured ? '켜짐 (추정)' : '켜짐', 'ok']
-                : [!snap.relay ? '차단됨' : measured ? '꺼짐 (추정)' : '꺼짐', 'off']
+              : !snap.relay
+                ? ['차단됨', 'off']
+                : !led.channelOn
+                  ? ['꺼짐 · 채널 OFF', 'off']
+                  : led.lit
+                    ? [measured ? '켜짐 (추정)' : '켜짐', 'ok']
+                    : [measured ? '전류 없음 (추정)' : '꺼짐', 'warn']
         return (
           <div
             key={def.id}
@@ -36,9 +41,18 @@ export default function Channels({ snap, selected, onSelect }: { snap: VillageSn
                 <span className="xs muted">LED {def.ch}</span>
               </span>
             </div>
-            <span className="small muted">{def.board}</span>
-            <span className="small muted">저항 직렬 · 병렬 연결</span>
-            <Status tone={tone}>{label}</Status>
+            <span className="small muted">{def.relay}</span>
+            <span className="small muted">{ZONE_SENSOR[def.kind]}</span>
+            <Status tone={tone}>{pending ? '명령 전송 중…' : label}</Status>
+            {controls && (
+              <Switch
+                on={pending ? snap.channelPending[def.id]! : led.channelOn}
+                pending={pending}
+                disabled={!snap.canControl || !snap.connected}
+                onToggle={() => setChannel(def.id, !led.channelOn)}
+                label={`${def.name} 채널 ${led.channelOn ? '끄기' : '켜기'}`}
+              />
+            )}
           </div>
         )
       })}

@@ -2,10 +2,12 @@ import { useSyncExternalStore } from 'react'
 import type { IotPoint } from '../types'
 import { openSerial, parseFrame, type SerialLink, type SerialReading } from './serial'
 
-// 스마트 마을 모형 계측 (최종 구성도 기준).
-//   5V DC 어댑터 → 1채널 릴레이(Arduino D2, 마을 전체 ON/OFF) → INA219(전체 전압·전류) → 브레드보드 → LED 5개 병렬
+// 스마트 마을 모형 계측 (채널 릴레이 구성).
+//   5V DC 어댑터 → 전체 릴레이(D2, COM→NC, 마을 ON/OFF)
+//     → INA219 ① 0x40 → 채널 릴레이 ①~③ (D3~D5) → 주택 1~3 LED
+//     → INA219 ② 0x41 → 채널 릴레이 ④~⑤ (D6~D7) → 가로등 1~2 LED
 // 출처: MOCK(브라우저 시뮬레이터) 또는 SERIAL(실제 모형, Web Serial).
-// LED별 전류는 측정하지 않음. 전체 전류로 켜진 LED 수만 추정. 교류 고장파형과는 별개 데이터.
+// LED별 전류는 측정하지 않음. 구간 전류로 켜진 LED 수를 추정하고, 어느 LED인지는 채널 점검으로 확인. 교류 고장파형과는 별개 데이터.
 
 export type ChannelId = 'h1' | 'h2' | 'h3' | 'l1' | 'l2'
 export type ChannelKind = 'HOUSE' | 'LAMP'
@@ -20,17 +22,17 @@ export interface ChannelDef {
   ch: number
   kind: ChannelKind
   name: string
-  /** 꽂힌 브레드보드 */
-  board: string
+  /** 이 LED를 켜고 끄는 채널 릴레이와 Arduino 핀 */
+  relay: string
 }
 
-/** 마을 부하: 주택 3 + 가로등 2, 모두 병렬 */
+/** 마을 부하: 주택 3 + 가로등 2. LED마다 채널 릴레이가 있고, 구간마다 INA219가 하나씩 있음 */
 export const IOT_CHANNELS: ChannelDef[] = [
-  { id: 'h1', ch: 1, kind: 'HOUSE', name: '주택 1', board: '브레드보드 2' },
-  { id: 'h2', ch: 2, kind: 'HOUSE', name: '주택 2', board: '브레드보드 2' },
-  { id: 'h3', ch: 3, kind: 'HOUSE', name: '주택 3', board: '브레드보드 2' },
-  { id: 'l1', ch: 4, kind: 'LAMP', name: '가로등 1', board: '브레드보드 3' },
-  { id: 'l2', ch: 5, kind: 'LAMP', name: '가로등 2', board: '브레드보드 3' },
+  { id: 'h1', ch: 1, kind: 'HOUSE', name: '주택 1', relay: '릴레이 ① · D3' },
+  { id: 'h2', ch: 2, kind: 'HOUSE', name: '주택 2', relay: '릴레이 ② · D4' },
+  { id: 'h3', ch: 3, kind: 'HOUSE', name: '주택 3', relay: '릴레이 ③ · D5' },
+  { id: 'l1', ch: 4, kind: 'LAMP', name: '가로등 1', relay: '릴레이 ④ · D6' },
+  { id: 'l2', ch: 5, kind: 'LAMP', name: '가로등 2', relay: '릴레이 ⑤ · D7' },
 ]
 
 export const SOURCE_LABEL: Record<DataSource, string> = {
@@ -58,8 +60,8 @@ export const STATUS_LABEL: Record<NodeStatus, string> = {
 }
 
 export const DEVICE_INFO: Record<DataSource, { deviceId: string; sensor: string; port: string }> = {
-  MOCK: { deviceId: 'arduino-sim-01', sensor: 'INA219 ×1 (시뮬레이터)', port: 'SIM' },
-  SERIAL: { deviceId: 'arduino-village', sensor: 'INA219 ×1', port: 'Web Serial 115200' },
+  MOCK: { deviceId: 'arduino-sim-01', sensor: 'INA219 ×2 (시뮬레이터)', port: 'SIM' },
+  SERIAL: { deviceId: 'arduino-village', sensor: 'INA219 ×2 (주택 0x40 · 가로등 0x41)', port: 'Web Serial 115200' },
 }
 export const IOT_MODEL = 'iot-anomaly-0.2 (전체 전류 잔차)'
 export const NOMINAL_V = 5
@@ -107,9 +109,25 @@ const HISTORY = 120
 const COMMAND_LATENCY_MS = 350 // 시뮬레이터 릴레이 응답 지연
 
 export interface LedState extends ChannelDef {
-  /** 켜져 있다고 보는지. Mock은 시뮬레이터 값, 실측은 추정 */
+  /** 켜져 있다고 보는지. Mock은 시뮬레이터 값, 실측은 구간 전류로 추정 */
   lit: boolean
+  /** 채널 릴레이가 켜져 있는지 (꺼져 있으면 의도한 소등) */
+  channelOn: boolean
   fault: FaultKind | null
+}
+
+/** 측정 구간: INA219 ① 0x40 = 주택 1~3, ② 0x41 = 가로등 1~2 */
+export const ZONE_LABEL: Record<ChannelKind, string> = { HOUSE: '주택 구간', LAMP: '가로등 구간' }
+export const ZONE_SENSOR: Record<ChannelKind, string> = { HOUSE: 'INA219 ① 0x40', LAMP: 'INA219 ② 0x41' }
+export const zoneChannels = (kind: ChannelKind) => IOT_CHANNELS.filter((c) => c.kind === kind)
+
+export interface ZoneState {
+  v: number
+  i: number
+  expected: number
+  score: number
+  /** 구간 전류로 추정한 켜진 LED 수 */
+  estLit: number
 }
 
 export interface VillageEvent {
@@ -156,7 +174,15 @@ export interface VillageSnapshot {
   /** 전체 전류로 추정한 켜진 LED 수 */
   estLit: number
   leds: Record<ChannelId, LedState>
-  history: { t: number; v: number; i: number; p: number; expected: number; score: number }[]
+  /** 채널 릴레이 상태 (D3~D7) */
+  channels: Record<ChannelId, boolean>
+  /** 장치 확인을 기다리는 채널 명령 */
+  channelPending: Partial<Record<ChannelId, boolean>>
+  /** 웹에서 채널을 끄고 켤 수 있는지 (시뮬레이터, 또는 채널 상태를 보고하는 장치) */
+  canControl: boolean
+  /** 구간별 측정. 구간 측정이 없는 예전 장치는 null */
+  zones: Record<ChannelKind, ZoneState> | null
+  history: (Omit<IotPoint, 't'> & { t: number; p: number })[]
   events: VillageEvent[]
   faults: Partial<Record<ChannelId, FaultKind>>
   supplyFault: FaultKind | null
@@ -191,8 +217,10 @@ let lastInjectedAt: string | null = null
 let relay = true
 let relayPending: boolean | null = null
 let commandTimer: ReturnType<typeof setTimeout> | undefined
-/** 시나리오 재생용 가상 부하 (시뮬레이터 전용, 실제 회로에는 LED별 스위치가 없음) */
+/** 채널 릴레이 상태 (D3~D7). 시뮬레이터는 명령 값, 실측은 장치가 보고한 값 */
 const enabled: Record<ChannelId, boolean> = { h1: true, h2: true, h3: true, l1: true, l2: true }
+const chPending: Partial<Record<ChannelId, boolean>> = {}
+const chTimers: Partial<Record<ChannelId, ReturnType<typeof setTimeout>>> = {}
 let connected = true
 let source: DataSource = 'MOCK'
 let link: SerialLink | null = null
@@ -213,32 +241,54 @@ function mockLit(id: ChannelId): boolean {
   return contactClosed({ relay, supplyFault }) && supplyFault !== 'OUTAGE' && enabled[id] && faults[id] !== 'OPEN'
 }
 
-function mockMeasure(): { v: number; i: number } {
+/** 시뮬레이터 측정: INA219 두 개가 각 구간 전압·전류를 잼 */
+function mockMeasure(): SerialReading & { zones: NonNullable<SerialReading['zones']> } {
   // 회로가 열려 있으면 INA219는 0 V·0 A (표시 자릿수 아래의 잡음만)
-  if (!contactClosed({ relay, supplyFault }) || supplyFault === 'OUTAGE') return { v: Math.abs(noise(0.004)), i: Math.abs(noise(0.0004)) }
-  const vSupply = supplyFault === 'SAG' ? 4.25 + noise(0.05) : 5.03 + noise(0.015)
-  let i = 0
-  for (const c of IOT_CHANNELS) {
-    if (!mockLit(c.id)) continue
-    i += LED_A * (vSupply / 5) * (1 + 0.03 * Math.sin(t / 7 + c.ch))
-    if (faults[c.id] === 'GROUND') i += 0.22
+  if (!contactClosed({ relay, supplyFault }) || supplyFault === 'OUTAGE') {
+    const off = () => ({ v: Math.abs(noise(0.004)), i: Math.abs(noise(0.0004)) })
+    const house = off()
+    const lamp = off()
+    return { v: Math.max(house.v, lamp.v), i: house.i + lamp.i, relay, zones: { house, lamp } }
   }
-  i += noise(0.003)
-  return { v: vSupply - i * 0.06, i: Math.max(0, i) }
+  const vSupply = supplyFault === 'SAG' ? 4.25 + noise(0.05) : 5.03 + noise(0.015)
+  const zone = (kind: ChannelKind) => {
+    let i = 0
+    for (const c of zoneChannels(kind)) {
+      if (!mockLit(c.id)) continue
+      i += LED_A * (vSupply / 5) * (1 + 0.03 * Math.sin(t / 7 + c.ch))
+      if (faults[c.id] === 'GROUND') i += 0.22
+    }
+    i = Math.max(0, i + noise(0.002))
+    return { v: vSupply - i * 0.06, i }
+  }
+  const house = zone('HOUSE')
+  const lamp = zone('LAMP')
+  return { v: Math.min(house.v, lamp.v), i: house.i + lamp.i, relay, zones: { house, lamp } }
 }
 
-function expectedNow(): number {
+/** 구간 예상 전류 = 마을 전원이 들어가 있을 때 켜진 채널 수 × LED 1개 정격 */
+function expectedZone(kind: ChannelKind): number {
   if (!relay) return 0
-  const on = IOT_CHANNELS.filter((c) => enabled[c.id]).length
-  return on * LED_A
+  return zoneChannels(kind).filter((c) => enabled[c.id]).length * LED_A
 }
 
-function ledStates(estLit: number): Record<ChannelId, LedState> {
-  // 실측은 LED별 전류가 없으므로 "켜진 수"만 앞에서부터 채워 표시
+/** 웹에서 채널을 조종할 수 있는지: 시뮬레이터이거나, 채널 상태를 보고하는 장치 */
+function canControlChannels(): boolean {
+  return source === 'MOCK' || !!latest?.frame.ch
+}
+
+function ledStates(estLit: number, zones: VillageSnapshot['zones']): Record<ChannelId, LedState> {
+  // 실측은 LED별 전류가 없으므로 구간마다 "켜진 수"를 켜져 있는 채널 앞에서부터 채워 표시
+  const litSerial = (c: ChannelDef, k: number) => {
+    if (!enabled[c.id]) return false
+    if (!zones) return k < estLit
+    const on = zoneChannels(c.kind).filter((x) => enabled[x.id])
+    return on.findIndex((x) => x.id === c.id) < zones[c.kind].estLit
+  }
   return Object.fromEntries(
     IOT_CHANNELS.map((c, k) => [
       c.id,
-      { ...c, lit: source === 'MOCK' ? mockLit(c.id) : k < estLit, fault: source === 'MOCK' ? (faults[c.id] ?? null) : null },
+      { ...c, lit: source === 'MOCK' ? mockLit(c.id) : litSerial(c, k), channelOn: enabled[c.id], fault: source === 'MOCK' ? (faults[c.id] ?? null) : null },
     ]),
   ) as Record<ChannelId, LedState>
 }
@@ -260,7 +310,11 @@ function initial(): VillageSnapshot {
     score: 0,
     status: 'NORMAL',
     estLit: 5,
-    leds: ledStates(5),
+    leds: ledStates(5, null),
+    channels: { ...enabled },
+    channelPending: {},
+    canControl: true,
+    zones: null,
     history: [],
     events: [],
     faults: {},
@@ -274,6 +328,7 @@ let snap: VillageSnapshot = initial()
 
 function emit(patch: Partial<VillageSnapshot> = {}) {
   const estLit = patch.estLit ?? snap.estLit
+  const zones = patch.zones !== undefined ? patch.zones : snap.zones
   snap = {
     ...snap,
     ...patch,
@@ -283,7 +338,10 @@ function emit(patch: Partial<VillageSnapshot> = {}) {
     badFrames,
     relay,
     relayPending,
-    leds: ledStates(estLit),
+    leds: ledStates(estLit, zones),
+    channels: { ...enabled },
+    channelPending: { ...chPending },
+    canControl: canControlChannels(),
     faults: { ...faults },
     supplyFault,
     scenario: scenario && { ...scenario },
@@ -293,11 +351,16 @@ function emit(patch: Partial<VillageSnapshot> = {}) {
 }
 
 function advanceScenario() {
-  if (!scenario || source !== 'MOCK' || t % 4 !== 0) return
+  if (!scenario || t % 4 !== 0) return
   scenario.hour = (scenario.hour + 1) % 24
   const max = Math.max(...scenario.profile)
   const n = Math.round((scenario.profile[scenario.hour] / max) * IOT_CHANNELS.length)
-  IOT_CHANNELS.forEach((c, k) => (enabled[c.id] = k < n))
+  IOT_CHANNELS.forEach((c, k) => {
+    const want = k < n
+    if (source === 'MOCK') enabled[c.id] = want
+    // 실측: 실제 채널 릴레이를 켜고 끔
+    else if (enabled[c.id] !== want && chPending[c.id] === undefined) setChannel(c.id, want)
+  })
 }
 
 function tick() {
@@ -308,12 +371,27 @@ function tick() {
   const stale = source === 'SERIAL' && (!latest || now - latest.at > 2000)
   if (!connected || stale) return emit({ status: 'NO_DATA' })
 
-  const { v, i } = source === 'SERIAL' ? latest!.frame : mockMeasure()
-  const expected = expectedNow()
-  const score = anomalyScore(v, i, expected)
+  const m = source === 'SERIAL' ? latest!.frame : mockMeasure()
+  const { v, i } = m
+  const eh = expectedZone('HOUSE')
+  const el = expectedZone('LAMP')
+  const expected = eh + el
+  let score = anomalyScore(v, i, expected)
+  let zones: VillageSnapshot['zones'] = null
+  if (m.zones) {
+    // 구간마다 따로 점수를 내서, 한 구간의 누설과 다른 구간의 단선이 합계에서 서로 가려지지 않게 함
+    const zoneState = (kind: ChannelKind, r: { v: number; i: number }, exp: number): ZoneState => ({
+      ...r,
+      expected: exp,
+      score: anomalyScore(r.v, r.i, exp),
+      estLit: Math.max(0, Math.min(zoneChannels(kind).length, Math.round(r.i / LED_A))),
+    })
+    zones = { HOUSE: zoneState('HOUSE', m.zones.house, eh), LAMP: zoneState('LAMP', m.zones.lamp, el) }
+    score = Math.max(score, zones.HOUSE.score, zones.LAMP.score)
+  }
   const status = classify(v, i, score, relay)
-  const estLit = Math.max(0, Math.min(IOT_CHANNELS.length, Math.round(i / LED_A)))
-  const point: IotPoint = { t: now, v, i, expected, score }
+  const estLit = zones ? zones.HOUSE.estLit + zones.LAMP.estLit : Math.max(0, Math.min(IOT_CHANNELS.length, Math.round(i / LED_A)))
+  const point: IotPoint = { t: now, v, i, expected, score, ...(m.zones && { ih: m.zones.house.i, il: m.zones.lamp.i, eh, el }) }
 
   const events = [...snap.events]
   const open = events.findIndex((e) => e.clearedAt === null)
@@ -351,9 +429,10 @@ function tick() {
     score,
     status,
     estLit,
+    zones,
     lastPacketAt: source === 'SERIAL' ? latest!.at : now,
     packets: snap.packets + 1,
-    history: [...snap.history, { t: now, v, i, p: v * i, expected, score }].slice(-HISTORY),
+    history: [...snap.history, { ...point, p: v * i }].slice(-HISTORY),
     events: events.slice(0, 40),
   })
 }
@@ -371,6 +450,11 @@ function subscribe(l: () => void) {
       timer = null
     }
   }
+}
+
+/** 화면 밖(채널 점검 등)에서 현재 상태를 읽을 때 */
+export function getVillage(): VillageSnapshot {
+  return snap
 }
 
 export function useVillage(): VillageSnapshot {
@@ -405,6 +489,30 @@ export function setRelay(on: boolean) {
   }, COMMAND_LATENCY_MS)
 }
 
+/** 웹 → 장치 채널 명령 (LED 하나 끄기·켜기). 장치가 보고한 채널 상태로 확인될 때까지 '전송 중'. */
+export function setChannel(id: ChannelId, on: boolean) {
+  if (!connected || !canControlChannels()) return
+  const def = IOT_CHANNELS.find((c) => c.id === id)!
+  chPending[id] = on
+  lastError = null
+  clearTimeout(chTimers[id])
+  emit()
+  if (source === 'SERIAL') {
+    link?.write(`CH ${def.ch} ${on ? 1 : 0}`).catch((e: Error) => fail(`명령 전송 실패: ${e.message}`))
+    chTimers[id] = setTimeout(() => {
+      if (chPending[id] === undefined) return
+      delete chPending[id]
+      fail(`${def.name}(채널 ${def.ch}) 명령에 장치가 응답하지 않았습니다.`)
+    }, 2000)
+    return
+  }
+  chTimers[id] = setTimeout(() => {
+    enabled[id] = on
+    delete chPending[id]
+    emit()
+  }, COMMAND_LATENCY_MS)
+}
+
 function onSerialLine(line: string) {
   const frame = parseFrame(line)
   if (!frame) {
@@ -416,6 +524,15 @@ function onSerialLine(line: string) {
   if (relayPending === relay) {
     relayPending = null
     clearTimeout(commandTimer)
+  }
+  if (frame.ch) {
+    IOT_CHANNELS.forEach((c, k) => {
+      enabled[c.id] = frame.ch![k]
+      if (chPending[c.id] === enabled[c.id]) {
+        delete chPending[c.id]
+        clearTimeout(chTimers[c.id])
+      }
+    })
   }
 }
 
@@ -446,6 +563,11 @@ export async function switchToMock() {
   source = 'MOCK'
   connected = true
   lastError = null
+  IOT_CHANNELS.forEach((c) => {
+    enabled[c.id] = true
+    delete chPending[c.id]
+    clearTimeout(chTimers[c.id])
+  })
   emit({ history: [] })
 }
 
@@ -479,22 +601,26 @@ export function setConnected(on: boolean) {
   emit()
 }
 
-/** 공공데이터 시간대 패턴으로 켜진 부하 수를 바꿔 재생 (시뮬레이터 전용) */
+/** 공공데이터 시간대 패턴으로 켜진 부하 수를 바꿔 재생. 실측 장치는 실제 채널 릴레이를 켜고 끔 */
 export function startScenario(label: string, profile: number[]) {
-  if (source !== 'MOCK') return
+  if (!canControlChannels()) return
   // 전원이 끊긴 채로는 켜지는 LED 수가 장면에 보이지 않으므로 재생과 함께 전력 복구
-  clearTimeout(commandTimer)
-  relay = true
-  relayPending = null
-  connected = true
+  if (source === 'MOCK') {
+    clearTimeout(commandTimer)
+    relay = true
+    relayPending = null
+    connected = true
+  } else if (!relay) setRelay(true)
   scenario = { label, profile, hour: -1 }
   t = 3 // 다음 tick에서 바로 0시 적용
   emit()
 }
 
 export function stopScenario() {
+  const was = scenario !== null
   scenario = null
-  IOT_CHANNELS.forEach((c) => (enabled[c.id] = true))
+  if (source === 'MOCK') IOT_CHANNELS.forEach((c) => (enabled[c.id] = true))
+  else if (was) IOT_CHANNELS.forEach((c) => !enabled[c.id] && setChannel(c.id, true))
   emit()
 }
 
@@ -509,6 +635,7 @@ export function lightView(led: LedState, snap: VillageSnapshot): { status: NodeS
   if (led.fault) return { status: led.fault === 'OPEN' ? 'WARNING' : 'FAULT', text: FAULT_LABEL[led.fault] }
   if (!snap.relay) return led.lit ? { status: 'FAULT', text: '차단했는데 켜짐' } : { status: 'OFF', text: '차단됨' }
   if (snap.status === 'OUTAGE') return { status: 'OUTAGE', text: '정전' }
+  if (!led.channelOn) return { status: 'OFF', text: snap.scenario ? '꺼짐 · 시나리오' : '꺼짐 · 채널 OFF' }
   if (!led.lit) return { status: 'OFF', text: snap.scenario ? '꺼짐 · 시나리오' : snap.source === 'SERIAL' ? '꺼짐 (추정)' : '꺼짐' }
   // 전체 전류 이상(LED 하나가 끊긴 경우 등)이 멀쩡한 LED의 색까지 바꾸면 고장 난 곳을 구분할 수 없으므로, 전원 쪽 고장일 때만 전체 색을 따른다
   const status = snap.supplyFault && (snap.status === 'WARNING' || snap.status === 'FAULT') ? snap.status : 'NORMAL'
@@ -543,7 +670,7 @@ export function speech(led: LedState, snap: VillageSnapshot): string | null {
   if (!snap.relay) return pick(L.outage ?? [])
   if (snap.supplyFault === 'OUTAGE') return house ? pick(HOUSE_LINES.noPower) : pick(LAMP_LINES.outage)
   if (snap.supplyFault === 'SAG') return pick(L.sag ?? [])
-  // 공공데이터 시나리오로 꺼진 집은 잠든 것으로 표현
-  if (snap.scenario && house && !led.lit) return pick(HOUSE_LINES.sleep)
+  // 공공데이터 시나리오나 채널로 끈 집은 잠든 것으로 표현
+  if (house && !led.channelOn) return pick(HOUSE_LINES.sleep)
   return null
 }

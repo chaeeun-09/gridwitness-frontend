@@ -1,12 +1,25 @@
 // Web Serial로 Arduino와 통신 (Chrome·Edge 지원).
 // 프로토콜 (115200 baud, 줄 단위):
-//   장치 → 웹: {"v":5.02,"i":0.281,"relay":1}   (INA219 전체 전압·전류, 릴레이 상태, 0.5초마다)
-//   웹 → 장치: RELAY <0|1>                     (D2 릴레이로 마을 전체 전원 차단·복구)
+//   장치 → 웹 (0.5초마다):
+//     {"v":5.02,"i":0.281,"relay":1,"ch":[1,1,1,1,1],"vh":5.02,"ih":0.168,"vl":5.01,"il":0.113}
+//     v·i 마을 전체 · relay 마을 전원 · ch 채널 1~5 릴레이 · vh·ih 주택 구간(INA219 0x40) · vl·il 가로등 구간(0x41)
+//     ch·구간 값이 없는 예전 장치({"v","i","relay"}만)도 받음
+//   웹 → 장치: RELAY <0|1>   마을 전체 전원 차단·복구 (D2)
+//              CH <1~5> <0|1> 채널 하나 끄기·켜기 (D3~D7)
+
+export interface ZoneReading {
+  v: number
+  i: number
+}
 
 export interface SerialReading {
   v: number
   i: number
   relay: boolean
+  /** 채널 1~5 릴레이 상태. 예전 장치는 없음 */
+  ch?: boolean[]
+  /** 구간별 측정 (주택 = INA219 0x40, 가로등 = 0x41). 예전 장치는 없음 */
+  zones?: { house: ZoneReading; lamp: ZoneReading }
 }
 
 export interface SerialLink {
@@ -30,11 +43,21 @@ export const serialSupported = () => typeof navigator !== 'undefined' && 'serial
 /** 한 줄을 측정값으로 해석. 형식이 틀리면 null */
 export function parseFrame(line: string): SerialReading | null {
   try {
-    const obj = JSON.parse(line) as { v?: unknown; i?: unknown; relay?: unknown }
+    const obj = JSON.parse(line) as Record<string, unknown>
     const v = Number(obj.v)
     const i = Number(obj.i)
     if (!Number.isFinite(v) || !Number.isFinite(i) || obj.relay === undefined) return null
-    return { v, i, relay: Number(obj.relay) === 1 }
+    const out: SerialReading = { v, i, relay: Number(obj.relay) === 1 }
+    if (Array.isArray(obj.ch)) {
+      if (obj.ch.length !== 5) return null
+      out.ch = obj.ch.map((x) => Number(x) === 1)
+    }
+    const z = ['vh', 'ih', 'vl', 'il'].map((k) => Number(obj[k]))
+    if (obj.ih !== undefined) {
+      if (!z.every(Number.isFinite)) return null
+      out.zones = { house: { v: z[0], i: z[1] }, lamp: { v: z[2], i: z[3] } }
+    }
+    return out
   } catch {
     return null
   }

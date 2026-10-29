@@ -1,45 +1,86 @@
-// GridWitness 마을 정전 모니터링 모형 — 최종 구성도 기준
-//   5V DC 어댑터 → 1채널 릴레이(D2) → INA219(VIN+ → VIN-) → 브레드보드 1(분배) → 브레드보드 2·3 → LED 5개(각 저항 직렬, 병렬)
-//   INA219: A4(SDA), A5(SCL), 주소 0x40
+// GridWitness 마을 정전 모니터링 모형 — 채널 릴레이 구성
+//   5V DC 어댑터 → 1채널 릴레이(D2, COM→NC 사용, 마을 전체 전원)
+//     → INA219 ① 0x40 → 채널 릴레이 ①~③ (D3~D5) → 주택 1~3 LED
+//     → INA219 ② 0x41 → 채널 릴레이 ④~⑤ (D6~D7) → 가로등 1~2 LED
+//   INA219 두 개: A4(SDA), A5(SCL) 공통
 //
 // 웹(Web Serial, 115200 baud)과 줄 단위로 통신합니다.
-//   장치 → 웹: {"v":5.02,"i":0.281,"relay":1}   (0.5초마다)
-//   웹 → 장치: RELAY 0  (정전 발생)  /  RELAY 1  (전력 복구)
+//   장치 → 웹 (0.5초마다):
+//     {"v":5.02,"i":0.281,"relay":1,"ch":[1,1,1,1,1],"vh":5.02,"ih":0.168,"vl":5.01,"il":0.113}
+//       v·i      : 마을 전체 (두 구간 합계)          relay : 마을 전원이 들어가 있으면 1
+//       ch       : 채널 1~5 릴레이 상태 (1 = 켜짐)   vh·ih : 주택 구간 (INA219 ①)   vl·il : 가로등 구간 (INA219 ②)
+//   웹 → 장치:
+//     RELAY 0 / RELAY 1   마을 전체 정전 / 복구
+//     CH <1~5> <0|1>      채널 하나 끄기 / 켜기   (예: CH 3 0 → 주택 3 소등)
 //
 // 필요 라이브러리: Adafruit INA219
 
 #include <Wire.h>
 #include <Adafruit_INA219.h>
 
-const uint8_t RELAY_PIN = 2;
-// 릴레이 모듈이 LOW에서 동작(Active-Low)하면 true로 바꿉니다.
+// ── 배선에 맞게 조정 ──────────────────────────────────
+const uint8_t MASTER_PIN = 2;
+// 전체 릴레이를 COM→NC로 연결: 코일이 꺼져 있을 때 전원이 들어감 (NO로 연결했다면 false)
+const bool MASTER_USES_NC = true;
+const uint8_t CH_PINS[5] = {3, 4, 5, 6, 7};  // 주택 1~3, 가로등 1~2
+// 채널 릴레이를 COM→NO로 연결: 코일이 켜져야 LED가 켜짐 (NC로 연결했다면 true)
+const bool CH_USES_NC = false;
+// 릴레이 모듈이 LOW 입력에서 코일이 켜지면(Active-Low) true
 const bool RELAY_ACTIVE_LOW = false;
+// ──────────────────────────────────────────────────
 
-Adafruit_INA219 ina219(0x40);
-bool sensorOk = false;
-bool relayOn = true;
+Adafruit_INA219 inaHouse(0x40);
+Adafruit_INA219 inaLamp(0x41);
+bool houseOk = false;
+bool lampOk = false;
+
+bool powerOn = true;                       // 마을 전원
+bool chOn[5] = {true, true, true, true, true};
 
 const unsigned long PERIOD_MS = 500;
 unsigned long lastSend = 0;
 String line;
 
-void applyRelay() {
-  bool level = relayOn ? !RELAY_ACTIVE_LOW : RELAY_ACTIVE_LOW;
-  digitalWrite(RELAY_PIN, level ? HIGH : LOW);
+// 원하는 상태(on)를 코일 구동 여부로 바꿔 핀에 씀
+void driveRelay(uint8_t pin, bool on, bool usesNc) {
+  bool coil = usesNc ? !on : on;
+  bool level = RELAY_ACTIVE_LOW ? !coil : coil;
+  digitalWrite(pin, level ? HIGH : LOW);
+}
+
+void applyAll() {
+  driveRelay(MASTER_PIN, powerOn, MASTER_USES_NC);
+  for (uint8_t k = 0; k < 5; k++) driveRelay(CH_PINS[k], chOn[k], CH_USES_NC);
 }
 
 void handleCommand(const String& cmd) {
-  if (cmd == "RELAY 1") relayOn = true;
-  else if (cmd == "RELAY 0") relayOn = false;
-  else return;
-  applyRelay();
+  if (cmd == "RELAY 1") powerOn = true;
+  else if (cmd == "RELAY 0") powerOn = false;
+  else if (cmd.startsWith("CH ") && cmd.length() >= 6) {
+    int n = cmd.charAt(3) - '0';
+    char s = cmd.charAt(5);
+    if (n < 1 || n > 5 || (s != '0' && s != '1')) return;
+    chOn[n - 1] = s == '1';
+  } else return;
+  applyAll();
+}
+
+// 부하 쪽 전압 = 버스 전압 + 션트 전압
+float loadVoltage(Adafruit_INA219& ina, bool ok) {
+  return ok ? ina.getBusVoltage_V() + ina.getShuntVoltage_mV() / 1000.0 : 0;
+}
+float loadCurrent(Adafruit_INA219& ina, bool ok) {
+  float i = ok ? ina.getCurrent_mA() / 1000.0 : 0;
+  return i < 0 ? 0 : i;
 }
 
 void setup() {
   Serial.begin(115200);
-  pinMode(RELAY_PIN, OUTPUT);
-  applyRelay();
-  sensorOk = ina219.begin();
+  pinMode(MASTER_PIN, OUTPUT);
+  for (uint8_t k = 0; k < 5; k++) pinMode(CH_PINS[k], OUTPUT);
+  applyAll();
+  houseOk = inaHouse.begin();
+  lampOk = inaLamp.begin();
 }
 
 void loop() {
@@ -58,16 +99,29 @@ void loop() {
   if (now - lastSend < PERIOD_MS) return;
   lastSend = now;
 
-  // 부하 쪽 전압 = 버스 전압 + 션트 전압
-  float v = sensorOk ? ina219.getBusVoltage_V() + ina219.getShuntVoltage_mV() / 1000.0 : 0;
-  float i = sensorOk ? ina219.getCurrent_mA() / 1000.0 : 0;
-  if (i < 0) i = 0;
+  float vh = loadVoltage(inaHouse, houseOk);
+  float ih = loadCurrent(inaHouse, houseOk);
+  float vl = loadVoltage(inaLamp, lampOk);
+  float il = loadCurrent(inaLamp, lampOk);
 
   Serial.print("{\"v\":");
-  Serial.print(v, 2);
+  Serial.print(vh > vl ? vh : vl, 2);
   Serial.print(",\"i\":");
-  Serial.print(i, 3);
+  Serial.print(ih + il, 3);
   Serial.print(",\"relay\":");
-  Serial.print(relayOn ? 1 : 0);
+  Serial.print(powerOn ? 1 : 0);
+  Serial.print(",\"ch\":[");
+  for (uint8_t k = 0; k < 5; k++) {
+    if (k) Serial.print(',');
+    Serial.print(chOn[k] ? 1 : 0);
+  }
+  Serial.print("],\"vh\":");
+  Serial.print(vh, 2);
+  Serial.print(",\"ih\":");
+  Serial.print(ih, 3);
+  Serial.print(",\"vl\":");
+  Serial.print(vl, 2);
+  Serial.print(",\"il\":");
+  Serial.print(il, 3);
   Serial.println("}");
 }
