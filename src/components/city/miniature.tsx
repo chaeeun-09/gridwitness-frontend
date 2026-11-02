@@ -90,9 +90,9 @@ function useBuildingMaterial() {
             float lit = max(vLit, 0.0);
             float along = (abs(on3.x) > 0.5) ? vObjPos.z * vInstScale.z : vObjPos.x * vInstScale.x;
             float yy = (vObjPos.y + 0.5) * vInstScale.y;
-            vec2 cell = vec2(along / 0.17, yy / 0.32);
+            vec2 cell = vec2(along / 0.6, yy / 0.7);
             vec2 f = fract(cell);
-            float win = step(0.2, f.x) * step(f.x, 0.8) * step(0.22, f.y) * step(f.y, 0.72) * (1.0 - top) * step(0.3, yy);
+            float win = step(0.1, f.x) * step(f.x, 0.9) * step(0.3, f.y) * step(f.y, 0.7) * (1.0 - top) * step(0.45, yy);
             float h = fract(sin(dot(floor(cell) + vec2(vSeed * 37.0, vSeed * 91.0), vec2(12.9898, 78.233))) * 43758.5453);
             float on = step(h, lit);
             vec3 grey = vec3(dot(pal, vec3(0.333)));

@@ -134,49 +134,66 @@ function generate(): City {
         if (industrialRegion(i, j)) tank[k] = 1
         continue
       }
-      const n = 2 // 블록당 2×2 필지: 건물이 굵직해서 미니어처 모형처럼 보임
-      const lot = BLOCK / n
       const dc = Math.hypot(bx[k], bz[k]) / (SPAN / 2)
-      for (let a = 0; a < n; a++) {
-        for (let b = 0; b < n; b++) {
-          if (z === 0 && rnd() < 0.14) continue
-          const x = bx[k] - BLOCK / 2 + lot * (a + 0.5)
-          const zz = bz[k] - BLOCK / 2 + lot * (b + 0.5)
-          let w = lot * 0.78
-          let d = lot * 0.78
-          let h: number
-          let kw: number
-          let type = 0
-          if (z === 1) {
-            // 도심은 고층, 가장자리는 중저층. 건물마다 편차를 크게 줘서 스카이라인이 들쑥날쑥하게
-            const core = Math.pow(Math.max(0, 1 - dc * 2.6), 1.5)
-            h = 1.4 + core * 11 * (0.25 + rnd() * rnd() * 1.6) + rnd() * 1.6
-            kw = 14 * h * (0.8 + rnd() * 0.4)
-            const r = rnd()
-            type = h > 5 ? (r < 0.5 ? 1 : 2) : r < 0.4 ? 0 : r < 0.7 ? 2 : r < 0.85 ? 1 : 5
-          } else if (z === 2) {
-            w = lot * 0.94
-            d = lot * 0.94
-            h = 0.9 + rnd() * 1.1
-            kw = 90 + rnd() * 110
-            type = rnd() < 0.78 ? 4 : 0
-          } else if (rnd() < 0.09) {
-            // 아파트: 가는 바늘처럼 보이지 않게 폭을 넓히고 높이는 중층
-            w = lot * 0.96
-            d = lot * 0.96
-            h = 1.5 + rnd() * 1.5
-            kw = 90 + rnd() * 70
-            type = rnd() < 0.6 ? 0 : 2
-          } else {
-            h = 0.5 + rnd() * 0.8
-            kw = 9 + rnd() * 12
-            type = rnd() < 0.85 ? 3 : 5
+      // 색은 동네(4×4블록) 단위로 어울리게, 가끔만 다른 색. 건물마다 제각각이면 어지러움
+      const cluster = Math.floor((((Math.sin(Math.floor(i / 4) * 12.9898 + Math.floor(j / 4) * 78.233) * 43758.5453) % 1) + 1) % 1 * 6)
+      const palOf = () => (rnd() < 0.8 ? cluster : Math.floor(rnd() * 6))
+      const put = (x: number, zz: number, w: number, d: number, h: number, type: number) => {
+        bld.push({ x, z: zz, w, d, h, block: k, kw: 0, r: rnd(), type, pal: palOf() })
+      }
+      const cx = bx[k]
+      const cz = bz[k]
+      if (z === 1) {
+        // 도심은 2×2로 촘촘한 고층, 바깥은 블록당 크고 낮은 건물 하나. 건물이 적고 큼직해야 미니어처처럼 보임
+        const core = Math.pow(Math.max(0, 1 - dc * 2.6), 1.5)
+        const tall = (r: number) => 1.4 + core * 11 * (0.25 + r * rnd() * 1.6) + rnd() * 1.6
+        const pickType = (h: number) => {
+          const r = rnd()
+          return h > 5 ? (r < 0.5 ? 1 : 2) : r < 0.4 ? 0 : r < 0.7 ? 2 : r < 0.85 ? 1 : 5
+        }
+        if (dc < 0.24) {
+          const lot = BLOCK / 2
+          for (let a = 0; a < 2; a++) {
+            for (let b = 0; b < 2; b++) {
+              if (rnd() < 0.3) continue
+              const h = tall(rnd())
+              put(cx - BLOCK / 2 + lot * (a + 0.5), cz - BLOCK / 2 + lot * (b + 0.5), lot * 0.84, lot * 0.84, h, pickType(h))
+            }
           }
-          bld.push({ x, z: zz, w, d, h, block: k, kw, r: rnd(), type, pal: Math.floor(rnd() * 6) })
-          baseKw[k] += kw
+        } else {
+          const h = 1.2 + core * 8 * rnd() + rnd() * 1.8
+          put(cx, cz, BLOCK * 0.72, BLOCK * 0.72, h, pickType(h))
+        }
+      } else if (z === 2) {
+        // 큰 공장 하나, 가끔 둘
+        if (rnd() < 0.7) put(cx, cz, BLOCK * 0.82, BLOCK * 0.82, 0.9 + rnd() * 0.9, rnd() < 0.8 ? 4 : 0)
+        else {
+          const s2 = BLOCK * 0.4
+          put(cx - 0.58, cz, s2, BLOCK * 0.78, 0.9 + rnd() * 0.7, 4)
+          put(cx + 0.58, cz, s2, BLOCK * 0.78, 0.9 + rnd() * 0.7, 4)
+        }
+      } else {
+        // 주거: 블록당 집 한 채(약 60%), 두 채(약 25%), 아파트(약 8%), 빈 땅
+        const r = rnd()
+        if (r < 0.08) put(cx, cz, BLOCK * 0.76, BLOCK * 0.76, 1.8 + rnd() * 1.8, rnd() < 0.6 ? 0 : 2)
+        else if (r < 0.68) put(cx + (rnd() - 0.5) * 0.3, cz + (rnd() - 0.5) * 0.3, BLOCK * 0.6, BLOCK * 0.6, 0.55 + rnd() * 0.7, rnd() < 0.85 ? 3 : 5)
+        else if (r < 0.92) {
+          put(cx - 0.55, cz, BLOCK * 0.38, BLOCK * 0.6, 0.5 + rnd() * 0.6, 3)
+          put(cx + 0.55, cz, BLOCK * 0.38, BLOCK * 0.6, 0.5 + rnd() * 0.6, 3)
         }
       }
     }
+  }
+
+  // 구역별 총 부하는 일정하게 맞춘다 (건물 수를 바꿔도 시나리오 결과가 같도록): 크기에 비례해 배분
+  const ZONE_TOTAL_KW = [83800, 52400, 130400]
+  const zoneSum = [0, 0, 0]
+  const weight = (b: (typeof bld)[number]) => b.w * b.d * (b.type === 4 ? 1 : 0.5 + b.h)
+  for (const b of bld) zoneSum[zone[b.block]] += weight(b)
+  for (const b of bld) {
+    const zn = zone[b.block]
+    b.kw = (weight(b) / zoneSum[zn]) * ZONE_TOTAL_KW[zn]
+    baseKw[b.block] += b.kw
   }
 
   // 변전소 → 구역(보로노이) → 사분면별 선로
