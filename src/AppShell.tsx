@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
 import { Link, Navigate, NavLink, Route, Routes, useLocation, useParams } from 'react-router-dom'
-import { IconAnalysis, IconDashboard, IconShieldCheck, IconDatabase, IconLive, IconLogo, IconMenu, IconSettings, IconVillage } from './components/Icons'
+import { IconAnalysis, IconDashboard, IconShieldCheck, IconDatabase, IconLive, IconLogo, IconMenu, IconBolt, IconSettings, IconVillage } from './components/Icons'
 import { Dot, PageSkeleton } from './components/ui'
 import { useActor } from './lib/actor'
 import { useBackendHealth } from './lib/backend'
@@ -16,6 +16,7 @@ import Settings from './pages/Settings'
 import VillageLoads from './pages/VillageLoads'
 
 const Village = lazy(() => import('./pages/Village'))
+const City = lazy(() => import('./pages/City'))
 
 const NAV: { label: string; items: { to: string; label: string; icon: ReactNode; end?: boolean }[] }[] = [
   {
@@ -24,6 +25,7 @@ const NAV: { label: string; items: { to: string; label: string; icon: ReactNode;
       { to: '/dashboard', label: '개요', icon: <IconDashboard /> },
       { to: '/village', label: '스마트 마을', icon: <IconVillage /> },
       { to: '/live', label: '실시간 분석', icon: <IconLive /> },
+      { to: '/city', label: '도시 시뮬레이션', icon: <IconBolt /> },
     ],
   },
   {
@@ -84,7 +86,7 @@ export function Shell({ extraRoutes }: { extraRoutes?: ReactNode } = {}) {
   const [navOpen, setNavOpen] = useState(false)
   const location = useLocation()
   useEffect(() => setNavOpen(false), [location.pathname])
-  const wide = location.pathname === '/village'
+  const wide = location.pathname === '/village' || location.pathname === '/city'
 
   return (
     <div className={`app ${navOpen ? 'nav-open' : ''}`}>
@@ -129,6 +131,7 @@ export function Shell({ extraRoutes }: { extraRoutes?: ReactNode } = {}) {
               <Route path="/village" element={<Village />} />
               <Route path="/village/loads" element={<VillageLoads />} />
               <Route path="/live" element={<LiveData />} />
+              <Route path="/city" element={<City />} />
               <Route path="/cases" element={<CaseList />} />
               <Route path="/cases/new" element={<NewCase />} />
               <Route path="/cases/:id" element={<CaseDetail />} />
