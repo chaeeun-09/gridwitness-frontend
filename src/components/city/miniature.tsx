@@ -27,13 +27,14 @@ const lin = (hex: string): [number, number, number] => {
   const c = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => v / 255)
   return [c[0] * c[0], c[1] * c[1], c[2] * c[2]]
 }
+// 색은 상태(정전·불빛)를 읽는 데 쓰고, 건물은 무채색에 가까운 톤으로 절제한다
 const PALETTE = [
-  ['#8fc3bd', '#e8dcc2', '#a8c2d6', '#e0946a', '#f0f0f2', '#7fa6bf'].map(lin), // 상업: 청록·크림·하늘·주황·흰색·강철
-  ['#efe3c8', '#f2c9a6', '#d9d5cc', '#f4e7a8', '#d99a7a', '#c7d8c9'].map(lin), // 주거
-  ['#d8b98e', '#e6a35c', '#a9b4bd', '#cdbfa6', '#e8d9b0', '#9fb0a4'].map(lin), // 산업
+  ['#cdd3d9', '#d9dcdf', '#c2c9d0', '#d4d6d8', '#bfc5cb', '#dde0e2'].map(lin), // 상업: 밝은 회청색 계열
+  ['#e6e1d8', '#ddd8cf', '#ebe7df', '#d9d4cb', '#e2ddd3', '#d6d1c8'].map(lin), // 주거: 밝은 베이지 계열
+  ['#cfcabf', '#c3beb4', '#d6d2c8', '#bab6ac', '#cbc7bd', '#c0bcb2'].map(lin), // 산업: 탁한 회갈색
 ]
-const TILE_DAY = [lin('#d3cfc4'), lin('#c9cfd6'), lin('#d2c6b0'), lin('#5fa04e')]
-const TREE = ['#4f9a45', '#5fae52', '#3f8a3c', '#78b856'].map(lin)
+const TILE_DAY = [lin('#dedad2'), lin('#d9dce0'), lin('#d6d0c3'), lin('#92b387')]
+const TREE = ['#7fa874', '#8bb27e', '#729e68', '#93b886'].map(lin)
 
 // ── 건물 모양 (y -0.5~0.5, 폭·깊이 -0.5~0.5 안에 들어가는 단위 모양) ──
 function merged(parts: BufferGeometry[]): BufferGeometry {
@@ -97,11 +98,11 @@ function useBuildingMaterial() {
             float on = step(h, lit);
             vec3 grey = vec3(dot(pal, vec3(0.333)));
             vec3 wall = mix(mix(pal, grey * 0.5, outage), mix(pal * 0.14, vec3(0.025, 0.028, 0.04), outage), uNight);
-            vec3 roofBase = mix(vec3(0.2, 0.5, 0.46), vec3(0.74, 0.4, 0.26), step(0.0, pal.b - pal.r));
-            roofBase = mix(roofBase, pal * 0.7, step(0.72, fract(vSeed * 7.0)));
+            vec3 roofBase = mix(pal * 0.62, vec3(0.36, 0.38, 0.41), 0.55);
+            roofBase = mix(roofBase, pal * 0.78, step(0.7, fract(vSeed * 7.0)));
             vec3 roofDay = mix(roofBase, grey * 0.4, outage);
             vec3 roof = mix(roofDay, roofDay * 0.12, uNight);
-            vec3 glass = mix(mix(vec3(0.27, 0.42, 0.53), vec3(0.12), outage), vec3(0.03, 0.04, 0.07), uNight);
+            vec3 glass = mix(mix(vec3(0.34, 0.41, 0.47), vec3(0.12), outage), vec3(0.03, 0.04, 0.07), uNight);
             vec3 col = mix(wall, glass, win);
             col = mix(col, roof, top);
             diffuseColor.rgb = col;
