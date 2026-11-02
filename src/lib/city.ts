@@ -71,6 +71,12 @@ export interface City {
   bBlock: Uint16Array
   /** 건물마다 0~1 고정 난수 (밤에 불이 켜진 정도 등) */
   bRand: Float32Array
+  /** 건물 모양(0 상자 · 1 계단식 · 2 설비 얹은 고층 · 3 뾰족 지붕 주택 · 4 공장 · 5 쌍둥이) */
+  bType: Uint8Array
+  /** 건물 색 번호 (구역별 팔레트 안에서) */
+  bPal: Uint8Array
+  /** 산업단지 안의 빈 블록은 공원 대신 저장탱크 단지 */
+  tank: Uint8Array
   subs: SubDef[]
   feeders: FeederDef[]
   plant: [number, number]
@@ -89,13 +95,19 @@ function wobble(i: number, j: number): number {
   return Math.sin(i * 0.31 + 1.3) * Math.sin(j * 0.27 + 0.7) * 0.55 + Math.sin(i * 0.12 + j * 0.17 + 2) * 0.45
 }
 
+function industrialRegion(bx: number, bz: number): boolean {
+  const cx = (bx + 0.5) / GRID - 0.5
+  const cz = (bz + 0.5) / GRID - 0.5
+  return cx > 0.16 + 0.05 * wobble(bx, bz) && cz > 0.1 + 0.05 * wobble(bz, bx)
+}
+
 function zoneOf(bx: number, bz: number, rnd: () => number): Zone {
   const cx = (bx + 0.5) / GRID - 0.5
   const cz = (bz + 0.5) / GRID - 0.5
   const w = wobble(bx, bz)
   const dc = Math.hypot(cx, cz) / 0.707 + 0.07 * w
   if (Math.abs(cx - 0.02) < 0.05 && Math.abs(cz + 0.01) < 0.045) return 3 // 중앙 공원
-  if (cx > 0.16 + 0.05 * w && cz > 0.1 + 0.05 * wobble(bz, bx)) return rnd() < 0.07 ? 3 : 2 // 남동 산업단지
+  if (industrialRegion(bx, bz)) return rnd() < 0.07 ? 3 : 2 // 남동 산업단지
   if (dc < 0.34) return 1
   if (dc < 0.58 && w > 0.25 && rnd() < 0.7) return 1 // 외곽 상업 거점
   return rnd() < 0.05 ? 3 : 0
@@ -107,8 +119,9 @@ function generate(): City {
   const bx = new Float32Array(nBlocks)
   const bz = new Float32Array(nBlocks)
   const zone = new Uint8Array(nBlocks)
-  const bld: { x: number; z: number; w: number; d: number; h: number; block: number; kw: number; r: number }[] = []
+  const bld: { x: number; z: number; w: number; d: number; h: number; block: number; kw: number; r: number; type: number; pal: number }[] = []
   const baseKw = new Float32Array(nBlocks)
+  const tank = new Uint8Array(nBlocks)
 
   for (let j = 0; j < GRID; j++) {
     for (let i = 0; i < GRID; i++) {
@@ -117,40 +130,49 @@ function generate(): City {
       bz[k] = (j - GRID / 2 + 0.5) * PITCH
       const z = zoneOf(i, j, rnd)
       zone[k] = z
-      if (z === 3) continue
-      const n = z === 0 ? 3 : 2
+      if (z === 3) {
+        if (industrialRegion(i, j)) tank[k] = 1
+        continue
+      }
+      const n = 2 // 블록당 2×2 필지: 건물이 굵직해서 미니어처 모형처럼 보임
       const lot = BLOCK / n
       const dc = Math.hypot(bx[k], bz[k]) / (SPAN / 2)
       for (let a = 0; a < n; a++) {
         for (let b = 0; b < n; b++) {
-          if (z === 0 && rnd() < 0.1) continue
+          if (z === 0 && rnd() < 0.14) continue
           const x = bx[k] - BLOCK / 2 + lot * (a + 0.5)
           const zz = bz[k] - BLOCK / 2 + lot * (b + 0.5)
           let w = lot * 0.78
           let d = lot * 0.78
           let h: number
           let kw: number
+          let type = 0
           if (z === 1) {
             // 도심은 고층, 가장자리는 중저층. 건물마다 편차를 크게 줘서 스카이라인이 들쑥날쑥하게
             const core = Math.pow(Math.max(0, 1 - dc * 2.6), 1.5)
             h = 1.4 + core * 11 * (0.25 + rnd() * rnd() * 1.6) + rnd() * 1.6
             kw = 14 * h * (0.8 + rnd() * 0.4)
+            const r = rnd()
+            type = h > 5 ? (r < 0.5 ? 1 : 2) : r < 0.4 ? 0 : r < 0.7 ? 2 : r < 0.85 ? 1 : 5
           } else if (z === 2) {
             w = lot * 0.94
             d = lot * 0.94
             h = 0.9 + rnd() * 1.1
             kw = 90 + rnd() * 110
+            type = rnd() < 0.78 ? 4 : 0
           } else if (rnd() < 0.09) {
             // 아파트: 가는 바늘처럼 보이지 않게 폭을 넓히고 높이는 중층
             w = lot * 0.96
             d = lot * 0.96
             h = 1.5 + rnd() * 1.5
-            kw = 40 + rnd() * 40
+            kw = 90 + rnd() * 70
+            type = rnd() < 0.6 ? 0 : 2
           } else {
             h = 0.5 + rnd() * 0.8
-            kw = 4 + rnd() * 6
+            kw = 9 + rnd() * 12
+            type = rnd() < 0.85 ? 3 : 5
           }
-          bld.push({ x, z: zz, w, d, h, block: k, kw, r: rnd() })
+          bld.push({ x, z: zz, w, d, h, block: k, kw, r: rnd(), type, pal: Math.floor(rnd() * 6) })
           baseKw[k] += kw
         }
       }
@@ -220,6 +242,9 @@ function generate(): City {
     bh: new Float32Array(nBuild),
     bBlock: new Uint16Array(nBuild),
     bRand: new Float32Array(nBuild),
+    bType: new Uint8Array(nBuild),
+    bPal: new Uint8Array(nBuild),
+    tank,
     subs,
     feeders,
     plant: [-SPAN / 2 - 14, -SPAN / 2 - 10],
@@ -232,6 +257,8 @@ function generate(): City {
     out.bh[n] = b.h
     out.bBlock[n] = b.block
     out.bRand[n] = b.r
+    out.bType[n] = b.type
+    out.bPal[n] = b.pal
   })
   return out
 }
