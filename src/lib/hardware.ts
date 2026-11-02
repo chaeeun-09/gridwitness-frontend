@@ -122,7 +122,7 @@ export const NETS: Net[] = [
   pins('n-scl-l', 'arduino.A5', 'inaL.SCL', 'scl', 'I2C 클럭 (SCL) → INA219 ②'),
 ]
 
-/** 채널 릴레이 → 집·가로등 내부 LED (LED와 220Ω 저항은 지면 위 건물 안에 있음). LED +는 릴레이 NO, LED −는 공통 GND */
+/** 채널 릴레이 → 집·가로등 내부 LED (LED마다 220Ω 저항이 직렬로 붙음). LED +는 릴레이 NO, LED −는 공통 GND */
 export interface LoadLine {
   led: ChannelId
   board: ChPartId

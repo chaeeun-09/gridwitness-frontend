@@ -38,7 +38,7 @@ function peers(ref: PinRef): { color: string; text: string }[] {
   const [part, pin] = splitPin(ref)
   for (const l of LOAD_LINES) {
     if (l.board !== part) continue
-    if (pin === 'NO') out.push({ color: NET_COLOR.ledPlus, text: `${l.name} LED ${l.ledNo} (+) · 220Ω 건물 안` })
+    if (pin === 'NO') out.push({ color: NET_COLOR.ledPlus, text: `${l.name} LED ${l.ledNo} (+) · 220Ω 저항을 거침` })
   }
   return out
 }

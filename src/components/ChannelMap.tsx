@@ -39,7 +39,7 @@ export default function ChannelMap() {
               <tr key={`${l.led}+`}>
                 <td><span className="wire-chip" style={{ background: NET_COLOR.ledPlus }} /></td>
                 <td className="small">{PART_BY_ID[l.board].name} NO</td>
-                <td className="small">{l.name} LED {l.ledNo} (+) · 220Ω 건물 안</td>
+                <td className="small">{l.name} LED {l.ledNo} (+) · 220Ω 저항을 거침</td>
                 <td className="small muted">LED 전원</td>
               </tr>,
               <tr key={`${l.led}−`}>
