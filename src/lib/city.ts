@@ -84,14 +84,20 @@ const SUB_SITES: { name: string; pos: [number, number] }[] = [
   { name: '남동(산업)', pos: [34, 30] },
 ]
 
+/** 격자 위에서 부드럽게 변하는 값 (-1~1). 구역 경계가 반듯한 도형이 되지 않게 함 */
+function wobble(i: number, j: number): number {
+  return Math.sin(i * 0.31 + 1.3) * Math.sin(j * 0.27 + 0.7) * 0.55 + Math.sin(i * 0.12 + j * 0.17 + 2) * 0.45
+}
+
 function zoneOf(bx: number, bz: number, rnd: () => number): Zone {
   const cx = (bx + 0.5) / GRID - 0.5
   const cz = (bz + 0.5) / GRID - 0.5
-  const dc = Math.hypot(cx, cz) / 0.707
-  if (Math.abs(cx) < 0.04 && Math.abs(cz) < 0.04) return 3 // 중앙 공원
-  if (cx > 0.2 && cz > 0.12) return rnd() < 0.08 ? 3 : 2 // 남동 산업단지
-  if (dc < 0.3) return 1
-  if (dc < 0.62 && (bx % 8 === 4 || bz % 8 === 4)) return 1 // 간선도로변 상업
+  const w = wobble(bx, bz)
+  const dc = Math.hypot(cx, cz) / 0.707 + 0.07 * w
+  if (Math.abs(cx - 0.02) < 0.05 && Math.abs(cz + 0.01) < 0.045) return 3 // 중앙 공원
+  if (cx > 0.16 + 0.05 * w && cz > 0.1 + 0.05 * wobble(bz, bx)) return rnd() < 0.07 ? 3 : 2 // 남동 산업단지
+  if (dc < 0.34) return 1
+  if (dc < 0.58 && w > 0.25 && rnd() < 0.7) return 1 // 외곽 상업 거점
   return rnd() < 0.05 ? 3 : 0
 }
 
@@ -125,18 +131,23 @@ function generate(): City {
           let h: number
           let kw: number
           if (z === 1) {
-            h = 1.2 + Math.pow(Math.max(0, 1 - dc * 1.5), 2) * 7.5 * (0.55 + rnd() * 0.65)
-            kw = 24 * h * (0.8 + rnd() * 0.4)
+            // 도심은 고층, 가장자리는 중저층. 건물마다 편차를 크게 줘서 스카이라인이 들쑥날쑥하게
+            const core = Math.pow(Math.max(0, 1 - dc * 2.6), 1.5)
+            h = 1.4 + core * 11 * (0.25 + rnd() * rnd() * 1.6) + rnd() * 1.6
+            kw = 14 * h * (0.8 + rnd() * 0.4)
           } else if (z === 2) {
             w = lot * 0.94
             d = lot * 0.94
-            h = 0.55 + rnd() * 0.55
+            h = 0.9 + rnd() * 1.1
             kw = 90 + rnd() * 110
           } else if (rnd() < 0.09) {
-            h = 1.5 + rnd() * 1.1 // 아파트
+            // 아파트: 가는 바늘처럼 보이지 않게 폭을 넓히고 높이는 중층
+            w = lot * 0.96
+            d = lot * 0.96
+            h = 1.5 + rnd() * 1.5
             kw = 40 + rnd() * 40
           } else {
-            h = 0.3 + rnd() * 0.45
+            h = 0.5 + rnd() * 0.8
             kw = 4 + rnd() * 6
           }
           bld.push({ x, z: zz, w, d, h, block: k, kw, r: rnd() })

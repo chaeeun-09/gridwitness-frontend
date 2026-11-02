@@ -18,6 +18,23 @@ const DARK_NIGHT = sq([0.11, 0.13, 0.2])
 const OUT_DAY = sq([0.34, 0.31, 0.36])
 const OUT_NIGHT = sq([0.1, 0.11, 0.17])
 
+function useCssZoom(ref: { current: HTMLElement | null }) {
+  const [zoom, setZoom] = useState(1)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const measure = () => {
+      const r = el.getBoundingClientRect().width / Math.max(1, el.offsetWidth)
+      setZoom((z) => (Math.abs(z - r) > 0.01 ? r : z))
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [ref])
+  return zoom
+}
+
 function Frame({ active, version }: { active: boolean; version: number }) {
   const invalidate = useThree((s) => s.invalidate)
   useEffect(() => {
@@ -198,7 +215,17 @@ function CityMeshes({ snap, selection, onSelect }: { snap: CitySnap; selection: 
 const FeederLine = memo(function FeederLine({ id, state, over, night, sel }: { id: number; state: string; over: boolean; night: boolean; sel: boolean }) {
   const f = CITY.feeders[id]
   const sub = CITY.subs[f.sub].pos
-  const points = useMemo<[number, number, number][]>(() => [[sub[0], 2.4, sub[1]], [f.centroid[0], 1.6, f.centroid[1]], [f.far[0], 0.9, f.far[1]]], [f, sub])
+  // 도로를 따라 꺾이는 간선 (대각선이 아니라 가로·세로로만 이동)
+  const points = useMemo<[number, number, number][]>(
+    () => [
+      [sub[0], 2.4, sub[1]],
+      [f.centroid[0], 1.8, sub[1]],
+      [f.centroid[0], 1.4, f.centroid[1]],
+      [f.far[0], 1.0, f.centroid[1]],
+      [f.far[0], 0.7, f.far[1]],
+    ],
+    [f, sub],
+  )
   const color = state === 'FAULT' ? '#e5484d' : state === 'TRIPPED' ? '#f0771f' : over ? '#f0a020' : night ? '#6fe3b0' : '#1c9c66'
   return <Line points={points} color={color} lineWidth={sel ? 5 : state === 'OK' ? 2.2 : 4} />
 })
@@ -271,7 +298,9 @@ export default function CityScene({ snap, selection, onSelect }: { snap: CitySna
   const [wrap, active] = useOnScreen<HTMLDivElement>()
   const night = nightness(snap.time)
   const bg = useMemo(() => new Color().setRGB(0.62 * (1 - night) + 0.03 * night, 0.78 * (1 - night) + 0.05 * night, 0.92 * (1 - night) + 0.1 * night), [night])
-  const dpr = Math.min(window.devicePixelRatio, 1.5)
+  // 앱이 넓은 화면에서 CSS zoom(1.12~1.2배)으로 확대되면 캔버스 버퍼가 zoom 이전 크기로 잡혀 흐려지므로 배율만큼 해상도를 올림
+  const zoom = useCssZoom(wrap)
+  const dpr = Math.min(window.devicePixelRatio * zoom, 2)
   return (
     <div ref={wrap} style={{ width: '100%', height: '100%' }}>
       <Canvas
@@ -288,8 +317,8 @@ export default function CityScene({ snap, selection, onSelect }: { snap: CitySna
         <hemisphereLight args={[night > 0.5 ? '#4a5f94' : '#eaf4ff', night > 0.5 ? '#141a28' : '#566c42', 0.5 + 0.5 * (1 - night)]} />
         <directionalLight position={[-40, 80, 30]} intensity={2.0 * (1 - night) + 0.3 * night} color={night > 0.5 ? '#9db4ff' : '#fff1dc'} />
         <mesh position={[0, -0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <planeGeometry args={[SPAN + 40, SPAN + 40]} />
-          <meshLambertMaterial color={night > 0.5 ? '#12161d' : '#454a54'} />
+          <planeGeometry args={[SPAN + 1, SPAN + 1]} />
+          <meshLambertMaterial color={night > 0.5 ? '#12161d' : '#5a606b'} />
         </mesh>
         <mesh position={[0, -0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <planeGeometry args={[900, 900]} />
