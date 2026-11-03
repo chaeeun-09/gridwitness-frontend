@@ -67,11 +67,12 @@ void handleCommand(const String& cmd) {
 
 // 부하 쪽 전압 = 버스 전압 + 션트 전압
 float loadVoltage(Adafruit_INA219& ina, bool ok) {
-  return ok ? ina.getBusVoltage_V() + ina.getShuntVoltage_mV() / 1000.0 : 0;
+  float v = ok ? ina.getBusVoltage_V() + ina.getShuntVoltage_mV() / 1000.0 : 0;
+  return isnan(v) || isinf(v) ? 0 : v;  // nan·inf가 찍히면 웹이 줄을 못 읽음
 }
 float loadCurrent(Adafruit_INA219& ina, bool ok) {
   float i = ok ? ina.getCurrent_mA() / 1000.0 : 0;
-  return i < 0 ? 0 : i;
+  return isnan(i) || isinf(i) || i < 0 ? 0 : i;
 }
 
 void setup() {

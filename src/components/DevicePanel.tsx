@@ -57,6 +57,18 @@ export default function DevicePanel({ snap }: { snap: VillageSnapshot }) {
         <div><dt>수신</dt><dd className="num">{snap.packets.toLocaleString()}회 · {1000 / TICK_MS} Hz{snap.source === 'SERIAL' && ` · 형식 오류 ${snap.badFrames}줄`}</dd></div>
       </dl>
 
+      {snap.source === 'SERIAL' && (
+        <div className="serial-diag">
+          <div className="small muted" style={{ marginBottom: 6 }}>연결 진단 · 장치에서 받은 줄 {snap.rawLines.toLocaleString()}개 (형식 오류 {snap.badFrames}개)</div>
+          {snap.lastLine ? (
+            <pre className="mono small" style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{snap.lastLine}</pre>
+          ) : (
+            <p className="small" style={{ margin: 0 }}>아직 아무 줄도 받지 못했습니다. 포트가 맞는지, 속도가 115200인지, 다른 프로그램(Arduino IDE 시리얼 모니터)이 포트를 쓰고 있지 않은지 확인하세요. USB를 꽂으면 Arduino가 다시 시작하므로 연결 직후 2~3초는 비어 있을 수 있습니다.</p>
+          )}
+          {snap.rawLines > 0 && snap.badFrames === snap.rawLines && <p className="small text-bad" style={{ margin: '8px 0 0' }}>받은 줄이 모두 형식 오류입니다. 위 줄이 {'{"v":…,"i":…,"relay":…}'} 모양인지 확인하세요 (다른 스케치가 올라가 있거나 속도가 다를 수 있습니다).</p>}
+        </div>
+      )}
+
       <details className="protocol">
         <summary>시리얼 프로토콜</summary>
         <pre>{`115200 baud, 줄 단위

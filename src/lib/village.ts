@@ -160,6 +160,10 @@ export interface VillageSnapshot {
   connected: boolean
   lastError: string | null
   badFrames: number
+  /** 장치에서 받은 줄 수 (형식이 맞든 틀리든) */
+  rawLines: number
+  /** 마지막으로 받은 줄 원문 (진단용) */
+  lastLine: string | null
   lastPacketAt: number | null
   packets: number
   /** 마을 전체 전원(릴레이) */
@@ -226,6 +230,8 @@ let source: DataSource = 'MOCK'
 let link: SerialLink | null = null
 let latest: { at: number; frame: SerialReading } | null = null
 let badFrames = 0
+let rawLines = 0
+let lastLine: string | null = null
 let lastError: string | null = null
 let scenario: Scenario | null = null
 const listeners = new Set<() => void>()
@@ -299,6 +305,8 @@ function initial(): VillageSnapshot {
     connected,
     lastError: null,
     badFrames: 0,
+    rawLines: 0,
+    lastLine: null,
     lastPacketAt: null,
     packets: 0,
     relay,
@@ -336,6 +344,8 @@ function emit(patch: Partial<VillageSnapshot> = {}) {
     connected,
     lastError,
     badFrames,
+    rawLines,
+    lastLine,
     relay,
     relayPending,
     leds: ledStates(estLit, zones),
@@ -514,9 +524,12 @@ export function setChannel(id: ChannelId, on: boolean) {
 }
 
 function onSerialLine(line: string) {
+  rawLines++
+  lastLine = line.slice(0, 200)
   const frame = parseFrame(line)
   if (!frame) {
     badFrames++
+    emit()
     return
   }
   latest = { at: Date.now(), frame }
@@ -549,6 +562,8 @@ export async function connectSerial() {
   connected = true
   latest = null
   badFrames = 0
+  rawLines = 0
+  lastLine = null
   lastError = null
   scenario = null
   IOT_CHANNELS.forEach((c) => (enabled[c.id] = true))

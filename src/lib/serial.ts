@@ -43,7 +43,8 @@ export const serialSupported = () => typeof navigator !== 'undefined' && 'serial
 /** 한 줄을 측정값으로 해석. 형식이 틀리면 null */
 export function parseFrame(line: string): SerialReading | null {
   try {
-    const obj = JSON.parse(line) as Record<string, unknown>
+    // Arduino는 계산이 안 된 실수를 nan·inf로 찍어 JSON이 깨지므로 0으로 바꿔 읽는다
+    const obj = JSON.parse(line.replace(/:\s*-?(nan|inf)\b/gi, ':0')) as Record<string, unknown>
     const v = Number(obj.v)
     const i = Number(obj.i)
     if (!Number.isFinite(v) || !Number.isFinite(i) || obj.relay === undefined) return null

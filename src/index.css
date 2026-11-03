@@ -927,3 +927,5 @@ body { background: linear-gradient(180deg, #e6effc 0%, #f1f6fd 380px, #f6f9fe 10
 .city-table tr.city-sub td { border-top: 1px solid var(--line-strong); }
 .plain-list { margin: 0; padding-left: 18px; display: grid; gap: 6px; color: var(--text-2); }
 @media (max-width: 700px) { .city-canvas { height: 62vh; } .scene-tools { flex-wrap: wrap; } .scene-legend { display: none; } }
+
+.serial-diag { margin-top: 16px; padding: 12px 14px; border-radius: var(--r); background: var(--fill); }
