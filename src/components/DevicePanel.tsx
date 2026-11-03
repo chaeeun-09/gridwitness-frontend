@@ -52,7 +52,7 @@ export default function DevicePanel({ snap }: { snap: VillageSnapshot }) {
           </dd>
         </div>
         <div><dt>장치</dt><dd className="mono">{info.deviceId}</dd></div>
-        <div><dt>센서</dt><dd>{info.sensor}</dd></div>
+        <div><dt>센서</dt><dd>{snap.source === 'SERIAL' ? (snap.zones ? 'INA219 ×2 (주택 0x40 · 가로등 0x41)' : snap.status === 'NO_DATA' ? 'INA219 (측정값 대기 중)' : 'INA219 ×1 (마을 전체)') : info.sensor}</dd></div>
         <div><dt>포트</dt><dd className="mono">{info.port}</dd></div>
         <div><dt>수신</dt><dd className="num">{snap.packets.toLocaleString()}회 · {1000 / TICK_MS} Hz{snap.source === 'SERIAL' && ` · 형식 오류 ${snap.badFrames}줄`}</dd></div>
       </dl>

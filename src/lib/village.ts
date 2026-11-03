@@ -61,7 +61,7 @@ export const STATUS_LABEL: Record<NodeStatus, string> = {
 
 export const DEVICE_INFO: Record<DataSource, { deviceId: string; sensor: string; port: string }> = {
   MOCK: { deviceId: 'arduino-sim-01', sensor: 'INA219 ×2 (시뮬레이터)', port: 'SIM' },
-  SERIAL: { deviceId: 'arduino-village', sensor: 'INA219 ×2 (주택 0x40 · 가로등 0x41)', port: 'Web Serial 115200' },
+  SERIAL: { deviceId: 'arduino-village', sensor: 'INA219 (실측, 감지된 개수만큼)', port: 'Web Serial 115200' },
 }
 export const IOT_MODEL = 'iot-anomaly-0.2 (전체 전류 잔차)'
 export const NOMINAL_V = 5
