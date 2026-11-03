@@ -929,3 +929,6 @@ body { background: linear-gradient(180deg, #e6effc 0%, #f1f6fd 380px, #f6f9fe 10
 @media (max-width: 700px) { .city-canvas { height: 62vh; } .scene-tools { flex-wrap: wrap; } .scene-legend { display: none; } }
 
 .serial-diag { margin-top: 16px; padding: 12px 14px; border-radius: var(--r); background: var(--fill); }
+
+.reconnect-banner { margin: 16px 40px 0; }
+@media (max-width: 960px) { .reconnect-banner { margin: 12px 16px 0; } }

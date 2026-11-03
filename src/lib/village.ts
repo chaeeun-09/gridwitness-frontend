@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import type { IotPoint } from '../types'
-import { openSerial, parseFrame, type SerialLink, type SerialReading } from './serial'
+import { NO_GRANTED_PORT, onSerialPlug, openSerial, parseFrame, serialSupported, type SerialLink, type SerialReading } from './serial'
 
 // 스마트 마을 모형 계측 (채널 릴레이 구성).
 //   5V DC 어댑터 → 전체 릴레이(D2, COM→NC, 마을 ON/OFF)
@@ -227,6 +227,10 @@ export interface VillageSnapshot {
   channelPending: Partial<Record<ChannelId, boolean>>
   /** 웹에서 채널을 끄고 켤 수 있는지 (시뮬레이터, 또는 채널 상태를 보고하는 장치) */
   canControl: boolean
+  /** 실측 장치를 다시 찾는 중 (자동 재연결) */
+  reconnecting: boolean
+  /** 이 브라우저에 이전에 허용한 포트가 없어 자동 재연결이 불가능함 (클릭해서 다시 허용해야 함) */
+  needsGrant: boolean
   /** 구간별 측정. 구간 측정이 없는 예전 장치는 null */
   zones: Record<ChannelKind, ZoneState> | null
   history: (Omit<IotPoint, 't'> & { t: number; p: number })[]
@@ -268,8 +272,25 @@ let commandTimer: ReturnType<typeof setTimeout> | undefined
 const enabled: Record<ChannelId, boolean> = { h1: true, h2: true, h3: true, l1: true, l2: true }
 const chPending: Partial<Record<ChannelId, boolean>> = {}
 const chTimers: Partial<Record<ChannelId, ReturnType<typeof setTimeout>>> = {}
-let connected = true
-let source: DataSource = 'MOCK'
+// 한 번 실측 장치로 연결하면 그 선택을 기억해서, 다음에 열 때 허용 창 없이 다시 붙는다
+const AUTO_KEY = 'gridwitness.autoSerial.v1'
+function autoPref(): boolean {
+  try {
+    return localStorage.getItem(AUTO_KEY) === '1' && serialSupported()
+  } catch {
+    return false
+  }
+}
+function setAutoPref(on: boolean) {
+  try {
+    if (on) localStorage.setItem(AUTO_KEY, '1')
+    else localStorage.removeItem(AUTO_KEY)
+  } catch {
+    // 저장 불가 환경은 무시
+  }
+}
+let source: DataSource = autoPref() ? 'SERIAL' : 'MOCK'
+let connected = source === 'MOCK'
 let link: SerialLink | null = null
 let latest: { at: number; frame: SerialReading } | null = null
 let badFrames = 0
@@ -329,16 +350,17 @@ function canControlChannels(): boolean {
 
 function ledStates(estLit: number, zones: VillageSnapshot['zones']): Record<ChannelId, LedState> {
   // 실측은 LED별 전류가 없으므로 구간마다 "켜진 수"를 켜져 있는 채널 앞에서부터 채워 표시
-  const litSerial = (c: ChannelDef, k: number) => {
+  const litSerial = (c: ChannelDef) => {
     if (!enabled[c.id]) return false
-    if (!zones) return k < estLit
+    // 구간 측정이 없으면 켜진 채널 중 앞에서부터 estLit개를 '켜짐'으로 본다 (꺼진 채널은 세지 않음)
+    if (!zones) return IOT_CHANNELS.filter((x) => enabled[x.id]).findIndex((x) => x.id === c.id) < estLit
     const on = zoneChannels(c.kind).filter((x) => enabled[x.id])
     return on.findIndex((x) => x.id === c.id) < zones[c.kind].estLit
   }
   return Object.fromEntries(
-    IOT_CHANNELS.map((c, k) => [
+    IOT_CHANNELS.map((c) => [
       c.id,
-      { ...c, lit: source === 'MOCK' ? mockLit(c.id) : litSerial(c, k), channelOn: enabled[c.id], fault: source === 'MOCK' ? (faults[c.id] ?? null) : null },
+      { ...c, lit: source === 'MOCK' ? mockLit(c.id) : litSerial(c), channelOn: enabled[c.id], fault: source === 'MOCK' ? (faults[c.id] ?? null) : null },
     ]),
   ) as Record<ChannelId, LedState>
 }
@@ -368,6 +390,8 @@ function initial(): VillageSnapshot {
     channelPending: {},
     canControl: true,
     zones: null,
+    reconnecting: false,
+    needsGrant: false,
     history: [],
     events: [],
     faults: {},
@@ -398,6 +422,8 @@ function emit(patch: Partial<VillageSnapshot> = {}) {
     channels: { ...enabled },
     channelPending: { ...chPending },
     canControl: canControlChannels(),
+    reconnecting: source === 'SERIAL' && !link && autoPref(),
+    needsGrant: source === 'SERIAL' && !link && autoPref() && noGrant,
     faults: { ...faults },
     supplyFault,
     scenario: scenario && { ...scenario },
@@ -601,13 +627,8 @@ function onSerialLine(line: string) {
   }
 }
 
-/** 실제 모형 연결 (브라우저가 포트 선택 창을 띄움) */
-export async function connectSerial() {
-  const next = await openSerial(onSerialLine, (reason) => {
-    link = null
-    connected = false
-    fail(reason)
-  })
+/** 포트가 열린 뒤 상태를 실측 모드로 맞춘다 */
+async function attach(next: SerialLink) {
   await link?.close()
   link = next
   source = 'SERIAL'
@@ -624,8 +645,66 @@ export async function connectSerial() {
   emit({ history: [] })
 }
 
-/** 시뮬레이터로 전환 */
+/** 장치가 사라졌을 때(USB 분리·재시작 등) */
+function onLost(reason: string) {
+  link = null
+  connected = false
+  fail(autoPref() ? `${reason} 자동으로 다시 연결합니다.` : reason)
+  scheduleRetry()
+}
+
+/** 실제 모형 연결 (브라우저가 포트 선택 창을 띄움). 성공하면 다음부터 자동으로 다시 연결 */
+export async function connectSerial() {
+  const next = await openSerial(onSerialLine, onLost, 'ask')
+  setAutoPref(true)
+  await attach(next)
+}
+
+// ── 자동 재연결: 이전에 허용한 포트를 허용 창 없이 다시 연다 ──
+let retryTimer: ReturnType<typeof setInterval> | null = null
+let trying = false
+let noGrant = false
+
+async function tryAutoConnect() {
+  if (trying || link || !autoPref() || (typeof document !== 'undefined' && document.hidden)) return
+  trying = true
+  try {
+    await attach(await openSerial(onSerialLine, onLost, 'granted'))
+    noGrant = false
+    stopRetry()
+  } catch (e) {
+    const msg = (e as Error).message
+    // 허용된 포트가 아직 없으면(다른 브라우저로 처음 연 경우 등) 조용히 기다린다
+    if (msg === NO_GRANTED_PORT) {
+      if (!noGrant) {
+        noGrant = true
+        emit()
+      }
+    } else {
+      const text = /busy|in use|Failed to open|already/i.test(msg) ? '포트를 다른 프로그램(시리얼 모니터 등)이 쓰고 있습니다. 닫으면 자동으로 연결됩니다.' : `다시 연결하지 못했습니다: ${msg}`
+      if (lastError !== text) {
+        lastError = text
+        emit()
+      }
+    }
+  } finally {
+    trying = false
+  }
+}
+
+function scheduleRetry() {
+  if (retryTimer || !autoPref()) return
+  retryTimer = setInterval(() => void tryAutoConnect(), 3000)
+}
+function stopRetry() {
+  if (retryTimer) clearInterval(retryTimer)
+  retryTimer = null
+}
+
+/** 시뮬레이터로 전환 (자동 재연결도 끔) */
 export async function switchToMock() {
+  setAutoPref(false)
+  stopRetry()
   await link?.close()
   link = null
   source = 'MOCK'
@@ -637,6 +716,13 @@ export async function switchToMock() {
     clearTimeout(chTimers[c.id])
   })
   emit({ history: [] })
+}
+
+if (typeof window !== 'undefined' && autoPref()) {
+  // 앱을 열자마자 한 번 시도하고, 안 되면 3초마다. USB가 꽂히면 바로 다시 시도한다
+  void tryAutoConnect()
+  scheduleRetry()
+  onSerialPlug(() => void tryAutoConnect())
 }
 
 /** 고장 주입 (Mock 전용). LED 위치 고장은 id, 전원 고장은 id 무시 */

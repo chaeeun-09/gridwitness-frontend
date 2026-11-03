@@ -37,6 +37,10 @@ interface SerialPortLike {
 }
 interface SerialLike {
   requestPort(): Promise<SerialPortLike>
+  /** 사용자가 이전에 허용한 포트 (허용 창 없이 얻음) */
+  getPorts?(): Promise<SerialPortLike[]>
+  addEventListener?(type: 'connect' | 'disconnect', cb: () => void): void
+  removeEventListener?(type: 'connect' | 'disconnect', cb: () => void): void
 }
 
 export const serialSupported = () => typeof navigator !== 'undefined' && 'serial' in navigator
@@ -65,9 +69,30 @@ export function parseFrame(line: string): SerialReading | null {
   }
 }
 
-export async function openSerial(onLine: (line: string) => void, onClose: (reason: string) => void): Promise<SerialLink> {
+/** 허용된 포트가 없을 때 던지는 오류 메시지 (자동 재연결이 조용히 넘어가도록) */
+export const NO_GRANTED_PORT = 'NO_GRANTED_PORT'
+
+/** USB 장치가 꽂히면 알려줌. 해제 함수를 돌려줌 */
+export function onSerialPlug(cb: () => void): () => void {
+  const serial = (navigator as unknown as { serial?: SerialLike }).serial
+  serial?.addEventListener?.('connect', cb)
+  return () => serial?.removeEventListener?.('connect', cb)
+}
+
+/**
+ * 시리얼 포트를 열어 줄 단위로 읽는다.
+ * mode 'ask': 포트 선택 창을 띄움 / 'granted': 이전에 허용한 포트를 창 없이 엶 (자동 재연결)
+ */
+export async function openSerial(onLine: (line: string) => void, onClose: (reason: string) => void, mode: 'ask' | 'granted' = 'ask'): Promise<SerialLink> {
   const serial = (navigator as unknown as { serial: SerialLike }).serial
-  const port = await serial.requestPort()
+  let port: SerialPortLike
+  if (mode === 'granted') {
+    const ports = (await serial.getPorts?.()) ?? []
+    if (ports.length === 0) throw new Error(NO_GRANTED_PORT)
+    port = ports[0]
+  } else {
+    port = await serial.requestPort()
+  }
   await port.open({ baudRate: 115200 })
   if (!port.readable || !port.writable) throw new Error('포트를 열 수 없습니다.')
   // 일부 보드·브라우저는 DTR을 켜야 데이터를 보낸다 (지원하지 않으면 무시)

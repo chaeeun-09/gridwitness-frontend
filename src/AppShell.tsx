@@ -4,7 +4,7 @@ import { IconAnalysis, IconDashboard, IconShieldCheck, IconDatabase, IconLive, I
 import { Dot, PageSkeleton } from './components/ui'
 import { useActor } from './lib/actor'
 import { useBackendHealth } from './lib/backend'
-import { DEVICE_INFO, useVillage } from './lib/village'
+import { connectSerial, DEVICE_INFO, useVillage } from './lib/village'
 import CaseDetail from './pages/CaseDetail'
 import CaseList from './pages/CaseList'
 import Admin from './pages/Admin'
@@ -80,6 +80,32 @@ function DeviceStatus() {
   )
 }
 
+/** 실측 장치 연결이 끊겼을 때 어느 화면에서든 한 번에 다시 연결하는 배너 */
+function ReconnectBanner() {
+  const snap = useVillage()
+  const [busy, setBusy] = useState(false)
+  if (snap.source !== 'SERIAL' || snap.connected || !snap.reconnecting) return null
+  async function connect() {
+    setBusy(true)
+    try {
+      await connectSerial()
+    } catch {
+      // 포트 선택 창을 닫은 경우 등은 그대로 둠
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <div className="alert alert-warn reconnect-banner no-print" role="status">
+      <span>
+        <strong>실측 장치 연결이 끊겼습니다.</strong>{' '}
+        {snap.needsGrant ? '이 브라우저는 이전에 허용한 포트를 기억하지 못해 새로고침하면 한 번 다시 허용해야 합니다.' : 'USB를 꽂으면 자동으로 다시 연결합니다.'}{' '}
+        <button className="btn btn-sm btn-primary" onClick={connect} disabled={busy}>{busy ? '포트 선택 중…' : '다시 연결'}</button>
+      </span>
+    </div>
+  )
+}
+
 /** 앱 화면 틀(사이드바 + 페이지). 소개 화면의 노트북에도 같은 것을 씀 */
 export function Shell({ extraRoutes }: { extraRoutes?: ReactNode } = {}) {
   const [actor] = useActor()
@@ -122,6 +148,7 @@ export function Shell({ extraRoutes }: { extraRoutes?: ReactNode } = {}) {
           </button>
           <span className="brand-name">GridWitness</span>
         </div>
+        <ReconnectBanner />
         <main key={location.pathname} className={`page ${wide ? 'wide' : ''}`}>
           <Suspense fallback={<PageSkeleton />}>
             <Routes location={location}>

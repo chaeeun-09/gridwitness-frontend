@@ -37,6 +37,7 @@ export default function DevicePanel({ snap }: { snap: VillageSnapshot }) {
         </button>
       </div>
 
+      {snap.reconnecting && <div className="alert alert-info"><span>실측 장치를 다시 찾는 중입니다. USB를 꽂으면 자동으로 연결됩니다.</span></div>}
       {(error || snap.lastError) && <div className="alert alert-err">{error ?? snap.lastError}</div>}
 
       <dl className="dl-rows" style={{ marginTop: 20 }}>
