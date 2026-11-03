@@ -30,6 +30,7 @@ export interface SerialLink {
 // TS DOM 타입에 Web Serial이 없어 필요한 부분만 선언
 interface SerialPortLike {
   open(opts: { baudRate: number }): Promise<void>
+  setSignals?(s: { dataTerminalReady?: boolean; requestToSend?: boolean }): Promise<void>
   close(): Promise<void>
   readable: ReadableStream<Uint8Array> | null
   writable: WritableStream<Uint8Array> | null
@@ -69,6 +70,8 @@ export async function openSerial(onLine: (line: string) => void, onClose: (reaso
   const port = await serial.requestPort()
   await port.open({ baudRate: 115200 })
   if (!port.readable || !port.writable) throw new Error('포트를 열 수 없습니다.')
+  // 일부 보드·브라우저는 DTR을 켜야 데이터를 보낸다 (지원하지 않으면 무시)
+  await port.setSignals?.({ dataTerminalReady: true, requestToSend: true }).catch(() => {})
 
   const reader = port.readable.pipeThrough(new TextDecoderStream() as unknown as ReadableWritablePair<string, Uint8Array>).getReader()
   const writer = port.writable.getWriter()

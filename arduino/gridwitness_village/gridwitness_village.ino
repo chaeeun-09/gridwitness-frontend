@@ -77,11 +77,24 @@ float loadCurrent(Adafruit_INA219& ina, bool ok) {
 
 void setup() {
   Serial.begin(115200);
+  // '#'로 시작하는 줄은 웹이 진단용 안내로만 읽는다 (측정값이 아님)
+  Serial.println(F("#GridWitness village sketch v2 - booting"));
   pinMode(MASTER_PIN, OUTPUT);
   for (uint8_t k = 0; k < 5; k++) pinMode(CH_PINS[k], OUTPUT);
   applyAll();
+  Wire.begin();
+#if defined(WIRE_HAS_TIMEOUT)
+  // SDA/SCL 배선이 잘못되면 I2C에서 영원히 멈출 수 있어 3ms 뒤 포기하게 함
+  Wire.setWireTimeout(3000, true);
+#endif
+  Serial.println(F("#looking for INA219 0x40 (house)..."));
   houseOk = inaHouse.begin();
+  Serial.println(F("#looking for INA219 0x41 (lamp)..."));
   lampOk = inaLamp.begin();
+  Serial.print(F("#INA219 house(0x40)="));
+  Serial.print(houseOk ? F("OK") : F("NOT FOUND"));
+  Serial.print(F(" lamp(0x41)="));
+  Serial.println(lampOk ? F("OK") : F("NOT FOUND"));
 }
 
 void loop() {

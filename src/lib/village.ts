@@ -164,6 +164,8 @@ export interface VillageSnapshot {
   rawLines: number
   /** 마지막으로 받은 줄 원문 (진단용) */
   lastLine: string | null
+  /** 스케치가 보낸 '#' 안내 줄 중 가장 최근 것 (센서를 찾았는지 등) */
+  lastNote: string | null
   lastPacketAt: number | null
   packets: number
   /** 마을 전체 전원(릴레이) */
@@ -232,6 +234,7 @@ let latest: { at: number; frame: SerialReading } | null = null
 let badFrames = 0
 let rawLines = 0
 let lastLine: string | null = null
+let lastNote: string | null = null
 let lastError: string | null = null
 let scenario: Scenario | null = null
 const listeners = new Set<() => void>()
@@ -307,6 +310,7 @@ function initial(): VillageSnapshot {
     badFrames: 0,
     rawLines: 0,
     lastLine: null,
+    lastNote: null,
     lastPacketAt: null,
     packets: 0,
     relay,
@@ -346,6 +350,7 @@ function emit(patch: Partial<VillageSnapshot> = {}) {
     badFrames,
     rawLines,
     lastLine,
+    lastNote,
     relay,
     relayPending,
     leds: ledStates(estLit, zones),
@@ -526,6 +531,12 @@ export function setChannel(id: ChannelId, on: boolean) {
 function onSerialLine(line: string) {
   rawLines++
   lastLine = line.slice(0, 200)
+  // 스케치가 시작 상황을 알리는 안내 줄 (측정값이 아니므로 형식 오류로 세지 않음)
+  if (line.startsWith('#')) {
+    lastNote = line.slice(1, 160)
+    emit()
+    return
+  }
   const frame = parseFrame(line)
   if (!frame) {
     badFrames++
@@ -564,6 +575,7 @@ export async function connectSerial() {
   badFrames = 0
   rawLines = 0
   lastLine = null
+  lastNote = null
   lastError = null
   scenario = null
   IOT_CHANNELS.forEach((c) => (enabled[c.id] = true))
