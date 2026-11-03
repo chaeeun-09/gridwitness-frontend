@@ -5,6 +5,7 @@
 //   INA219 두 개: A4(SDA), A5(SCL) 공통
 //
 // 웹(Web Serial, 115200 baud)과 줄 단위로 통신합니다.
+// INA219가 1개만 연결된 경우(0x40 또는 0x41 자동 감지)에는 마을 전체 값(v·i)만 보내고 구간 값은 생략합니다.
 //   장치 → 웹 (0.5초마다):
 //     {"v":5.02,"i":0.281,"relay":1,"ch":[1,1,1,1,1],"vh":5.02,"ih":0.168,"vl":5.01,"il":0.113}
 //       v·i      : 마을 전체 (두 구간 합계)          relay : 마을 전원이 들어가 있으면 1
@@ -75,6 +76,23 @@ float loadCurrent(Adafruit_INA219& ina, bool ok) {
   return isnan(i) || isinf(i) || i < 0 ? 0 : i;
 }
 
+// 테스트 코드와 같은 I2C 주소 스캔. 센서가 어느 주소로 잡히는지 시작할 때 알려줌
+void scanI2C() {
+  Serial.println(F("#--- I2C scan ---"));
+  int count = 0;
+  for (byte addr = 1; addr < 127; addr++) {
+    Wire.beginTransmission(addr);
+    if (Wire.endTransmission() == 0) {
+      Serial.print(F("#found 0x"));
+      if (addr < 16) Serial.print('0');
+      Serial.println(addr, HEX);
+      count++;
+    }
+  }
+  if (count == 0) Serial.println(F("#no I2C device found (SDA/SCL wiring?)"));
+  Serial.println(F("#----------------"));
+}
+
 void setup() {
   Serial.begin(115200);
   // '#'로 시작하는 줄은 웹이 진단용 안내로만 읽는다 (측정값이 아님)
@@ -87,14 +105,63 @@ void setup() {
   // SDA/SCL 배선이 잘못되면 I2C에서 영원히 멈출 수 있어 3ms 뒤 포기하게 함
   Wire.setWireTimeout(3000, true);
 #endif
+  delay(500);  // 센서 전원이 안정될 때까지 (테스트 코드와 동일하게 여유를 둠)
+  scanI2C();
   Serial.println(F("#looking for INA219 0x40 (house)..."));
   houseOk = inaHouse.begin();
+  if (houseOk) inaHouse.setCalibration_32V_2A();
   Serial.println(F("#looking for INA219 0x41 (lamp)..."));
   lampOk = inaLamp.begin();
+  if (lampOk) inaLamp.setCalibration_32V_2A();
   Serial.print(F("#INA219 house(0x40)="));
   Serial.print(houseOk ? F("OK") : F("NOT FOUND"));
   Serial.print(F(" lamp(0x41)="));
   Serial.println(lampOk ? F("OK") : F("NOT FOUND"));
+  if (houseOk != lampOk) Serial.println(F("#sensor 1개만 감지: 마을 전체 값으로 보냅니다 (구간 값 없음)"));
+  if (!houseOk && !lampOk) Serial.println(F("#INA219 없음: v·i는 0으로 보냅니다. 배선을 확인하세요"));
+}
+
+// 센서 값을 읽어 줄로 내보낸다. 센서 개수에 따라 형식이 달라진다
+void printSensors() {
+  float vh = loadVoltage(inaHouse, houseOk);
+  float ih = loadCurrent(inaHouse, houseOk);
+  float vl = loadVoltage(inaLamp, lampOk);
+  float il = loadCurrent(inaLamp, lampOk);
+  bool both = houseOk && lampOk;
+  float v, i;
+  if (both) {
+    v = vh > vl ? vh : vl;
+    i = ih + il;
+  } else if (houseOk) {
+    v = vh; i = ih;  // 센서 1개 = 마을 전체
+  } else if (lampOk) {
+    v = vl; i = il;
+  } else {
+    v = 0; i = 0;
+  }
+  Serial.print("{\"v\":");
+  Serial.print(v, 2);
+  Serial.print(",\"i\":");
+  Serial.print(i, 3);
+  Serial.print(",\"relay\":");
+  Serial.print(powerOn ? 1 : 0);
+  Serial.print(",\"ch\":[");
+  for (uint8_t k = 0; k < 5; k++) {
+    if (k) Serial.print(',');
+    Serial.print(chOn[k] ? 1 : 0);
+  }
+  Serial.print("]");
+  if (both) {
+    Serial.print(",\"vh\":");
+    Serial.print(vh, 2);
+    Serial.print(",\"ih\":");
+    Serial.print(ih, 3);
+    Serial.print(",\"vl\":");
+    Serial.print(vl, 2);
+    Serial.print(",\"il\":");
+    Serial.print(il, 3);
+  }
+  Serial.println("}");
 }
 
 void loop() {
@@ -113,29 +180,5 @@ void loop() {
   if (now - lastSend < PERIOD_MS) return;
   lastSend = now;
 
-  float vh = loadVoltage(inaHouse, houseOk);
-  float ih = loadCurrent(inaHouse, houseOk);
-  float vl = loadVoltage(inaLamp, lampOk);
-  float il = loadCurrent(inaLamp, lampOk);
-
-  Serial.print("{\"v\":");
-  Serial.print(vh > vl ? vh : vl, 2);
-  Serial.print(",\"i\":");
-  Serial.print(ih + il, 3);
-  Serial.print(",\"relay\":");
-  Serial.print(powerOn ? 1 : 0);
-  Serial.print(",\"ch\":[");
-  for (uint8_t k = 0; k < 5; k++) {
-    if (k) Serial.print(',');
-    Serial.print(chOn[k] ? 1 : 0);
-  }
-  Serial.print("],\"vh\":");
-  Serial.print(vh, 2);
-  Serial.print(",\"ih\":");
-  Serial.print(ih, 3);
-  Serial.print(",\"vl\":");
-  Serial.print(vl, 2);
-  Serial.print(",\"il\":");
-  Serial.print(il, 3);
-  Serial.println("}");
+  printSensors();
 }
