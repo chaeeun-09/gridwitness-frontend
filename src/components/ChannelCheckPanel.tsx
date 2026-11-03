@@ -11,7 +11,7 @@ export default function ChannelCheckPanel({ snap }: { snap: VillageSnapshot }) {
   return (
     <Section
       title="채널 점검"
-      description="켜져 있는 LED를 하나씩 약 2초씩 꺼 보고, 그 구간 전류가 LED 1개 분량(0.056 A)만큼 줄어드는지 확인합니다. 구간까지만 알 수 있던 고장을 LED 하나까지 짚습니다."
+      description="켜져 있는 LED를 하나씩 약 2초씩 꺼 보고, 그 구간 전류가 LED 1개 분량(기준 전류)만큼 줄어드는지 확인합니다. 구간까지만 알 수 있던 고장을 LED 하나까지 짚습니다."
       actions={
         chk.running ? (
           <button className="btn" onClick={cancelChannelCheck}>멈추기</button>

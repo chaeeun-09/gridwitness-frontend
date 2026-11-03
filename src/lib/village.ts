@@ -65,8 +65,42 @@ export const DEVICE_INFO: Record<DataSource, { deviceId: string; sensor: string;
 }
 export const IOT_MODEL = 'iot-anomaly-0.2 (전체 전류 잔차)'
 export const NOMINAL_V = 5
-/** LED 1개(저항 포함) 정격 전류 A — 5개 합 ≈ 0.28 A */
-export const LED_A = 0.056
+/** LED 1개(저항 포함)가 흘리는 전류 A 기본값. 실제 LED·저항·전원 전압에 따라 크게 달라서 관리자 화면에서 보정할 수 있음 */
+export const DEFAULT_LED_A = 0.056
+const LED_KEY = 'gridwitness.ledA.v1'
+function loadLedA(): number {
+  try {
+    const n = Number(localStorage.getItem(LED_KEY))
+    if (Number.isFinite(n) && n >= 0.002 && n <= 0.3) return n
+  } catch {
+    // 저장값을 못 읽으면 기본값
+  }
+  return DEFAULT_LED_A
+}
+let ledAValue = loadLedA()
+/** LED 1개 기준 전류 (A). 항상 최신 값 */
+export const ledA = () => ledAValue
+export function setLedA(a: number) {
+  if (!Number.isFinite(a) || a < 0.002 || a > 0.3) return
+  ledAValue = a
+  try {
+    localStorage.setItem(LED_KEY, String(a))
+  } catch {
+    // 저장 불가 환경은 무시
+  }
+  emit()
+}
+/** 지금 켜져 있는 LED 수로 현재 전류를 나눠 기준값으로 삼음. 실패하면 이유를 돌려줌 */
+export function calibrateLedA(): { ok: true; a: number; n: number } | { ok: false; reason: string } {
+  if (!snap.connected || snap.status === 'NO_DATA') return { ok: false, reason: '장치에서 측정값을 받고 있지 않습니다.' }
+  if (!snap.relay) return { ok: false, reason: '마을 전원이 꺼져 있습니다. 전력 복구 뒤에 시도하세요.' }
+  const n = IOT_CHANNELS.filter((c) => snap.channels[c.id] && !snap.faults[c.id]).length
+  if (n < 1) return { ok: false, reason: '켜져 있는 LED 채널이 없습니다.' }
+  if (snap.i < 0.003) return { ok: false, reason: `전류가 거의 없습니다(${snap.i.toFixed(3)} A). LED가 켜져 있는지 확인하세요.` }
+  const a = snap.i / n
+  setLedA(a)
+  return { ok: true, a, n }
+}
 /** 이상 탐지 기준. 관리자 페이지에서 바꾸면 이 브라우저에 저장됨 */
 export interface Thresholds {
   /** 이 점수 이상이면 '주의' */
@@ -198,7 +232,7 @@ export interface VillageSnapshot {
 
 /** IoT 이상 탐지: 릴레이 상태로 예상 전류를 정하고, 실제 전류와의 차이(LED 2개 분량 = 1.0)와 전압 강하로 점수 산출 */
 export function anomalyScore(v: number, i: number, expected: number): number {
-  const ri = Math.abs(i - expected) / (LED_A * 2)
+  const ri = Math.abs(i - expected) / (ledA() * 2)
   const rv = expected > 0 ? Math.max(0, THRESHOLDS.vMin - v) / 0.75 : 0
   return Math.min(1, Math.max(ri, rv))
 }
@@ -264,7 +298,7 @@ function mockMeasure(): SerialReading & { zones: NonNullable<SerialReading['zone
     let i = 0
     for (const c of zoneChannels(kind)) {
       if (!mockLit(c.id)) continue
-      i += LED_A * (vSupply / 5) * (1 + 0.03 * Math.sin(t / 7 + c.ch))
+      i += ledA() * (vSupply / 5) * (1 + 0.03 * Math.sin(t / 7 + c.ch))
       if (faults[c.id] === 'GROUND') i += 0.22
     }
     i = Math.max(0, i + noise(0.002))
@@ -275,10 +309,10 @@ function mockMeasure(): SerialReading & { zones: NonNullable<SerialReading['zone
   return { v: Math.min(house.v, lamp.v), i: house.i + lamp.i, relay, zones: { house, lamp } }
 }
 
-/** 구간 예상 전류 = 마을 전원이 들어가 있을 때 켜진 채널 수 × LED 1개 정격 */
+/** 구간 예상 전류 = 마을 전원이 들어가 있을 때 켜진 채널 수 × LED 1개 기준 전류 */
 function expectedZone(kind: ChannelKind): number {
   if (!relay) return 0
-  return zoneChannels(kind).filter((c) => enabled[c.id]).length * LED_A
+  return zoneChannels(kind).filter((c) => enabled[c.id]).length * ledA()
 }
 
 /** 웹에서 채널을 조종할 수 있는지: 시뮬레이터이거나, 채널 상태를 보고하는 장치 */
@@ -316,9 +350,9 @@ function initial(): VillageSnapshot {
     relay,
     relayPending: null,
     v: NOMINAL_V,
-    i: LED_A * 5,
-    p: NOMINAL_V * LED_A * 5,
-    expected: LED_A * 5,
+    i: ledA() * 5,
+    p: NOMINAL_V * ledA() * 5,
+    expected: ledA() * 5,
     score: 0,
     status: 'NORMAL',
     estLit: 5,
@@ -399,13 +433,13 @@ function tick() {
       ...r,
       expected: exp,
       score: anomalyScore(r.v, r.i, exp),
-      estLit: Math.max(0, Math.min(zoneChannels(kind).length, Math.round(r.i / LED_A))),
+      estLit: Math.max(0, Math.min(zoneChannels(kind).length, Math.round(r.i / ledA()))),
     })
     zones = { HOUSE: zoneState('HOUSE', m.zones.house, eh), LAMP: zoneState('LAMP', m.zones.lamp, el) }
     score = Math.max(score, zones.HOUSE.score, zones.LAMP.score)
   }
   const status = classify(v, i, score, relay)
-  const estLit = zones ? zones.HOUSE.estLit + zones.LAMP.estLit : Math.max(0, Math.min(IOT_CHANNELS.length, Math.round(i / LED_A)))
+  const estLit = zones ? zones.HOUSE.estLit + zones.LAMP.estLit : Math.max(0, Math.min(IOT_CHANNELS.length, Math.round(i / ledA())))
   const point: IotPoint = { t: now, v, i, expected, score, ...(m.zones && { ih: m.zones.house.i, il: m.zones.lamp.i, eh, el }) }
 
   const events = [...snap.events]

@@ -1,8 +1,8 @@
 import { useSyncExternalStore } from 'react'
-import { getVillage, IOT_CHANNELS, LED_A, setChannel, type ChannelDef, type ChannelId } from './village'
+import { getVillage, IOT_CHANNELS, ledA, setChannel, type ChannelDef, type ChannelId } from './village'
 
 // 채널 점검: 켜져 있는 채널을 하나씩 잠깐 꺼서 그 구간 전류가 얼마나 줄어드는지 본다.
-//   LED 1개 분량(0.056 A)쯤 줄면 정상 · 거의 안 줄면 단선·접촉 불량 · 훨씬 많이 줄면 누설·단락.
+//   LED 1개 분량(기준 전류)쯤 줄면 정상 · 거의 안 줄면 단선·접촉 불량 · 훨씬 많이 줄면 누설·단락.
 // INA219가 구간(주택/가로등)마다 하나라 평소에는 구간까지만 알 수 있는데, 이렇게 하면 LED 하나까지 짚을 수 있다.
 
 export type CheckVerdict = 'OK' | 'NO_CURRENT' | 'OVER' | 'SKIPPED' | 'ERROR'
@@ -72,8 +72,8 @@ async function zoneCurrent(c: ChannelDef, samples = 2): Promise<number> {
 }
 
 function judge(drop: number): CheckVerdict {
-  if (drop < LED_A * 0.5) return 'NO_CURRENT'
-  if (drop > LED_A * 1.8) return 'OVER'
+  if (drop < ledA() * 0.5) return 'NO_CURRENT'
+  if (drop > ledA() * 1.8) return 'OVER'
   return 'OK'
 }
 

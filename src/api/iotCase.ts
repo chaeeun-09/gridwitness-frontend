@@ -1,4 +1,4 @@
-import { DEVICE_INFO, FAULT_LABEL, IOT_MODEL, LED_A, NOMINAL_V, STATUS_LABEL, THRESHOLDS, TICK_MS, type VillageEvent } from '../lib/village'
+import { DEVICE_INFO, FAULT_LABEL, IOT_MODEL, ledA, NOMINAL_V, STATUS_LABEL, THRESHOLDS, TICK_MS, type VillageEvent } from '../lib/village'
 import type { DiagnosisIssue, IotCase } from '../types'
 
 /** 마을 이상 이벤트 구간으로 IoT 사건을 만든다 . 계측 기록 그대로 보존하고 교류 파형으로 바꾸지 않음. */
@@ -24,10 +24,10 @@ export function buildIotCase(e: VillageEvent, actor: string, id: string): IotCas
     else if (relayOn && minVOn < THRESHOLDS.vMin) findings.push(`전압이 정격 ${NOMINAL_V}V 대비 ${minVOn.toFixed(2)}V까지 낮아졌습니다 (어댑터·배선 접촉 확인).`)
     // 과전류 판단은 릴레이가 닫혀 있어야 할 때만 (차단 후 흐르는 전류는 아래 고착 항목에서 따로 봄)
     const overA = Math.max(0, ...w.filter((p) => p.expected > 0).map((p) => p.i - p.expected))
-    if (overA > LED_A && !w.some((p) => p.ih !== undefined)) findings.push(`실제 전류가 예상보다 최대 ${overA.toFixed(2)}A 많습니다 (누설·단락 가능성).`)
+    if (overA > ledA() && !w.some((p) => p.ih !== undefined)) findings.push(`실제 전류가 예상보다 최대 ${overA.toFixed(2)}A 많습니다 (누설·단락 가능성).`)
     // INA219 두 개 구성이면 구간(주택/가로등)까지 짚고, 아니면 마을 전체로만 말함
     const zoned = w.some((p) => p.ih !== undefined)
-    const short = (i: number | undefined, e: number | undefined, v: number) => (i !== undefined && e !== undefined && e > 0 && v > 4 ? Math.round((e - i) / LED_A) : 0)
+    const short = (i: number | undefined, e: number | undefined, v: number) => (i !== undefined && e !== undefined && e > 0 && v > 4 ? Math.round((e - i) / ledA()) : 0)
     if (zoned) {
       const zones = [
         { name: '주택 구간(INA219 ① 0x40)', missing: Math.max(0, ...w.map((p) => short(p.ih, p.eh, p.v))), over: Math.max(0, ...w.map((p) => (p.eh ? (p.ih ?? 0) - p.eh : 0))) },
@@ -35,7 +35,7 @@ export function buildIotCase(e: VillageEvent, actor: string, id: string): IotCas
       ]
       for (const z of zones) {
         if (z.missing > 0) findings.push(`${z.name} 전류가 LED ${z.missing}개 분량만큼 적습니다 (LED 단선·접촉 불량 가능성). 채널 점검으로 어느 LED인지 확인할 수 있습니다.`)
-        if (z.over > LED_A) findings.push(`${z.name} 전류가 예상보다 ${z.over.toFixed(2)}A 많습니다 (누설·단락 가능성).`)
+        if (z.over > ledA()) findings.push(`${z.name} 전류가 예상보다 ${z.over.toFixed(2)}A 많습니다 (누설·단락 가능성).`)
       }
     } else {
       const missing = Math.max(0, ...w.map((p) => short(p.i, p.expected, p.v)))

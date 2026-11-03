@@ -3,7 +3,7 @@ import EventList from '../components/EventList'
 import HardwareFlow from '../components/HardwareFlow'
 import { Metric, Metrics, NODE_TONE, PageHeader, Section, Status } from '../components/ui'
 import { CHART } from '../lib/chart'
-import { IOT_MODEL, LED_A, STATUS_LABEL, THRESHOLDS, TICK_MS, useVillage, ZONE_LABEL, ZONE_SENSOR, zoneChannels } from '../lib/village'
+import { IOT_MODEL, ledA, STATUS_LABEL, THRESHOLDS, TICK_MS, useVillage, ZONE_LABEL, ZONE_SENSOR, zoneChannels } from '../lib/village'
 
 /** 실시간 분석: 예상 전류 vs 실제 전류, 이상 점수, 경고 이력 */
 export default function LiveData() {
@@ -16,7 +16,7 @@ export default function LiveData() {
     score: +h.score.toFixed(2),
   }))
   const residual = snap.i - snap.expected
-  const ledUnits = residual / LED_A
+  const ledUnits = residual / ledA()
   const warnings = snap.events.length
   const axis = { tick: CHART.tick, axisLine: CHART.axisLine, tickLine: CHART.tickLine }
   const scoreColor = (s: number) => (s >= THRESHOLDS.fault ? CHART.err : s >= THRESHOLDS.warn ? CHART.warn : CHART.ink)
@@ -71,12 +71,12 @@ export default function LiveData() {
         </Section>
       </div>
 
-      <Section title="판정 근거" description={snap.zones ? '주택 구간과 가로등 구간을 INA219 두 개로 따로 잽니다. 예상 전류는 켜진 채널 수 × LED 1개 정격(0.056 A)이고, 이상 점수는 전체와 구간 중 가장 큰 값입니다.' : 'INA219 하나로 마을 전체만 측정하는 예전 장치입니다. LED별 상태는 전류 차이를 LED 1개 정격(0.056 A)으로 나눠 추정합니다.'}>
+      <Section title="판정 근거" description={snap.zones ? `주택 구간과 가로등 구간을 INA219 두 개로 따로 잽니다. 예상 전류는 켜진 채널 수 × LED 1개 기준 전류(${ledA().toFixed(3)} A)이고, 이상 점수는 전체와 구간 중 가장 큰 값입니다.` : `INA219 하나로 마을 전체를 잽니다. 예상 전류는 켜진 채널 수 × LED 1개 기준 전류(${ledA().toFixed(3)} A)이고, LED 개수는 전류를 이 값으로 나눠 추정합니다.`}>
         <dl className="dl-rows">
           <div><dt>릴레이</dt><dd>{snap.relay ? '닫힘 — 5개 LED에 전원 공급' : '열림 — 마을 전체 차단'}</dd></div>
           <div><dt>전압</dt><dd className="num">{snap.v.toFixed(2)} V <span className="muted">(정격 5 V, {THRESHOLDS.vMin} V 미만이면 점수 상승)</span></dd></div>
           <div><dt>실제 전류</dt><dd className="num">{snap.i.toFixed(3)} A</dd></div>
-          <div><dt>예상 전류</dt><dd className="num">{snap.expected.toFixed(3)} A <span className="muted">(켜져야 할 LED × {LED_A} A)</span></dd></div>
+          <div><dt>예상 전류</dt><dd className="num">{snap.expected.toFixed(3)} A <span className="muted">(켜져야 할 LED × {ledA().toFixed(3)} A, 관리자에서 보정)</span></dd></div>
           <div><dt>차이</dt><dd className={`num ${Math.abs(residual) > 0.04 ? 'text-bad' : ''}`}>{residual >= 0 ? '+' : ''}{residual.toFixed(3)} A · LED {ledUnits >= 0 ? '+' : ''}{ledUnits.toFixed(1)}개 분량</dd></div>
           <div><dt>전력</dt><dd className="num">{snap.p.toFixed(2)} W</dd></div>
           <div><dt>켜진 LED (추정)</dt><dd className="num">{snap.estLit} / 5 <span className="muted">(채널 켜짐 {Object.values(snap.channels).filter(Boolean).length}개)</span></dd></div>

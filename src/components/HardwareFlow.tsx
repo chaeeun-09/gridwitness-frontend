@@ -7,7 +7,7 @@ import IssueList from '../components/IssueList'
 import Sparkline from '../components/Sparkline'
 import { Badge, DIAG_LABEL, DIAG_TONE, Metric, Metrics, NODE_TONE, Section, Status } from '../components/ui'
 import { getActor } from '../lib/actor'
-import { DEVICE_INFO, IOT_CHANNELS, IOT_MODEL, LED_A, linkEventToCase, setChannel, setRelay, STATUS_LABEL, useVillage, ZONE_LABEL, type ChannelId, type VillageEvent } from '../lib/village'
+import { DEVICE_INFO, IOT_CHANNELS, IOT_MODEL, ledA, linkEventToCase, setChannel, setRelay, STATUS_LABEL, useVillage, ZONE_LABEL, type ChannelId, type VillageEvent } from '../lib/village'
 import type { IotPoint } from '../types'
 
 // 실제 하드웨어 분석 흐름:
@@ -63,7 +63,7 @@ const avg = (pts: IotPoint[], target: Target): Avg => {
   const n = Math.max(1, pts.length)
   const v = pts.reduce((s, x) => s + x.v, 0) / n
   const i = pts.reduce((s, x) => s + pickI(target, x), 0) / n
-  return { v, i, p: v * i, leds: Math.max(0, Math.min(5, Math.round(i / LED_A))) }
+  return { v, i, p: v * i, leds: Math.max(0, Math.min(5, Math.round(i / ledA()))) }
 }
 
 interface Result {
@@ -192,7 +192,7 @@ export default function HardwareFlow() {
       injected: null,
       injectedAt: new Date(result.cutAt).toISOString(),
       status: one ? 'WARNING' : 'OUTAGE',
-      maxScore: Math.min(1, Math.max(0, (before.i - during.i) / (LED_A * 2))),
+      maxScore: Math.min(1, Math.max(0, (before.i - during.i) / (ledA() * 2))),
       relayOn: !!one,
       expected: before.i,
       window: result.window,
@@ -260,7 +260,7 @@ export default function HardwareFlow() {
           <Metric label="전압" value={snap.v.toFixed(2)} unit="V" />
           <Metric label="전류" value={snap.i.toFixed(3)} unit="A" />
           <Metric label="전력" value={snap.p.toFixed(2)} unit="W" />
-          <Metric label="켜진 LED (추정)" value={snap.estLit} unit="/ 5" foot="전체 전류 ÷ LED 1개 정격" />
+          <Metric label="켜진 LED (추정)" value={snap.estLit} unit="/ 5" foot="전류 ÷ LED 1개 기준 전류" />
         </Metrics>
       </Section>
 

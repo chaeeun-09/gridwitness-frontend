@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { api } from '../api'
 import { Empty, ErrorState, Metric, Metrics, NODE_TONE, PageHeader, Section, Segmented, Status, TableSkeleton } from '../components/ui'
 import { fmtTime } from '../lib/actor'
-import { DEFAULT_THRESHOLDS, DEVICE_INFO, resetThresholds, setThresholds, SOURCE_LABEL, STATUS_LABEL, TICK_MS, useVillage } from '../lib/village'
+import { calibrateLedA, DEFAULT_LED_A, DEFAULT_THRESHOLDS, DEVICE_INFO, ledA, resetThresholds, setLedA, setThresholds, SOURCE_LABEL, STATUS_LABEL, TICK_MS, useVillage } from '../lib/village'
 import { CASE_TYPE_LABEL, type ActivityItem, type CaseSummary, type CaseType } from '../types'
 
 /** 슬라이더 + 숫자 + 설명이 한 줄인 설정 항목 */
@@ -86,12 +86,40 @@ export default function Admin() {
               <b className="num">{th.fault.toFixed(2)}</b>
             </Setting>
             <Setting label="전압 하한 (V)" hint="릴레이가 닫혀 있는데 이 전압 아래면 점수 상승">
-              <input type="range" min={4} max={5} step={0.05} value={th.vMin} onChange={(e) => setThresholds({ vMin: Number(e.target.value) })} aria-label="전압 하한" />
+              <input type="range" min={2.5} max={5} step={0.05} value={th.vMin} onChange={(e) => setThresholds({ vMin: Number(e.target.value) })} aria-label="전압 하한" />
               <b className="num">{th.vMin.toFixed(2)}</b>
             </Setting>
           </div>
           {thInvalid && <div className="alert alert-err" role="alert">주의 기준({th.warn.toFixed(2)})이 이상 기준({th.fault.toFixed(2)})보다 작아야 합니다. 이 상태로는 저장되지 않습니다.</div>}
           <p className="hint">현재 이상 점수 <b className="num">{snap.score.toFixed(2)}</b> → {STATUS_LABEL[snap.status]} · 기준을 너무 낮추면 정상 변동도 이상으로 기록됩니다.</p>
+        </Section>
+      </div>
+
+      <div className="section">
+        <Section
+          title="LED 기준 전류"
+          description="LED 1개가 흘리는 전류입니다. 예상 전류·켜진 LED 수·채널 점검 판정이 모두 이 값을 기준으로 합니다. 실제 LED와 저항, 전원 전압에 따라 크게 달라서 실물에 맞춰야 합니다."
+          actions={ledA() !== DEFAULT_LED_A && <button className="btn btn-sm" onClick={() => { setLedA(DEFAULT_LED_A); flash('기본값으로 되돌렸습니다.') }}>기본값</button>}
+        >
+          <div className="stack" style={{ gap: 0 }}>
+            <Setting label="LED 1개 기준 전류 (mA)" hint={`기본 ${(DEFAULT_LED_A * 1000).toFixed(0)} mA. 220Ω 저항을 단 일반 LED는 보통 7~15 mA입니다.`}>
+              <input type="number" min={2} max={300} step={0.5} value={Number((ledA() * 1000).toFixed(1))} onChange={(e) => setLedA(Number(e.target.value) / 1000)} aria-label="LED 1개 기준 전류" style={{ width: 96 }} />
+              <b className="num">{(ledA() * 1000).toFixed(1)} mA</b>
+            </Setting>
+            <Setting label="지금 값으로 맞추기" hint="LED가 모두 정상으로 켜진 상태에서 누르세요. 현재 전류를 켜진 LED 수로 나눠 기준으로 삼습니다.">
+              <button
+                className="btn btn-primary"
+                disabled={!snap.connected || snap.status === 'NO_DATA' || !snap.relay}
+                onClick={() => {
+                  const r = calibrateLedA()
+                  flash(r.ok ? `LED 1개 ${(r.a * 1000).toFixed(1)} mA로 맞췄습니다 (LED ${r.n}개 기준).` : r.reason)
+                }}
+              >
+                지금 값으로 맞추기
+              </button>
+            </Setting>
+          </div>
+          <p className="hint">지금 전류 <b className="num">{snap.i.toFixed(3)} A</b> · 켜진 채널 {Object.values(snap.channels).filter(Boolean).length}개 → 예상 <b className="num">{snap.expected.toFixed(3)} A</b></p>
         </Section>
       </div>
 
