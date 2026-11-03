@@ -106,13 +106,13 @@ export default function Admin() {
               <input type="number" min={2} max={300} step={0.5} value={Number((ledA() * 1000).toFixed(1))} onChange={(e) => setLedA(Number(e.target.value) / 1000)} aria-label="LED 1개 기준 전류" style={{ width: 96 }} />
               <b className="num">{(ledA() * 1000).toFixed(1)} mA</b>
             </Setting>
-            <Setting label="지금 값으로 맞추기" hint="LED가 모두 정상으로 켜진 상태에서 누르세요. 현재 전류를 켜진 LED 수로 나눠 기준으로 삼습니다.">
+            <Setting label="지금 값으로 맞추기" hint="LED가 모두 정상으로 켜진 상태에서 누르세요. 현재 전류를 켜진 LED 수로 나눠 기준으로 삼고, 전원 전압이 하한보다 낮게 측정되면 하한도 맞춰 줍니다.">
               <button
                 className="btn btn-primary"
                 disabled={!snap.connected || snap.status === 'NO_DATA' || !snap.relay}
                 onClick={() => {
                   const r = calibrateLedA()
-                  flash(r.ok ? `LED 1개 ${(r.a * 1000).toFixed(1)} mA로 맞췄습니다 (LED ${r.n}개 기준).` : r.reason)
+                  flash(r.ok ? `LED 1개 ${(r.a * 1000).toFixed(1)} mA로 맞췄습니다 (LED ${r.n}개 기준).${r.vMin !== null ? ` 전압 하한도 ${r.vMin.toFixed(2)} V로 낮췄습니다.` : ''}` : r.reason)
                 }}
               >
                 지금 값으로 맞추기

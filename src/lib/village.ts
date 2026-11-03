@@ -91,7 +91,7 @@ export function setLedA(a: number) {
   emit()
 }
 /** 지금 켜져 있는 LED 수로 현재 전류를 나눠 기준값으로 삼음. 실패하면 이유를 돌려줌 */
-export function calibrateLedA(): { ok: true; a: number; n: number } | { ok: false; reason: string } {
+export function calibrateLedA(): { ok: true; a: number; n: number; vMin: number | null } | { ok: false; reason: string } {
   if (!snap.connected || snap.status === 'NO_DATA') return { ok: false, reason: '장치에서 측정값을 받고 있지 않습니다.' }
   if (!snap.relay) return { ok: false, reason: '마을 전원이 꺼져 있습니다. 전력 복구 뒤에 시도하세요.' }
   const n = IOT_CHANNELS.filter((c) => snap.channels[c.id] && !snap.faults[c.id]).length
@@ -99,7 +99,14 @@ export function calibrateLedA(): { ok: true; a: number; n: number } | { ok: fals
   if (snap.i < 0.003) return { ok: false, reason: `전류가 거의 없습니다(${snap.i.toFixed(3)} A). LED가 켜져 있는지 확인하세요.` }
   const a = snap.i / n
   setLedA(a)
-  return { ok: true, a, n }
+  // 전원이 약해서 전압이 하한보다 낮게 측정되면 하한도 그에 맞춰 낮춘다 (정상 상태를 매번 이상으로 판정하지 않도록).
+  // 하한은 지금 전압보다 0.4V 아래로 잡는다. 전압 강하·정전 판정(1V 미만)은 그대로다.
+  let vMin: number | null = null
+  if (snap.v < THRESHOLDS.vMin + 0.15) {
+    vMin = Math.max(2.5, Math.floor((snap.v - 0.4) * 20) / 20)
+    setThresholds({ vMin })
+  }
+  return { ok: true, a, n, vMin }
 }
 /** 이상 탐지 기준. 관리자 페이지에서 바꾸면 이 브라우저에 저장됨 */
 export interface Thresholds {
