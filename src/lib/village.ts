@@ -348,12 +348,13 @@ function canControlChannels(): boolean {
   return source === 'MOCK' || !!latest?.frame.ch
 }
 
-function ledStates(estLit: number, zones: VillageSnapshot['zones']): Record<ChannelId, LedState> {
+function ledStates(zones: VillageSnapshot['zones']): Record<ChannelId, LedState> {
   // 실측은 LED별 전류가 없으므로 구간마다 "켜진 수"를 켜져 있는 채널 앞에서부터 채워 표시
   const litSerial = (c: ChannelDef) => {
     if (!enabled[c.id]) return false
-    // 구간 측정이 없으면 켜진 채널 중 앞에서부터 estLit개를 '켜짐'으로 본다 (꺼진 채널은 세지 않음)
-    if (!zones) return IOT_CHANNELS.filter((x) => enabled[x.id]).findIndex((x) => x.id === c.id) < estLit
+    // 센서가 1개면 어느 LED의 전류가 모자란지 알 수 없다. 특정 LED(예: 맨 뒤 가로등 2)를 꺼진 것으로 찍으면 오해라서,
+    // 채널이 켜져 있으면 켜진 것으로 보고 전류 부족은 전체 판정·'켜진 LED 수'로만 알린다. 어느 LED인지는 채널 점검으로 확인
+    if (!zones) return true
     const on = zoneChannels(c.kind).filter((x) => enabled[x.id])
     return on.findIndex((x) => x.id === c.id) < zones[c.kind].estLit
   }
@@ -385,7 +386,7 @@ function initial(): VillageSnapshot {
     score: 0,
     status: 'NORMAL',
     estLit: 5,
-    leds: ledStates(5, null),
+    leds: ledStates(null),
     channels: { ...enabled },
     channelPending: {},
     canControl: true,
@@ -404,7 +405,6 @@ function initial(): VillageSnapshot {
 let snap: VillageSnapshot = initial()
 
 function emit(patch: Partial<VillageSnapshot> = {}) {
-  const estLit = patch.estLit ?? snap.estLit
   const zones = patch.zones !== undefined ? patch.zones : snap.zones
   snap = {
     ...snap,
@@ -418,7 +418,7 @@ function emit(patch: Partial<VillageSnapshot> = {}) {
     lastNote,
     relay,
     relayPending,
-    leds: ledStates(estLit, zones),
+    leds: ledStates(zones),
     channels: { ...enabled },
     channelPending: { ...chPending },
     canControl: canControlChannels(),
