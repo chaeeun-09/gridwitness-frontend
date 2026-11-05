@@ -22,7 +22,8 @@
 // ── 배선에 맞게 조정 ──────────────────────────────────
 const uint8_t MASTER_PIN = 2;
 // 전체 릴레이를 COM→NC로 연결: 코일이 꺼져 있을 때 전원이 들어감 (NO로 연결했다면 false)
-const bool MASTER_USES_NC = true;
+// 웹에서 '정전 발생'을 눌러도 LED가 안 꺼지면 이 값을 반대로 바꿔 보세요.
+const bool MASTER_USES_NC = false;
 const uint8_t CH_PINS[5] = {3, 4, 5, 6, 7};  // 주택 1~3, 가로등 1~2
 // 채널 릴레이를 COM→NO로 연결: 코일이 켜져야 LED가 켜짐 (NC로 연결했다면 true)
 const bool CH_USES_NC = false;

@@ -655,9 +655,21 @@ function onLost(reason: string) {
 
 /** 실제 모형 연결 (브라우저가 포트 선택 창을 띄움). 성공하면 다음부터 자동으로 다시 연결 */
 export async function connectSerial() {
-  const next = await openSerial(onSerialLine, onLost, 'ask')
-  setAutoPref(true)
-  await attach(next)
+  // 이미 연결돼 있으면 다시 열지 않는다 (같은 포트를 두 번 열면 'Port is already open'으로 끊김)
+  if (link && connected && source === 'SERIAL') return
+  // 자동 재연결이 열고 있는 중이면 끝나기를 기다린 뒤, 그래도 안 열렸을 때만 직접 연다
+  const waitStart = Date.now()
+  while (trying && Date.now() - waitStart < 4000) await new Promise((r) => setTimeout(r, 100))
+  if (link && connected && source === 'SERIAL') return
+  trying = true
+  try {
+    const next = await openSerial(onSerialLine, onLost, 'ask')
+    setAutoPref(true)
+    await attach(next)
+    stopRetry()
+  } finally {
+    trying = false
+  }
 }
 
 // ── 자동 재연결: 이전에 허용한 포트를 허용 창 없이 다시 연다 ──
