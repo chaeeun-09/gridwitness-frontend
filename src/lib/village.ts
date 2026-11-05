@@ -548,7 +548,13 @@ function fail(message: string) {
   emit()
 }
 
-/** 웹 → 장치 릴레이 명령 (마을 전체 전원). 장치가 보고한 상태로 확인될 때까지 '전송 중'. */
+/** 정전 직전의 채널 상태. 복구할 때 이대로 되돌린다 */
+let blackoutSaved: Record<ChannelId, boolean> | null = null
+
+/**
+ * 웹 → 장치 릴레이 명령 (마을 전체 전원). 장치가 보고한 상태로 확인될 때까지 '전송 중'.
+ * 실측 장치는 전체 릴레이(D2)가 LED 전원 경로에 없어도 정전이 되도록, 채널 릴레이 5개도 함께 끄고(복구 때 원래 상태로 켠다).
+ */
 export function setRelay(on: boolean) {
   if (!connected) return
   relayPending = on
@@ -556,7 +562,20 @@ export function setRelay(on: boolean) {
   clearTimeout(commandTimer)
   emit()
   if (source === 'SERIAL') {
-    link?.write(`RELAY ${on ? 1 : 0}`).catch((e: Error) => fail(`명령 전송 실패: ${e.message}`))
+    const write = (line: string) => link?.write(line).catch((e: Error) => fail(`명령 전송 실패: ${e.message}`))
+    write(`RELAY ${on ? 1 : 0}`)
+    if (canControlChannels()) {
+      if (!on) {
+        // 정전: 지금 켜진 채널을 기억해 두고 모두 끈다
+        if (!blackoutSaved) blackoutSaved = { ...enabled }
+        IOT_CHANNELS.forEach((c) => write(`CH ${c.ch} 0`))
+      } else if (blackoutSaved) {
+        // 복구: 정전 직전에 켜져 있던 채널만 다시 켠다
+        const saved = blackoutSaved
+        blackoutSaved = null
+        IOT_CHANNELS.forEach((c) => saved[c.id] && write(`CH ${c.ch} 1`))
+      }
+    }
     commandTimer = setTimeout(() => {
       if (relayPending === null) return
       relayPending = null
