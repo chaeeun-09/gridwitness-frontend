@@ -133,7 +133,7 @@ function useOnScreen<T extends Element>() {
 /** 카메라 목표: 지상 / 지하 전체(위에서 내려다봄) / 부품 확대. 목표가 바뀌면 부드럽게 따라감 */
 type Shot = { pos: Vector3; target: Vector3 }
 const SURFACE: Shot = { pos: new Vector3(-9, 19, 25), target: new Vector3(0, 0, 0) }
-const UNDER: Shot = { pos: new Vector3(-1, BOX_FLOOR + 41, 27), target: new Vector3(-1, BOX_FLOOR, 3.5) }
+const UNDER: Shot = { pos: new Vector3(-4, BOX_FLOOR + 35, 22), target: new Vector3(-4, BOX_FLOOR, -1.5) }
 function partShot(id: PartId): Shot {
   const [x, y, z] = partCenter(id)
   return { pos: new Vector3(x, y + 10.5, z + 4.5), target: new Vector3(x, y, z - 0.6) }
