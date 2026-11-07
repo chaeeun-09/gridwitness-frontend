@@ -2,7 +2,10 @@ import { useSyncExternalStore } from 'react'
 
 // 분석 서버(FastAPI) 연결 설정.
 
-export const DEFAULT_API = 'https://gridwitness-api.https.gsmsv.site'
+// 실제 서버 주소. 서버 CORS가 localhost:5173만 허용하므로 브라우저는 같은 출처의 /gw-api로
+// 요청하고, Vite 개발 서버(vite.config.ts)와 Vercel(vercel.json)이 이 주소로 프록시한다.
+export const UPSTREAM_API = 'https://gridwitness-api.https.gsmsv.site'
+export const DEFAULT_API = '/gw-api'
 
 const URL_KEY = 'gridwitness.api.url'
 
@@ -16,7 +19,9 @@ function read(key: string): string | null {
 
 export function apiBase(): string {
   const raw = read(URL_KEY) ?? (import.meta.env.VITE_API_BASE as string | undefined) ?? DEFAULT_API
-  return raw.replace(/\/+$/, '')
+  const url = raw.trim().replace(/\/+$/, '')
+  // 예전에 저장된 직접 주소는 CORS에 막히므로 프록시 경로로 돌린다
+  return url === UPSTREAM_API ? DEFAULT_API : url
 }
 
 export function setApiBase(url: string) {

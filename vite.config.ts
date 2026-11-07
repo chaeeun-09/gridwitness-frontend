@@ -6,4 +6,22 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   base: process.env.VITE_BASE ?? '/',
   plugins: [react()],
+  server: {
+    proxy: {
+      '/gw-api': {
+        target: 'https://gridwitness-api.https.gsmsv.site',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/gw-api/, ''),
+      },
+    },
+  },
+  preview: {
+    proxy: {
+      '/gw-api': {
+        target: 'https://gridwitness-api.https.gsmsv.site',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/gw-api/, ''),
+      },
+    },
+  },
 })
