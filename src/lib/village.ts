@@ -29,8 +29,9 @@ export interface ChannelDef {
 /** 마을 부하: 주택 3 + 가로등 2. LED마다 채널 릴레이가 있고, 구간마다 INA219가 하나씩 있음 */
 export const IOT_CHANNELS: ChannelDef[] = [
   { id: 'h1', ch: 1, kind: 'HOUSE', name: '주택 1', relay: '릴레이 ① · D3' },
-  { id: 'h2', ch: 2, kind: 'HOUSE', name: '주택 2', relay: '릴레이 ② · D4' },
-  { id: 'h3', ch: 3, kind: 'HOUSE', name: '주택 3', relay: '릴레이 ③ · D5' },
+  // 실제 배선에서 주택 2·3 LED가 서로 바뀌어 있어 채널 번호를 맞바꿈 (주택 2 = 채널 ③ D5, 주택 3 = 채널 ② D4)
+  { id: 'h2', ch: 3, kind: 'HOUSE', name: '주택 2', relay: '릴레이 ③ · D5' },
+  { id: 'h3', ch: 2, kind: 'HOUSE', name: '주택 3', relay: '릴레이 ② · D4' },
   { id: 'l1', ch: 4, kind: 'LAMP', name: '가로등 1', relay: '릴레이 ④ · D6' },
   { id: 'l2', ch: 5, kind: 'LAMP', name: '가로등 2', relay: '릴레이 ⑤ · D7' },
 ]
@@ -636,8 +637,8 @@ function onSerialLine(line: string) {
     clearTimeout(commandTimer)
   }
   if (frame.ch) {
-    IOT_CHANNELS.forEach((c, k) => {
-      enabled[c.id] = frame.ch![k]
+    IOT_CHANNELS.forEach((c) => {
+      enabled[c.id] = frame.ch![c.ch - 1]
       if (chPending[c.id] === enabled[c.id]) {
         delete chPending[c.id]
         clearTimeout(chTimers[c.id])
