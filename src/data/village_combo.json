@@ -112,23 +112,40 @@
   },
   "open_circuit": {
    "cases": 1322,
-   "detected": 0.938,
-   "channel_identified": 0.6377
+   "detected": 0.9228,
+   "channel_identified": 0.6233
   },
   "stuck_relay": {
    "cases": 1318,
-   "detected": 0.9879,
-   "channel_identified": 0.6055
+   "detected": 0.975,
+   "channel_identified": 0.5926
   },
   "candidates": {
    "open": {
     "true_channel_in_candidates": 1.0,
-    "mean_candidates": 2.19
+    "mean_candidates": 2.72
    },
    "stuck": {
     "true_channel_in_candidates": 1.0,
-    "mean_candidates": 2.3
+    "mean_candidates": 2.82
    }
-  }
- }
+  },
+  "real_fault": [
+   {
+    "file": "fault_ch5_led_removed_20261108.csv",
+    "removed_channel": 5,
+    "normal_equivalent": {
+     "samples": 201,
+     "false_alarms": 0
+    },
+    "fault": {
+     "samples": 199,
+     "detected": 187,
+     "true_channel_in_candidates": 184,
+     "mean_candidates": 2.78
+    }
+   }
+  ]
+ },
+ "tol_a": 0.001
 }

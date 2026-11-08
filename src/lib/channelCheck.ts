@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import { getVillage, IOT_CHANNELS, ledA, setChannel, type ChannelDef, type ChannelId } from './village'
+import { expectedDrop, getVillage, IOT_CHANNELS, ledA, setChannel, type ChannelDef, type ChannelId } from './village'
 
 // 채널 점검: 켜져 있는 채널을 하나씩 잠깐 꺼서 그 구간 전류가 얼마나 줄어드는지 본다.
 //   LED 1개 분량(기준 전류)쯤 줄면 정상 · 거의 안 줄면 단선·접촉 불량 · 훨씬 많이 줄면 누설·단락.
@@ -63,7 +63,7 @@ async function waitFor(cond: () => boolean, timeout: number): Promise<boolean> {
 }
 
 /** 해당 채널이 속한 구간의 최근 전류 평균 (구간 측정이 없으면 마을 전체) */
-async function zoneCurrent(c: ChannelDef, samples = 2): Promise<number> {
+async function zoneCurrent(c: ChannelDef, samples = 4): Promise<number> {
   const since = Date.now()
   await waitFor(() => getVillage().history.filter((h) => h.t > since).length >= samples, 4000)
   const pts = getVillage().history.filter((h) => h.t > since).slice(-samples)
@@ -71,9 +71,12 @@ async function zoneCurrent(c: ChannelDef, samples = 2): Promise<number> {
   return pts.reduce((s, h) => s + pick(h), 0) / Math.max(1, pts.length)
 }
 
-function judge(drop: number): CheckVerdict {
-  if (drop < ledA() * 0.5) return 'NO_CURRENT'
-  if (drop > ledA() * 1.8) return 'OVER'
+/** 줄어든 전류를 '지금 조합에서 이 채널을 끄면 줄어야 할 양'(실측 조합표)과 비교.
+ *  USB 전원은 많이 켤수록 전압이 내려가 한 채널 몫이 작아진다 (실측: 1개 켤 때 11 mA, 5개 중 하나 끌 때 2~4 mA) */
+function judge(drop: number, expected: number | null): CheckVerdict {
+  const e = expected ?? ledA()
+  if (drop < e * 0.5) return 'NO_CURRENT'
+  if (drop > e * 2 + 0.003) return 'OVER'
   return 'OK'
 }
 
@@ -100,6 +103,7 @@ export async function runChannelCheck() {
         continue
       }
       set({ current: c.id })
+      const exp = expectedDrop(c.id)
       const before = await zoneCurrent(c)
       setChannel(c.id, false)
       const off = await waitFor(() => !getVillage().channels[c.id] && getVillage().channelPending[c.id] === undefined, 3000)
@@ -114,7 +118,7 @@ export async function runChannelCheck() {
       setChannel(c.id, true)
       await waitFor(() => getVillage().channels[c.id] && getVillage().channelPending[c.id] === undefined, 3000)
       const drop = before - after
-      results.push({ id: c.id, before, after, drop, verdict: judge(drop) })
+      results.push({ id: c.id, before, after, drop, verdict: judge(drop, exp), note: exp != null ? `예상 감소 ${(exp * 1000).toFixed(0)} mA (실측 조합표)` : undefined })
       set({ results: [...results] })
       await sleep(400)
     }

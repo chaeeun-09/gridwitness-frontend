@@ -220,13 +220,25 @@ export interface ComboDiagnosis {
   /** 한 채널만 바꿨을 때 측정과 맞는 채널 (센서가 1개라 여러 개일 수 있음) */
   candidates: ChannelId[]
 }
+/** 장치가 전류를 1 mA 단위로 보내므로 그 한 칸만큼은 허용 (다른 시점 실측에서 정상값이 1 mA 달라지는 것 확인, 2026-11-08) */
+export const COMBO_TOL_A = 0.001
+/** 지금 조합에서 채널 하나를 끄면 줄어들 것으로 예상되는 전류 (조합표). 표에 없으면 null */
+export function expectedDrop(id: ChannelId): number | null {
+  const key = commandKey()
+  const j = IOT_CHANNELS.find((c) => c.id === id)!.ch - 1
+  if (key[j] !== '1') return null
+  const off = key.slice(0, j) + '0' + key.slice(j + 1)
+  const a = COMBO.mean_a[key]
+  const b = COMBO.mean_a[off]
+  return a == null || b == null ? null : a - b
+}
 /** 조합표로 판정: 점수(0~1)와 진단. 표에 없는 조합이면 null */
 function comboJudge(key: string, i: number): { expected: number; score: number; diag: ComboDiagnosis | null } | null {
   const mu = COMBO.mean_a[key]
   const sd = COMBO.sigma_a[key]
   if (mu == null || sd == null) return null
   const z = (i - mu) / sd
-  const s = Math.abs(z) / COMBO.k_sigma
+  const s = Math.abs(i - mu) / (COMBO.k_sigma * sd + COMBO_TOL_A)
   // 기준(k)의 80%부터 주의, 기준을 넘으면 이상 (THRESHOLDS 0.3 / 0.6 에 맞춤)
   const score = s < 0.8 ? (0.3 * s) / 0.8 : Math.min(1, 0.3 + (0.3 * (s - 0.8)) / 0.2)
   if (s <= 1) return { expected: mu, score, diag: null }
@@ -235,7 +247,7 @@ function comboJudge(key: string, i: number): { expected: number; score: number; 
     const alt = key.slice(0, j) + (key[j] === '1' ? '0' : '1') + key.slice(j + 1)
     const m2 = COMBO.mean_a[alt]
     const s2 = COMBO.sigma_a[alt]
-    if (m2 != null && s2 != null && Math.abs(i - m2) <= COMBO.k_sigma * s2) candidates.push(IOT_CHANNELS.find((c) => c.ch === j + 1)!.id)
+    if (m2 != null && s2 != null && Math.abs(i - m2) <= COMBO.k_sigma * s2 + COMBO_TOL_A) candidates.push(IOT_CHANNELS.find((c) => c.ch === j + 1)!.id)
   }
   return { expected: mu, score, diag: { kind: z < 0 ? 'LOW' : 'HIGH', z: Math.round(z * 10) / 10, candidates } }
 }

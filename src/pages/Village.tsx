@@ -183,6 +183,8 @@ export default function Village() {
                     ? '끈 채널에 전류가 흐름 (릴레이 고착 의심)'
                     : '예상보다 전류가 많음 (누설·단락 의심)'}
                 {snap.diagnosis.candidates.length > 0 && ` · 의심: ${snap.diagnosis.candidates.map((id) => snap.leds[id].name).join(', ')}`}
+                {' · '}
+                <Link to="/village/loads">채널 점검으로 찾기 →</Link>
               </span>
             )}
             <div className="hud-nums num">
