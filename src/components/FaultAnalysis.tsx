@@ -3,6 +3,7 @@ import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Too
 import { analyzeWaveform, fmtCurrent, fmtPct } from '../lib/faultAnalysis'
 import { CHART } from '../lib/chart'
 import { ANALYSIS_LABEL, EVENT_LABELS, type AnalysisResult, type AnalysisType, type EventLabel } from '../types'
+import AiEvidence from './AiEvidence'
 import { IconBars, IconWave } from './Icons'
 import { Segmented, Skeleton } from './ui'
 
@@ -196,11 +197,14 @@ export default function FaultAnalysis({ matrix, fs, hz, analysis, blocked, busy,
           )}
         </div>
 
-        {/* 주요 근거 (파형에서 직접 계산) */}
+        {/* AI 판단 근거 (서버 AI 원문: 판단 기준 통과 여부 + TreeSHAP) */}
+        {analysis?.ai && <AiEvidence ai={analysis.ai} compact={compact} />}
+
+        {/* 파형 요약 (브라우저에서 직접 계산, AI 판단과 별개) */}
         <div className="fa-card">
           <div className="fa-card-head">
-            <strong>주요 근거</strong>
-            <span className="small muted">파형에서 직접 계산</span>
+            <strong>파형 요약</strong>
+            <span className="small muted">화면에서 직접 계산 · AI 판단과 별개</span>
           </div>
           {!features.onset ? (
             <p className="small muted">기록 안에서 뚜렷한 급변을 찾지 못했습니다. (한 주기 전과 비교해 크게 달라진 구간이 없음)</p>

@@ -6,6 +6,7 @@ import FaultAnalysis from '../components/FaultAnalysis'
 import IotCaseView from '../components/IotCaseView'
 import IssueList from '../components/IssueList'
 import ReviewPanel from '../components/ReviewPanel'
+import TrustStrip from '../components/TrustStrip'
 import { ErrorState, PageHeader, PageSkeleton, Section } from '../components/ui'
 import { fmtTime, getActor } from '../lib/actor'
 import { needsWaveform, SOURCE_LABEL, type AnalysisType, type AnyCase, type ChannelFeatures, type IncidentCase } from '../types'
@@ -54,6 +55,7 @@ export function WaveformCaseView({ c, onChange }: { c: IncidentCase; onChange: (
         actions={<button className="btn no-print" onClick={() => window.print()}>PDF로 내보내기</button>}
       />
       <Steps steps={WAVEFORM_STEPS} done={waveformStepsDone(c.stage)} />
+      <TrustStrip c={c} onGo={setTab} />
       {missing && (
         <div className="alert alert-warn no-print" style={{ marginTop: 20 }}>
           <span>

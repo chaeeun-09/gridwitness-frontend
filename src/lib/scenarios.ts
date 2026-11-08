@@ -4,6 +4,8 @@ import { parseCsv } from './waveform'
 
 // 고장파형 입력 예시. 만든(합성) 파형은 쓰지 않는다.
 // - 실제 공개 파형: Xiong et al. 공개 데이터(MIT) 원본 4건 (public/data/xiong, 유형마다 1건). AI 분석까지 가능
+// - AI가 보류한 실제 사례: 시험 세트(학습에 안 씀)에서 배포 모델이 실제로 보류한 파형 3건 (xiong-87 은 위 SIF 와 같은 파일)
+//   gridwitness-ai scripts/export_model_card.py 가 모델을 돌려 찾고 원본 값 그대로 내보냄
 // - 입력 검사용: 위 실제 파일을 일부러 망가뜨리거나(헤더 삭제·순서 변경·결측) 잘못된 설정값을 넣은 파일.
 //   입력 진단이 어떻게 반응하는지 보는 용도이고, 데이터셋 ID를 'gridwitness-input-check'로 둬서 AI가 고장 유형을 판단하지 않는다
 
@@ -25,11 +27,11 @@ export interface RealSample {
   rows: string[][]
   matrix: number[][]
 }
-export type RealSamples = Record<'SIF' | 'MIF' | 'PF' | 'TD', RealSample>
+export type RealSamples = Record<'SIF' | 'MIF' | 'PF' | 'TD' | 'ABS1' | 'ABS2', RealSample>
 
 export interface InputScenario {
   id: string
-  group: '실제 공개 파형' | '입력 검사 · 설정값' | '입력 검사 · 형식 오류' | '입력 검사 · COMTRADE'
+  group: '실제 공개 파형' | 'AI가 보류한 실제 사례' | '입력 검사 · 설정값' | '입력 검사 · 형식 오류' | '입력 검사 · COMTRADE'
   label: string
   /** 기대하는 입력 진단 결과 */
   expect: DiagnosisStatus
@@ -38,7 +40,9 @@ export interface InputScenario {
 }
 
 const XIONG = `${import.meta.env.BASE_URL}data/xiong/`
-const FILES: Record<keyof RealSamples, string> = { SIF: 'xiong-87', MIF: 'xiong-214', PF: 'xiong-44', TD: 'xiong-227' }
+const FILES: Record<keyof RealSamples, string> = { SIF: 'xiong-87', MIF: 'xiong-214', PF: 'xiong-44', TD: 'xiong-227', ABS1: 'xiong-1', ABS2: 'xiong-195' }
+/** 보류 사례의 실제 유형 (Xiong 라벨) */
+const TRUE_LABEL: Partial<Record<keyof RealSamples, string>> = { ABS1: 'PF', ABS2: 'PF' }
 export const XIONG_DATASET_ID = 'Xiong-public-fault-dataset'
 export const CHECK_DATASET_ID = 'gridwitness-input-check'
 
@@ -51,7 +55,7 @@ export function loadRealSamples(): Promise<RealSamples> {
       if (!r.ok) throw new Error(`${id}.csv: HTTP ${r.status}`)
       const text = await r.text()
       const rows = parseCsv(text).rows
-      return [label, { id, label, text, rows, matrix: rows.map((r) => r.map(Number)) }] as const
+      return [label, { id, label: TRUE_LABEL[label] ?? label, text, rows, matrix: rows.map((r) => r.map(Number)) }] as const
     }),
   )
     .then((xs) => Object.fromEntries(xs) as RealSamples)
@@ -77,10 +81,12 @@ const lines = (t: string) => t.trimEnd().split(/\r?\n/)
 const joinCsv = (header: readonly string[], rows: string[][]) => [header.join(','), ...rows.map((r) => r.join(','))].join('\n')
 
 export const INPUT_SCENARIOS: InputScenario[] = [
-  { id: 'x-sif', group: '실제 공개 파형', label: 'SIF (Xiong 87)', expect: 'ACCEPTED', note: '원본 그대로 · AI 분석 가능', build: (s) => real(s.SIF) },
+  { id: 'x-sif', group: '실제 공개 파형', label: 'SIF (Xiong 87)', expect: 'ACCEPTED', note: '원본 그대로 · 시험에서 AI가 보류한 파형 (SIF·MIF 점수 차 0.02)', build: (s) => real(s.SIF) },
   { id: 'x-mif', group: '실제 공개 파형', label: 'MIF (Xiong 214)', expect: 'ACCEPTED', note: '원본 그대로 · AI 분석 가능', build: (s) => real(s.MIF) },
   { id: 'x-pf', group: '실제 공개 파형', label: 'PF (Xiong 44)', expect: 'ACCEPTED', note: '원본 그대로 · AI 분석 가능', build: (s) => real(s.PF) },
   { id: 'x-td', group: '실제 공개 파형', label: 'TD (Xiong 227)', expect: 'ACCEPTED', note: '원본 그대로 · AI 분석 가능', build: (s) => real(s.TD) },
+  { id: 'x-abs1', group: 'AI가 보류한 실제 사례', label: '정답 PF (Xiong 1)', expect: 'ACCEPTED', note: '원본 그대로 · 시험에서 AI가 보류 (SIF·PF 점수 차 0.007)', build: (s) => real(s.ABS1) },
+  { id: 'x-abs2', group: 'AI가 보류한 실제 사례', label: '정답 PF (Xiong 195)', expect: 'ACCEPTED', note: '원본 그대로 · 시험에서 AI가 보류 (PF·SIF 점수 차 0.08)', build: (s) => real(s.ABS2) },
   {
     id: 'no-header',
     group: '입력 검사 · 형식 오류',
