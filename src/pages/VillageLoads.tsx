@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import ChannelCheckPanel from '../components/ChannelCheckPanel'
+import ComboCalibratePanel from '../components/ComboCalibratePanel'
 import Channels from '../components/Channels'
 import { Metric, Metrics, PageHeader, Section } from '../components/ui'
 import { type ChannelId, useVillage, ZONE_LABEL, ZONE_SENSOR, zoneChannels } from '../lib/village'
@@ -30,6 +31,7 @@ export default function VillageLoads() {
         <p className="hint">LED별 전류는 따로 재지 않습니다. 구간 전류로 켜진 개수를 추정하고, 어느 LED인지는 채널 점검으로 확인합니다.</p>
       </Section>
       <ChannelCheckPanel snap={snap} />
+      <ComboCalibratePanel snap={snap} />
     </>
   )
 }

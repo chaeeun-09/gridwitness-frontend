@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react'
+import { deviation, type DeviationParams } from './deviation'
 
 // 가상 대단지: 마을 모형(집마다 릴레이 + 전류 측정 → 예상과 비교해 이상 판정)을 실제 규모 아파트 단지로 키운 소프트웨어 모형.
 //
@@ -22,7 +23,10 @@ export const LAMP_KW = 0.1 // 가정: LED 가로등 1개 100 W
 export const LAMP_ON = (hour: number) => hour >= 18 || hour < 6 // 가정: 18시~다음날 6시 점등
 export const NOMINAL_V = 220
 const V_MIN = 0.9 * NOMINAL_V
-export const TH = { warn: 0.3, fault: 0.6 } // 마을 모형과 같은 기준 (예상 대비 차이 비율)
+// 세대 계량기 판정: 스마트 마을과 같은 규칙(deviation.ts). 세대별 실측이 없어 흔들림·여유는 가정값
+//   흔들림 = 정상의 5%, k = 4 (마을 학습값과 같은 배수), 여유 = 0.05 kW
+export const UNIT_RULE = { sigmaRel: 0.05, k: 4, tolKw: 0.05 }
+const unitParams = (expected: number): DeviationParams => ({ sigma: UNIT_RULE.sigmaRel * expected, k: UNIT_RULE.k, tol: UNIT_RULE.tolKw })
 
 export type UnitFault = 'OPEN' | 'LEAK' | 'STUCK'
 export type BuildingFault = 'OUTAGE' | 'SAG'
@@ -249,10 +253,12 @@ function judge(kw: number | null, expected: number | null, v: number, on: boolea
   if (kw == null || expected == null) return { kw, expected, v, status: 'NO_DATA', score: 0 }
   if (v < 0.5 * NOMINAL_V) return { kw, expected, v, status: 'OUTAGE', score: 1 }
   if (!on) return { kw, expected, v, status: kw > 0.05 ? 'FAULT' : 'OFF', score: kw > 0.05 ? 1 : 0 }
-  const ri = Math.abs(kw - expected) / Math.max(expected, 0.2)
+  const dv = deviation(kw, expected, unitParams(expected))
+  // 전압 강하는 따로: 정격의 90% 아래부터 주의
   const rv = Math.max(0, V_MIN - v) / (0.15 * NOMINAL_V)
-  const score = Math.min(1, Math.max(ri, rv))
-  return { kw, expected, v, status: score >= TH.fault ? 'FAULT' : score >= TH.warn ? 'WARNING' : 'NORMAL', score }
+  const score = Math.min(1, Math.max(dv.score, rv))
+  const level = dv.level === 'FAULT' || rv >= 0.6 ? 'FAULT' : dv.level === 'WARNING' || rv >= 0.3 ? 'WARNING' : 'NORMAL'
+  return { kw, expected, v, status: level, score }
 }
 
 const EMPTY_COUNTS = (): Record<UnitStatus, number> => ({ NORMAL: 0, OFF: 0, WARNING: 0, FAULT: 0, OUTAGE: 0, NO_DATA: 0 })

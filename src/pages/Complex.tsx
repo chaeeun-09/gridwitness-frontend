@@ -31,6 +31,7 @@ import {
   setSpeed,
   toggleUnit,
   UNIT_FAULT_LABEL,
+  UNIT_RULE,
   UNIT_STATUS_LABEL,
   unitKey,
   unitName,
@@ -334,6 +335,7 @@ function TruthNote({ index }: { index: ComplexIndex | null }) {
             <li>모든 세대가 같은 양을 씀(그 지역·그 달 가구 평균). 하루 중 시간 패턴은 지역 전체(주택·상가·산업 합계) 패턴을 씀. 세대별 실측 데이터는 없음</li>
             {index?.household && <li>지역본부↔시도 대응 (서울·남서울본부 = 서울 전체, 경기·경기북부본부 = 경기 전체, 세종 자료 없음)</li>}
             <li>가상 고장의 크기(누설 +1 kW, 전압 85%)와 측정은 잡음 없는 계산값</li>
+            <li>세대 판정 규칙은 스마트 마을에서 실측으로 검증한 것과 같은 코드지만, 세대 흔들림({UNIT_RULE.sigmaRel * 100}%)·여유({UNIT_RULE.tolKw} kW)는 가정값</li>
           </ul>
         </div>
       </div>
@@ -420,7 +422,7 @@ function SelPanel({ sel, data, readings }: { sel: Sel; data: RegionData | null; 
         </button>
       </div>
       <p className="hint">
-        판정 규칙(마을 모형과 같음): 켜져 있으면 예상 대비 차이 {'≥'} 30% 주의, {'≥'} 60% 이상 · 꺼졌는데 전기가 흐르면 이상 · 전압 50% 미만이면 정전. 동 전력 {fmt(b.kw, 0)} kW / 예상 {fmt(b.expected, 0)} kW
+        판정 규칙(스마트 마을과 같은 코드): |측정 − 정상| &gt; {UNIT_RULE.k} × 흔들림 + {UNIT_RULE.tolKw} kW 이면 이상, 그 80%부터 주의 · 꺼졌는데 전기가 흐르면 이상 · 전압 50% 미만이면 정전. 흔들림은 정상의 {UNIT_RULE.sigmaRel * 100}%로 가정(세대 실측 없음). 동 전력 {fmt(b.kw, 0)} kW / 예상 {fmt(b.expected, 0)} kW
       </p>
     </Section>
   )

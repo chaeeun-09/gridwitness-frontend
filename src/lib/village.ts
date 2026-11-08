@@ -1,4 +1,5 @@
 import COMBO_JSON from '../data/village_combo.json'
+import { deviation } from './deviation'
 import { useSyncExternalStore } from 'react'
 import type { IotPoint } from '../types'
 import { NO_GRANTED_PORT, onSerialPlug, openSerial, parseFrame, serialSupported, type SerialLink, type SerialReading } from './serial'
@@ -209,6 +210,42 @@ interface ComboTable {
   eval: { normal_false_alarm: { rate: number; samples: number }; open_circuit: { detected: number }; stuck_relay: { detected: number }; candidates: Record<string, { true_channel_in_candidates: number; mean_candidates: number }> }
 }
 export const COMBO = COMBO_JSON as ComboTable
+
+// 이 PC에서 다시 맞춘 기준 (USB 전원·포트가 바뀌면 정상 전류가 조금 달라진다). 흔들림(sigma)·기준(k)은 학습값을 그대로 쓴다
+export interface ComboCalibration {
+  at: string
+  mean_a: Record<string, number>
+  samplesPerCombo: number
+  /** 학습 기준과 가장 크게 달라진 조합의 차이 (A) */
+  maxShiftA: number
+}
+const CAL_KEY = 'gridwitness.comboCal.v1'
+function loadCal(): ComboCalibration | null {
+  try {
+    const raw = localStorage.getItem(CAL_KEY)
+    return raw ? (JSON.parse(raw) as ComboCalibration) : null
+  } catch {
+    return null
+  }
+}
+let comboCal: ComboCalibration | null = loadCal()
+export const getComboCalibration = () => comboCal
+export function setComboCalibration(cal: ComboCalibration | null) {
+  comboCal = cal
+  try {
+    if (cal) localStorage.setItem(CAL_KEY, JSON.stringify(cal))
+    else localStorage.removeItem(CAL_KEY)
+  } catch {
+    // 저장할 수 없는 환경이면 이 화면에서만 씀
+  }
+  emit()
+}
+/** 조합의 정상 전류: 이 PC에서 맞춘 값이 있으면 그것, 없으면 학습값 */
+export function comboMean(key: string): number | undefined {
+  return comboCal?.mean_a[key] ?? COMBO.mean_a[key]
+}
+/** 지금 명령한 조합 (장치 채널 1~5 순서, '1' = 켬) */
+export const currentCommandKey = () => commandKey()
 /** 지금 켜라고 한 채널 조합 (장치 채널 순서) */
 function commandKey(): string {
   return [1, 2, 3, 4, 5].map((n) => (enabled[IOT_CHANNELS.find((c) => c.ch === n)!.id] ? '1' : '0')).join('')
@@ -228,24 +265,24 @@ export function expectedDrop(id: ChannelId): number | null {
   const j = IOT_CHANNELS.find((c) => c.id === id)!.ch - 1
   if (key[j] !== '1') return null
   const off = key.slice(0, j) + '0' + key.slice(j + 1)
-  const a = COMBO.mean_a[key]
-  const b = COMBO.mean_a[off]
+  const a = comboMean(key)
+  const b = comboMean(off)
   return a == null || b == null ? null : a - b
 }
 /** 조합표로 판정: 점수(0~1)와 진단. 표에 없는 조합이면 null */
 function comboJudge(key: string, i: number): { expected: number; score: number; diag: ComboDiagnosis | null } | null {
-  const mu = COMBO.mean_a[key]
+  const mu = comboMean(key)
   const sd = COMBO.sigma_a[key]
   if (mu == null || sd == null) return null
   const z = (i - mu) / sd
-  const s = Math.abs(i - mu) / (COMBO.k_sigma * sd + COMBO_TOL_A)
-  // 기준(k)의 80%부터 주의, 기준을 넘으면 이상 (THRESHOLDS 0.3 / 0.6 에 맞춤)
-  const score = s < 0.8 ? (0.3 * s) / 0.8 : Math.min(1, 0.3 + (0.3 * (s - 0.8)) / 0.2)
-  if (s <= 1) return { expected: mu, score, diag: null }
+  // 대단지 세대 판정과 같은 규칙 (deviation.ts)
+  const dv = deviation(i, mu, { sigma: sd, k: COMBO.k_sigma, tol: COMBO_TOL_A })
+  const score = dv.score
+  if (dv.ratio <= 1) return { expected: mu, score, diag: null }
   const candidates: ChannelId[] = []
   for (let j = 0; j < 5; j++) {
     const alt = key.slice(0, j) + (key[j] === '1' ? '0' : '1') + key.slice(j + 1)
-    const m2 = COMBO.mean_a[alt]
+    const m2 = comboMean(alt)
     const s2 = COMBO.sigma_a[alt]
     if (m2 != null && s2 != null && Math.abs(i - m2) <= COMBO.k_sigma * s2 + COMBO_TOL_A) candidates.push(IOT_CHANNELS.find((c) => c.ch === j + 1)!.id)
   }
