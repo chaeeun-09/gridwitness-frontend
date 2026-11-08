@@ -221,7 +221,7 @@ export interface ComboDiagnosis {
   candidates: ChannelId[]
 }
 /** 장치가 전류를 1 mA 단위로 보내므로 그 한 칸만큼은 허용 (다른 시점 실측에서 정상값이 1 mA 달라지는 것 확인, 2026-11-08) */
-export const COMBO_TOL_A = 0.001
+export const COMBO_TOL_A = (COMBO_JSON as { tol_a?: number }).tol_a ?? 0.001
 /** 지금 조합에서 채널 하나를 끄면 줄어들 것으로 예상되는 전류 (조합표). 표에 없으면 null */
 export function expectedDrop(id: ChannelId): number | null {
   const key = commandKey()

@@ -110,10 +110,10 @@ void setup() {
   scanI2C();
   Serial.println(F("#looking for INA219 0x40 (house)..."));
   houseOk = inaHouse.begin();
-  if (houseOk) inaHouse.setCalibration_32V_2A();
+  if (houseOk) inaHouse.setCalibration_16V_400mA();  // 모형 전류는 수십 mA → 저전류 범위(0.05 mA 단위)
   Serial.println(F("#looking for INA219 0x41 (lamp)..."));
   lampOk = inaLamp.begin();
-  if (lampOk) inaLamp.setCalibration_32V_2A();
+  if (lampOk) inaLamp.setCalibration_16V_400mA();
   Serial.print(F("#INA219 house(0x40)="));
   Serial.print(houseOk ? F("OK") : F("NOT FOUND"));
   Serial.print(F(" lamp(0x41)="));
@@ -141,9 +141,9 @@ void printSensors() {
     v = 0; i = 0;
   }
   Serial.print("{\"v\":");
-  Serial.print(v, 2);
+  Serial.print(v, 3);
   Serial.print(",\"i\":");
-  Serial.print(i, 3);
+  Serial.print(i, 5);  // 0.01 mA 자리까지 (센서 분해능 0.05 mA)
   Serial.print(",\"relay\":");
   Serial.print(powerOn ? 1 : 0);
   Serial.print(",\"ch\":[");
@@ -154,13 +154,13 @@ void printSensors() {
   Serial.print("]");
   if (both) {
     Serial.print(",\"vh\":");
-    Serial.print(vh, 2);
+    Serial.print(vh, 3);
     Serial.print(",\"ih\":");
-    Serial.print(ih, 3);
+    Serial.print(ih, 5);
     Serial.print(",\"vl\":");
-    Serial.print(vl, 2);
+    Serial.print(vl, 3);
     Serial.print(",\"il\":");
-    Serial.print(il, 3);
+    Serial.print(il, 5);
   }
   Serial.println("}");
 }
