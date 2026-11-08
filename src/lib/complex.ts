@@ -71,6 +71,8 @@ export interface ComplexIndex {
   source: { dataset: string; url: string; license: string; file: string; sha256: string; note: string }
   model: { version: Record<string, string>; trained_until: string; z_node: number; z_wide: number; code_commit: string; fleet_joblib_sha256: string; note: string; weather?: string | null }
   regions: { region: string; file: string; missing_hours: number }[]
+  /** 한전 '가구 평균 전력사용량' 지역본부별 1~12월 가구당 평균 (kWh) */
+  household?: { dataset: string; url: string; kwh_month_by_region: Record<string, (number | null)[]>; national_kwh_by_month: Record<string, number>; note: string }
   events: RealEvent[]
   wide_area: WideEvent[]
 }
@@ -96,31 +98,49 @@ const perCust = (d: RegionData, h: number, which: 'use' | 'exp'): number | null 
 }
 
 export interface Scale {
-  /** 2024년 8월 지역 고객 1호당 평균 시간 사용량 (kWh) */
-  augMean: number
-  /** 세대 사용량 = 지역 1호당 사용량 × factor */
-  factor: number
+  /** 월별(0~11) 세대 사용량 = 지역 1호당 사용량 × factor[월]. 그 달 기준값이 없으면 null (채우지 않음) */
+  factor: (number | null)[]
+  /** monthly = 한전 가구 평균(지역·월), anchor = 전국 363 kWh 하나 */
+  basis: 'monthly' | 'anchor'
+  /** 지역·월 가구당 평균 사용량 (kWh) */
+  kwhMonth: (number | null)[]
 }
-export function scaleFor(d: RegionData): Scale | null {
-  let s = 0
-  let n = 0
-  for (let h = AUG_START; h < AUG_START + AUG_HOURS && h < d.hours; h++) {
+const monthOf = (d: RegionData, h: number) => {
+  const t = new Date(d.start.replace(' ', 'T') + 'Z')
+  t.setUTCHours(t.getUTCHours() + h)
+  return t.getUTCMonth()
+}
+/** 세대 기준 = 그 지역·그 달의 실제 가구 평균(있으면), 시간 변화 = 지역 전체의 실제 시간 패턴 */
+export function scaleFor(d: RegionData, idx: ComplexIndex | null): Scale | null {
+  const sum = new Array(12).fill(0)
+  const cnt = new Array(12).fill(0)
+  const hours = new Array(12).fill(0)
+  for (let h = 0; h < d.hours; h++) {
+    const m = monthOf(d, h)
+    hours[m]++
     const v = perCust(d, h, 'use')
     if (v != null) {
-      s += v
-      n++
+      sum[m] += v
+      cnt[m]++
     }
   }
-  if (!n) return null
-  const augMean = s / n
-  return { augMean, factor: ANCHOR_KWH_MONTH / AUG_HOURS / augMean }
+  const monthly = idx?.household?.kwh_month_by_region[d.region]
+  if (monthly) {
+    return { basis: 'monthly', kwhMonth: monthly, factor: monthly.map((k, m) => (k == null || !cnt[m] ? null : k / hours[m] / (sum[m] / cnt[m]))) }
+  }
+  const aug = 7
+  if (!cnt[aug]) return null
+  const f = ANCHOR_KWH_MONTH / AUG_HOURS / (sum[aug] / cnt[aug])
+  return { basis: 'anchor', kwhMonth: new Array(12).fill(ANCHOR_KWH_MONTH), factor: new Array(12).fill(f) }
 }
 
-/** 세대 1곳의 그 시각 사용량 (kW = 1시간 kWh). 실제 지역 패턴 × 363 kWh 기준 */
+/** 세대 1곳의 그 시각 사용량 (kW = 1시간 kWh) */
 export function householdKw(d: RegionData, sc: Scale, h: number, which: 'use' | 'exp' = 'use'): number | null {
   const v = perCust(d, h, which)
-  return v == null ? null : v * sc.factor
+  const f = sc.factor[monthOf(d, h)]
+  return v == null || f == null ? null : v * f
 }
+export const monthIndex = monthOf
 
 export function hourLabel(start: string, h: number): string {
   const t = new Date(start.replace(' ', 'T') + 'Z')

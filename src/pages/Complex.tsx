@@ -22,6 +22,7 @@ import {
   measure,
   noteDetections,
   resetComplex,
+  monthIndex,
   scaleFor,
   setBuildingPower,
   setHour,
@@ -81,7 +82,7 @@ export default function Complex() {
   }, [index, region])
   useEffect(() => () => setPlaying(false), [])
 
-  const scale = useMemo(() => (data ? scaleFor(data) : null), [data])
+  const scale = useMemo(() => (data ? scaleFor(data, index) : null), [data, index])
   const readings = useMemo(() => (data && scale ? measure(s, data, scale) : null), [s, data, scale])
 
   // 상태가 바뀐 세대·가로등을 기록 (판정 규칙이 새로 잡은 것만)
@@ -191,7 +192,12 @@ export default function Complex() {
 
       <Metrics cols={4}>
         <Metric label="세대 · 가로등" value={totalUnits.toLocaleString('ko-KR')} unit="세대" foot={`${s.layout.buildings}개 동 · 가로등 ${s.layout.buildings * s.layout.lampsPerBuilding}개`} />
-        <Metric label="단지 전체 사용" value={fmt(totalKw, 0)} unit="kW" foot={`세대당 ${fmt(hhKw)} kW (실제 지역 패턴 기준)`} />
+        <Metric
+          label="단지 전체 사용"
+          value={fmt(totalKw, 0)}
+          unit="kW"
+          foot={`세대당 ${fmt(hhKw)} kW · ${region} ${data ? monthIndex(data, s.hour) + 1 : ''}월 가구 평균 ${scale && data ? fmt(scale.kwhMonth[monthIndex(data, s.hour)], 0) : '–'} kWh${scale?.basis === 'anchor' ? ' (전국 기준값)' : ''}`}
+        />
         <Metric label="이상 판정" value={abnormal} unit="곳" foot={counts ? `주의 ${counts.WARNING} · 이상 ${counts.FAULT} · 정전 ${counts.OUTAGE} · 차단 ${counts.OFF}` : ''} />
         <Metric label={`실제 AI · ${region}`} value={holiday ? '보류' : fmt(z)} unit={holiday ? '' : 'z'} foot={index ? `기준 |z| > ${index.model.z_node} 이면 이상 · 지역 예측 대비 ${hhKw && hhExp ? fmt((hhKw / hhExp - 1) * 100, 1) + '%' : '–'}` : ''} />
       </Metrics>
@@ -309,9 +315,15 @@ function TruthNote({ index }: { index: ComplexIndex | null }) {
                 기온·습도: <a href="https://www.data.go.kr/data/15057210/openapi.do" target="_blank" rel="noreferrer">기상청 ASOS 시간자료</a> 관측값 (AI 입력으로 사용)
               </li>
             )}
-            <li>
-              세대 월평균 {ANCHOR_KWH_MONTH} kWh: <a href={ANCHOR_URL} target="_blank" rel="noreferrer">{ANCHOR_SOURCE}</a>
-            </li>
+            {index?.household ? (
+              <li>
+                세대 월 사용량: <a href={index.household.url} target="_blank" rel="noreferrer">한전 전력데이터 개방포털 가구 평균 전력사용량</a> (지역·월별, 시군구 값을 가구수로 가중 평균)
+              </li>
+            ) : (
+              <li>
+                세대 월평균 {ANCHOR_KWH_MONTH} kWh: <a href={ANCHOR_URL} target="_blank" rel="noreferrer">{ANCHOR_SOURCE}</a>
+              </li>
+            )}
           </ul>
         </div>
         <div>
@@ -319,7 +331,8 @@ function TruthNote({ index }: { index: ComplexIndex | null }) {
           <ul className="small" style={{ margin: '8px 0 0 16px' }}>
             <li>단지 구성(동·층·호)과 가로등 개수·{LAMP_KW * 1000} W·18~6시 점등</li>
             {index?.model.weather && <li>지역본부마다 대표 기상 관측소 1곳 (예: 경기본부 → 수원)</li>}
-            <li>모든 세대가 같은 양을 씀. 시간 패턴은 지역 전체(주택·상가·산업 합계) 패턴을 씀. 세대별 실측 데이터는 없음</li>
+            <li>모든 세대가 같은 양을 씀(그 지역·그 달 가구 평균). 하루 중 시간 패턴은 지역 전체(주택·상가·산업 합계) 패턴을 씀. 세대별 실측 데이터는 없음</li>
+            {index?.household && <li>지역본부↔시도 대응 (서울·남서울본부 = 서울 전체, 경기·경기북부본부 = 경기 전체, 세종 자료 없음)</li>}
             <li>가상 고장의 크기(누설 +1 kW, 전압 85%)와 측정은 잡음 없는 계산값</li>
           </ul>
         </div>
