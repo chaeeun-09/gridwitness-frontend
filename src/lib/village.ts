@@ -66,7 +66,7 @@ export const DEVICE_INFO: Record<DataSource, { deviceId: string; sensor: string;
   MOCK: { deviceId: 'arduino-sim-01', sensor: 'INA219 ×2 (시뮬레이터)', port: 'SIM' },
   SERIAL: { deviceId: 'arduino-village', sensor: 'INA219 (실측, 감지된 개수만큼)', port: 'Web Serial 115200' },
 }
-export const IOT_MODEL = 'iot-anomaly-0.2 (전체 전류 잔차)'
+export const IOT_MODEL = 'iot-combo-v3 (채널 조합별 실측 정상 전류)'
 export const NOMINAL_V = 5
 /** LED 1개(저항 포함)가 흘리는 전류 A 기본값. 실제 LED·저항·전원 전압에 따라 크게 달라서 관리자 화면에서 보정할 수 있음 */
 // 실측 (2026-11-08, USB 전원): LED 1개 9~12 mA. 여러 개를 켜면 전압이 내려가 합이 맞지 않으므로 판정은 아래 조합표를 쓴다
@@ -384,7 +384,25 @@ function setAutoPref(on: boolean) {
     // 저장 불가 환경은 무시
   }
 }
-let source: DataSource = autoPref() ? 'SERIAL' : 'MOCK'
+// 시뮬레이터는 사용자가 직접 고른 경우에만 켠다. 아무것도 고르지 않았으면 '실측 장치 · 연결 안 됨'으로 시작해
+// 장치 없이 계산한 값이 실측처럼 먼저 보이지 않게 한다
+const SIM_KEY = 'gridwitness.simulator.v1'
+function simPref(): boolean {
+  try {
+    return localStorage.getItem(SIM_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+function setSimPref(on: boolean) {
+  try {
+    if (on) localStorage.setItem(SIM_KEY, '1')
+    else localStorage.removeItem(SIM_KEY)
+  } catch {
+    // 저장 불가 환경은 무시
+  }
+}
+let source: DataSource = !autoPref() && simPref() ? 'MOCK' : 'SERIAL'
 let connected = source === 'MOCK'
 let link: SerialLink | null = null
 let latest: { at: number; frame: SerialReading } | null = null
@@ -474,13 +492,14 @@ function initial(): VillageSnapshot {
     packets: 0,
     relay,
     relayPending: null,
-    v: NOMINAL_V,
-    i: ledA() * 5,
-    p: NOMINAL_V * ledA() * 5,
-    expected: ledA() * 5,
+    // 장치 값이 오기 전에는 0 · 데이터 없음 (시뮬레이터만 계산값으로 시작)
+    v: source === 'MOCK' ? NOMINAL_V : 0,
+    i: source === 'MOCK' ? ledA() * 5 : 0,
+    p: source === 'MOCK' ? NOMINAL_V * ledA() * 5 : 0,
+    expected: source === 'MOCK' ? ledA() * 5 : 0,
     score: 0,
-    status: 'NORMAL',
-    estLit: 5,
+    status: source === 'MOCK' ? 'NORMAL' : 'NO_DATA',
+    estLit: source === 'MOCK' ? 5 : 0,
     leds: ledStates(null),
     channels: { ...enabled },
     channelPending: {},
@@ -794,6 +813,7 @@ export async function connectSerial() {
   try {
     const next = await openSerial(onSerialLine, onLost, 'ask')
     setAutoPref(true)
+    setSimPref(false)
     await attach(next)
     stopRetry()
   } finally {
@@ -845,6 +865,7 @@ function stopRetry() {
 /** 시뮬레이터로 전환 (자동 재연결도 끔) */
 export async function switchToMock() {
   setAutoPref(false)
+  setSimPref(true)
   stopRetry()
   await link?.close()
   link = null

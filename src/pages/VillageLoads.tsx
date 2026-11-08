@@ -26,7 +26,7 @@ export default function VillageLoads() {
           })}
         </Metrics>
       )}
-      <Section title="LED 채널" description={snap.canControl ? '스위치로 LED 하나씩 끄고 켭니다. 장치가 상태를 보고하면 확정됩니다.' : '이 장치는 채널 상태를 보고하지 않아 조종할 수 없습니다.'} actions={<Link to="/settings" className="small">회로 구성 →</Link>}>
+      <Section title="LED 채널" description={snap.canControl ? '스위치로 LED 하나씩 끄고 켭니다. 장치가 상태를 보고하면 확정됩니다.' : snap.connected ? '이 장치는 채널 상태를 보고하지 않아 조종할 수 없습니다.' : '장치가 연결되지 않았습니다. 사이드바에서 장치를 연결하세요.'} actions={<Link to="/settings" className="small">회로 구성 →</Link>}>
         <Channels snap={snap} selected={selected} onSelect={setSelected} controls />
         <p className="hint">LED별 전류는 따로 재지 않습니다. 구간 전류로 켜진 개수를 추정하고, 어느 LED인지는 채널 점검으로 확인합니다.</p>
       </Section>
