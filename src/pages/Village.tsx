@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import Channels from '../components/Channels'
+import EventCausePanel from '../components/EventCausePanel'
 import EventList from '../components/EventList'
 import { IconMoon, IconPower, IconSun, IconX } from '../components/Icons'
 import PartPanel from '../components/PartPanel'
@@ -292,6 +293,10 @@ export default function Village() {
         <Section title="이상 이벤트" description="이상 점수가 기준을 넘으면 기록되고, 사건으로 등록할 수 있습니다." actions={<Link to="/village/loads" className="small">부하(LED 5개) 현황 →</Link>}>
           <EventList events={snap.events} limit={4} />
         </Section>
+      </div>
+
+      <div className="section">
+        <EventCausePanel />
       </div>
     </>
   )
