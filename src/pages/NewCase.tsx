@@ -4,7 +4,7 @@ import { api } from '../api'
 import { IconUpload } from '../components/Icons'
 import { DIAG_LABEL, PageHeader, Section } from '../components/ui'
 import { getActor } from '../lib/actor'
-import { INPUT_SCENARIOS } from '../lib/scenarios'
+import { INPUT_SCENARIOS, loadRealSamples } from '../lib/scenarios'
 import { MODEL_SCOPE } from '../lib/waveform'
 import { CHANNELS, SOURCE_LABEL, type SourceType } from '../types'
 
@@ -59,17 +59,23 @@ export default function NewCase() {
     setError(null)
   }
 
-  function loadScenario(id: string) {
+  async function loadScenario(id: string) {
     setScenario(id)
     const s = INPUT_SCENARIOS.find((x) => x.id === id)
     if (!s) return
-    const f = s.build()
+    let f
+    try {
+      f = s.build(await loadRealSamples())
+    } catch (err) {
+      setError(`예시 파형을 불러오지 못했습니다: ${(err as Error).message}`)
+      return
+    }
     setFile(f.file)
     setCfg(f.cfg ?? null)
     setPickError(null)
     setTitle(f.title)
     setSourceType(f.sourceType)
-    setDatasetId('gridwitness-example')
+    setDatasetId(f.datasetId)
     setFs(f.samplingRateHz)
     setSysHz(f.systemFrequencyHz)
     setError(null)
@@ -156,7 +162,14 @@ export default function NewCase() {
                 ))}
               </select>
             </label>
-            {chosen && <p className="hint">{chosen.note}. 기능 시험용 합성 데이터이며 실제 계측 자료가 아닙니다.</p>}
+            {chosen && (
+              <p className="hint">
+                {chosen.note}.{' '}
+                {chosen.group === '실제 공개 파형'
+                  ? '중국 배전망에서 실제 측정한 공개 파형(Xiong et al., MIT)입니다. 한국 파형은 아닙니다.'
+                  : '실제 공개 파형을 입력 검사용으로 일부러 바꾼 파일이라, 서버 AI는 고장 유형을 판단하지 않습니다.'}
+              </p>
+            )}
           </Section>
 
           <Section title="출처와 계측 조건">

@@ -1,8 +1,8 @@
-import { Fragment, lazy, memo, Suspense, useState } from 'react'
+import { Fragment, lazy, memo, Suspense, useEffect, useState } from 'react'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { IconMoon, IconSun } from '../components/Icons'
 import SceneBoundary from '../components/SceneBoundary'
-import { Badge, Metric, Metrics, PageHeader, Section, Segmented, Skeleton, Status, Switch, type Tone } from '../components/ui'
+import { Badge, ErrorState, Metric, Metrics, PageHeader, Section, Segmented, Skeleton, Status, Switch, type Tone } from '../components/ui'
 import { nightness, SUB_COLOR, type CitySelection } from '../components/city/shared'
 import { CHART } from '../lib/chart'
 import {
@@ -22,6 +22,8 @@ import {
   setDemandResponse,
   setHeat,
   setPlaying,
+  setCityData,
+  cityDataReady,
   setProfile,
   setSpeed,
   setTime,
@@ -32,7 +34,7 @@ import {
   type FeederState,
   type SubStatus,
 } from '../lib/city'
-import { REGIONS, type DayType } from '../lib/publicData'
+import { loadKepcoDataset, type DayType } from '../lib/publicData'
 
 const CityScene = lazy(() => import('../components/city/CityScene'))
 
@@ -54,6 +56,23 @@ const mw = (kw: number) => (kw / 1000).toFixed(1)
 const pct = (x: number) => `${Math.round(x * 100)}%`
 
 export default function City() {
+  const [regions, setRegions] = useState<string[] | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  useEffect(() => {
+    loadKepcoDataset().then(
+      (ds) => {
+        setCityData(ds)
+        setRegions(ds.regions)
+      },
+      (e) => setLoadError(String(e)),
+    )
+  }, [])
+  if (loadError) return <ErrorState message={`한전 데이터를 불러오지 못했습니다: ${loadError}`} onRetry={() => location.reload()} />
+  if (!regions || !cityDataReady()) return <Skeleton h={560} />
+  return <CityView regions={regions} />
+}
+
+function CityView({ regions }: { regions: string[] }) {
   const snap = useCity()
   const [selection, setSelection] = useState<CitySelection>(null)
   const night = nightness(snap.time) > 0.5
@@ -67,7 +86,7 @@ export default function City() {
       <PageHeader
         title="도시 시뮬레이션"
         description={`블록 ${CITY.nBlocks.toLocaleString()}개·건물 ${CITY.nBuild.toLocaleString()}동 규모 도시의 전력 계통을 시뮬레이션합니다. 발전소 → 변전소 ${CITY.subs.length}곳 → 배전선로 ${CITY.feeders.length}개 → 건물로 이어지고, 사고와 과부하가 정전으로 번지는 과정을 볼 수 있습니다.`}
-        meta={<span>부하 패턴은 공공데이터 예시 프로파일 · 교육용 모형 (전압·위상 계산 없음)</span>}
+        meta={<span>부하 패턴: 한전 지역본부 실제 시간별 사용량(2022~2024)의 월·평일/주말 평균 · 계약종별 구분 자료가 없어 모든 구역이 같은 지역 패턴 사용 · 도시 구성·설비 용량은 가정 · 교육용 모형 (전압·위상 계산 없음)</span>}
       />
 
       <div className="scene city-scene">
@@ -147,7 +166,7 @@ export default function City() {
             <label className="field">
               지역 패턴
               <select value={snap.region} onChange={(e) => setProfile(e.target.value, snap.month, snap.day)}>
-                {REGIONS.map((r) => <option key={r}>{r}</option>)}
+                {regions.map((r) => <option key={r}>{r}</option>)}
               </select>
             </label>
             <label className="field">
@@ -160,7 +179,7 @@ export default function City() {
               요일
               <select value={snap.day} onChange={(e) => setProfile(snap.region, snap.month, e.target.value as DayType)}>
                 <option value="WEEKDAY">평일</option>
-                <option value="WEEKEND">주말</option>
+                <option value="WEEKEND">주말·공휴일</option>
               </select>
             </label>
           </div>
@@ -278,7 +297,7 @@ export default function City() {
       <div className="section">
         <Section title="모형의 가정과 한계">
           <ul className="plain-list small">
-            <li>건물 수요 = 기준 용량 × 시간대 패턴(공공데이터 예시 프로파일, 실제 한전 수치 아님) × 기온 배율. 전압·위상·손실은 계산하지 않습니다.</li>
+            <li>건물 수요 = 기준 용량(가정) × 시간대 패턴(한전 지역본부 실제 시간별 사용량 평균, 계약종별 구분 없음) × 기온 배율. 전압·위상·손실은 계산하지 않습니다.</li>
             <li>선로·변전소 용량은 설계 조건(서울 · 8월 · 평일)의 하루 최대 부하로 정해져 있어, 지역·월을 바꾸거나 배율을 올리면 설비가 모자랄 수 있습니다.</li>
             <li>자동 절체는 블록 단위로 이웃 선로에 부하를 넘기는 단순화입니다. 실제 계통의 개폐기 위치와 보호 협조는 반영하지 않습니다.</li>
             <li>마을 모형(Arduino·INA219)의 IoT 데이터, 고장파형 AI와는 섞지 않는 별개 시뮬레이션입니다.</li>

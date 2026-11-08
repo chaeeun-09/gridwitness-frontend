@@ -1,9 +1,10 @@
 import { useSyncExternalStore } from 'react'
-import { EXAMPLE_DATASET, getProfile, type Contract, type DayType } from './publicData'
+import { getProfile, type DayType, type UsageDataset } from './publicData'
 
 // 도시 전력 시뮬레이션 (교육용 단순 모형).
 //   발전소 → 변전소 5곳 → 배전선로(feeder) → 블록 → 건물
-// 건물 수요 = 건물 기준 용량 × 시간대 패턴(공공데이터 예시 프로파일) × 기상 배율.
+// 건물 수요 = 건물 기준 용량 × 시간대 패턴(한전 지역본부 실제 시간별 사용량의 월·평일/주말 평균) × 기상 배율.
+// 한전 시간별 자료에는 계약종별 구분이 없어 주거·상업·산업 구역이 같은 지역 패턴을 쓴다 (구역 차이는 건물 기준 용량뿐).
 // 선로·변전소 용량을 넘으면 트립하고, 자동 절체를 켜면 이웃 선로가 남는 용량만큼 부하를 넘겨받는다.
 // 전력 조류 계산(전압·위상)은 하지 않는다. 마을 모형(IoT)·고장파형 AI와는 별개 데이터다.
 
@@ -14,14 +15,14 @@ export const SPAN = GRID * PITCH
 
 export type Zone = 0 | 1 | 2 | 3
 export const ZONE_LABEL = ['주거', '상업', '산업', '공원'] as const
-const ZONE_CONTRACT: Contract[] = ['RESIDENTIAL', 'GENERAL', 'INDUSTRIAL']
 
 export const SAFE_TRANSFER = 1.05
 export const RISKY_TRANSFER = 1.25
 const TRIP_RATIO = 1.1
 const TRIP_AFTER_MIN = 15
 const FEEDER_HEADROOM = 1.1
-const SUB_DIVERSITY = 0.92
+// 변전소 용량 = 연결된 선로 용량 합 × 1.05 (가정). 실제 자료는 모든 구역이 같은 지역 패턴이라 피크가 겹치므로 부등률(<1)을 두지 않는다
+const SUB_HEADROOM = 1.05
 
 function mulberry32(seed: number) {
   let a = seed
@@ -283,17 +284,21 @@ function generate(): City {
 export const CITY: City = generate()
 
 // ── 시간대 패턴 ────────────────────────────────────────
-function loadProfiles(region: string, month: number, day: DayType): number[][] {
-  return ZONE_CONTRACT.map((c) => {
-    const raw = getProfile(EXAMPLE_DATASET, region, c, month, day) ?? Array<number>(24).fill(1)
-    const max = Math.max(...raw.filter(Number.isFinite), 1e-9)
-    return raw.map((v) => (Number.isFinite(v) ? v / max : 0))
-  })
+let DATA: UsageDataset | null = null
+/** 구역(주거·상업·산업)별 24시간 패턴 (최대 = 1). 실제 자료가 아직 없으면 null */
+function loadProfiles(region: string, month: number, day: DayType): number[][] | null {
+  if (!DATA) return null
+  const raw = getProfile(DATA, region, 'RESIDENTIAL', month, day)
+  if (!raw) return null
+  const max = Math.max(...raw.filter(Number.isFinite), 1e-9)
+  const norm = raw.map((v) => (Number.isFinite(v) ? v / max : 0))
+  return [norm, norm, norm]
 }
 
-// 용량은 설계 조건(서울·8월·평일)의 하루 최대 부하로 정해 항상 같다
-;(() => {
-  const prof = loadProfiles('서울', 8, 'WEEKDAY')
+// 용량은 설계 조건(서울본부·8월·평일)의 하루 최대 부하로 정해 항상 같다
+function designCapacity() {
+  const prof = loadProfiles('서울본부', 8, 'WEEKDAY')
+  if (!prof) return
   const peak = new Float64Array(CITY.feeders.length)
   for (let h = 0; h < 24; h++) {
     const load = new Float64Array(CITY.feeders.length)
@@ -306,8 +311,8 @@ function loadProfiles(region: string, month: number, day: DayType): number[][] {
     load.forEach((v, f) => (peak[f] = Math.max(peak[f], v)))
   }
   CITY.feeders.forEach((f, i) => (f.capKw = peak[i] * FEEDER_HEADROOM))
-  CITY.subs.forEach((s) => (s.capKw = s.feeders.reduce((sum, f) => sum + CITY.feeders[f].capKw, 0) * SUB_DIVERSITY))
-})()
+  CITY.subs.forEach((s) => (s.capKw = s.feeders.reduce((sum, f) => sum + CITY.feeders[f].capKw, 0) * SUB_HEADROOM))
+}
 
 // ── 상태 ────────────────────────────────────────────
 export type FeederState = 'OK' | 'FAULT' | 'TRIPPED'
@@ -387,13 +392,23 @@ const S = {
   auto: false,
   transferLimit: SAFE_TRANSFER,
   dr: false,
-  region: '서울',
+  region: '서울본부',
   month: 8,
   day: 'WEEKDAY' as DayType,
   scenario: 'normal' as ScenarioId,
   outBuildingHours: 0,
 }
-let profiles = loadProfiles(S.region, S.month, S.day)
+const FLAT = [0, 1, 2].map(() => Array<number>(24).fill(0))
+let profiles: number[][] = FLAT
+/** 실제 자료를 받은 뒤 한 번 부른다 (용량 설계 + 현재 패턴) */
+export function setCityData(ds: UsageDataset) {
+  if (DATA) return
+  DATA = ds
+  designCapacity()
+  profiles = loadProfiles(S.region, S.month, S.day) ?? FLAT
+  frame(0)
+}
+export const cityDataReady = () => DATA !== null
 const F = CITY.feeders.length
 const feederState = new Uint8Array(F) // 0 OK 1 FAULT 2 TRIPPED
 const subFault = new Uint8Array(CITY.subs.length)
@@ -614,7 +629,7 @@ export function setProfile(region: string, month: number, day: DayType) {
   S.region = region
   S.month = month
   S.day = day
-  profiles = loadProfiles(region, month, day)
+  profiles = loadProfiles(region, month, day) ?? FLAT
   frame(0)
 }
 export function faultFeeder(f: number) {

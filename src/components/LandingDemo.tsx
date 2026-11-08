@@ -8,7 +8,7 @@ import { useMedia } from '../lib/useMedia'
 import { IconPerson } from './Icons'
 
 // 소개 화면의 노트북. 실제 앱 화면(사이드바 + 고장파형 분석·스마트 마을·실시간 분석)을 그대로 띄운다.
-// 고장파형은 합성 예시 사건이고, 마을 계측값은 시뮬레이터 값이다.
+// 고장파형은 실제 공개 파형(Xiong 87) 샘플 사건이고, 마을 계측값은 시뮬레이터 값이다.
 
 type TabId = 'cases' | 'village' | 'live'
 const TABS: { id: TabId; label: string; path: string }[] = [

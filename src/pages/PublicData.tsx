@@ -1,13 +1,13 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useMedia } from '../lib/useMedia'
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useNavigate } from 'react-router-dom'
 import {
   CONTRACT_LABEL,
   DAYTYPE_LABEL,
-  EXAMPLE_DATASET,
   getProfile,
   importUsageCsv,
+  loadKepcoDataset,
   profileStats,
   templateCsv,
   type Contract,
@@ -18,53 +18,59 @@ import {
 import { IconDownload, IconUpload } from '../components/Icons'
 import IssueList from '../components/IssueList'
 import KepcoReal from '../components/KepcoReal'
-import { Empty, Metric, Metrics, PageHeader, Section } from '../components/ui'
+import { Empty, ErrorState, Metric, Metrics, PageHeader, Section, Skeleton } from '../components/ui'
 import { CHART } from '../lib/chart'
 import { startScenario } from '../lib/village'
 
 const DATA_SOURCES = [
   {
     name: 'Arduino + INA219 실측',
-    what: '모형의 실시간 DC 부하 (전압·전류·LED 상태)',
-    unit: '12V DC · 0.5초 간격',
-    use: 'IoT 이상 탐지',
+    what: '모형의 DC 부하 (전압·전류·채널 상태)',
+    unit: 'USB 5V DC · 0.5초 간격',
+    use: '마을 이상 탐지 (예상 전류와 비교)',
     train: '정상 운전 기록으로 예상 전류 기준 설정',
-    verify: '주입 고장 시나리오(지락·전압강하·정전·단선)로 검증',
-    limit: '축소 모형이므로 22.9kV 배전 성능 근거로 쓰지 않음',
+    verify: '실물에서 LED를 빼거나 끄는 시험으로 확인 예정',
+    limit: '축소 모형이라 실제 배전 성능 근거로 쓰지 않음',
   },
   {
-    name: '공개 고장파형 (Xiong et al.)',
-    what: '전력설비 교류 고장 이벤트 7채널 파형',
-    unit: '50Hz · 4,096Hz · 1,312×7',
-    use: '고장파형 4종 분류 (SIF·MIF·PF·TD)',
-    train: '가능 — 라벨 4종, 236건, 클래스 불균형',
-    verify: '고정 분할·macro-F1·클래스별 Recall',
-    limit: '국내 60Hz·물리적 고장원인 근거 아님',
+    name: '공개 고장파형 (중국 Xiong · 러시아 OscGrid)',
+    what: '전력설비 교류 고장 이벤트 파형',
+    unit: '중국 4,096Hz 7채널 · 러시아 1,600Hz 5채널',
+    use: '고장파형 분류 (나라별 모델, 다른 나라 파형은 판단 보류)',
+    train: '사용 — 중국 236건(4종), 러시아 3,195건(4종)',
+    verify: '시험 세트 macro-F1, 묶음 단위 5-fold, 판단 보류율',
+    limit: '한국 파형 아님 (한국 자료는 KDN 요청 필요)',
   },
   {
-    name: '한전 전력사용량 공공데이터',
-    what: '지역·시간대별 실제 전력 소비 패턴',
-    unit: 'kWh · 1시간 단위',
-    use: '수요 패턴 분석·비교, 마을 부하 시나리오',
-    train: '사용 안 함 — 고장·이상 라벨 없음',
-    verify: '패턴 비교 기준으로만 사용',
-    limit: '고장 정보가 없어 이상 탐지 근거로 쓰지 않음',
+    name: '한전 지역본부 시간별 전력사용량 (15151157)',
+    what: '15개 지역본부의 실제 시간별 전력 소비',
+    unit: 'MWh · 1시간 · 2022~2024',
+    use: '이 화면의 패턴 비교, 도시·대단지 시뮬레이션 부하, AI 부하 이상 탐지',
+    train: '사용 — 2022~2023 학습, 2024 시험 (기상청 관측 날씨 함께)',
+    verify: '2024 예측 오차(MAPE), 판정된 사례 목록',
+    limit: '계약종별 구분 없음 · 사고 정답 라벨 없음 (판정은 사람 확인 필요)',
   },
 ]
 
 export default function PublicData() {
   const narrow = useMedia('(max-width: 600px)')
   const nav = useNavigate()
-  const [ds, setDs] = useState<UsageDataset>(EXAMPLE_DATASET)
+  const [kepco, setKepco] = useState<UsageDataset | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [csv, setCsv] = useState<UsageDataset | null>(null)
+  const ds = csv ?? kepco
   const [importResult, setImportResult] = useState<ImportResult | null>(null)
-  const [region, setRegion] = useState('서울')
-  const [compare, setCompare] = useState('경기')
+  const [region, setRegion] = useState('서울본부')
+  const [compare, setCompare] = useState('경기본부')
+  useEffect(() => {
+    loadKepcoDataset().then(setKepco, (e) => setLoadError(String(e)))
+  }, [])
   const [contract, setContract] = useState<Contract>('RESIDENTIAL')
   const [month, setMonth] = useState(8)
   const [dayType, setDayType] = useState<DayType>('WEEKDAY')
 
-  const profile = useMemo(() => getProfile(ds, region, contract, month, dayType), [ds, region, contract, month, dayType])
-  const compareProfile = useMemo(() => getProfile(ds, compare, contract, month, dayType), [ds, compare, contract, month, dayType])
+  const profile = useMemo(() => (ds ? getProfile(ds, region, contract, month, dayType) : null), [ds, region, contract, month, dayType])
+  const compareProfile = useMemo(() => (ds ? getProfile(ds, compare, contract, month, dayType) : null), [ds, compare, contract, month, dayType])
   const stats = profile ? profileStats(profile) : null
 
   const lineData = Array.from({ length: 24 }, (_, h) => ({
@@ -72,8 +78,9 @@ export default function PublicData() {
     a: profile && Number.isFinite(profile[h]) ? profile[h] : null,
     b: compareProfile && Number.isFinite(compareProfile[h]) ? compareProfile[h] : null,
   }))
-  const barData = ds.regions
+  const barData = (ds?.regions ?? [])
     .map((r) => {
+      if (!ds) return { region: r, total: 0 }
       const p = getProfile(ds, r, contract, month, dayType)
       return { region: r, total: p ? p.filter(Number.isFinite).reduce((s, v) => s + v, 0) : 0 }
     })
@@ -84,7 +91,7 @@ export default function PublicData() {
     const res = importUsageCsv(await f.text(), f.name)
     setImportResult(res)
     if (res.dataset) {
-      setDs(res.dataset)
+      setCsv(res.dataset)
       setRegion(res.dataset.regions[0])
       setCompare(res.dataset.regions[1] ?? res.dataset.regions[0])
     }
@@ -100,8 +107,8 @@ export default function PublicData() {
   }
 
   function playOnVillage() {
-    if (!profile) return
-    startScenario(`${region} ${CONTRACT_LABEL[contract]} ${month}월 ${DAYTYPE_LABEL[dayType]}`, profile.map((v) => (Number.isFinite(v) ? v : 0)))
+    if (!profile || !ds) return
+    startScenario(`${region}${ds.hasContract ? ` ${CONTRACT_LABEL[contract]}` : ''} ${month}월 ${DAYTYPE_LABEL[dayType]}`, profile.map((v) => (Number.isFinite(v) ? v : 0)))
     nav('/village')
   }
 
@@ -114,12 +121,15 @@ export default function PublicData() {
     if (e?.shiftKey) setCompare(r)
     else setRegion(r)
   }
-  const resetToExample = () => {
-    setDs(EXAMPLE_DATASET)
+  const resetToKepco = () => {
+    setCsv(null)
     setImportResult(null)
-    setRegion('서울')
-    setCompare('경기')
+    setRegion('서울본부')
+    setCompare('경기본부')
   }
+  if (loadError && !csv) return <ErrorState message={`한전 데이터를 불러오지 못했습니다: ${loadError}`} onRetry={() => location.reload()} />
+  if (!ds) return <Skeleton h={400} />
+  const unit = ds.unit
 
   return (
     <>
@@ -138,16 +148,16 @@ export default function PublicData() {
         }
       />
 
-      {ds.isExample ? (
-        <div className="alert alert-warn" style={{ marginTop: 0 }}>
+      {ds.kind === 'kepco' ? (
+        <div className="alert alert-ok" style={{ marginTop: 0 }}>
           <span>
-            <strong>기본 데이터를 보고 있습니다.</strong> 실제 한전 수치가 아닌 화면 확인용 값입니다. 공공데이터포털·한전 전력데이터 개방포털에서 받은 CSV를 가져오면 실제 값으로 바뀝니다.
+            <strong>한전 실제 데이터</strong>: <a href={ds.source?.url} target="_blank" rel="noreferrer">{ds.source?.dataset}</a> ({ds.source?.range[0].slice(0, 10)} ~ {ds.source?.range[1].slice(0, 10)})의 월·평일/주말별 시간 평균입니다. 지역본부 전체 고객 합계라 계약종별(주택·일반·산업)은 나뉘지 않습니다.
           </span>
         </div>
       ) : (
         <div className="alert alert-ok" style={{ marginTop: 0, alignItems: 'center' }}>
           <span style={{ flex: 1 }}><strong>{ds.fileName}</strong> 데이터를 보고 있습니다.</span>
-          <button className="btn btn-sm" onClick={resetToExample}>기본 데이터로</button>
+          <button className="btn btn-sm" onClick={resetToKepco}>한전 데이터로</button>
         </div>
       )}
 
@@ -161,7 +171,7 @@ export default function PublicData() {
         <label className="field">지역<select value={region} onChange={(e) => setRegion(e.target.value)}>{ds.regions.map((r) => <option key={r}>{r}</option>)}</select></label>
         <label className="field">비교 지역<select value={compare} onChange={(e) => setCompare(e.target.value)}>{ds.regions.map((r) => <option key={r}>{r}</option>)}</select></label>
         <label className="field">계약종별
-          <select value={contract} onChange={(e) => setContract(e.target.value as Contract)}>
+          <select value={contract} onChange={(e) => setContract(e.target.value as Contract)} disabled={!ds.hasContract} title={ds.hasContract ? '' : '한전 시간별 자료에는 계약종별 구분이 없습니다'}>
             {Object.entries(CONTRACT_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
         </label>
@@ -178,8 +188,8 @@ export default function PublicData() {
       ) : (
         <>
           <Metrics>
-            <Metric label="일 사용량" value={stats.total.toLocaleString()} unit="kWh" foot={ds.isExample ? '기본 값' : region} />
-            <Metric label="피크 시간" value={`${stats.peakHour}시`} foot={`${stats.peak.toLocaleString()} kWh`} />
+            <Metric label="일 사용량" value={Math.round(stats.total).toLocaleString()} unit={unit} foot={region} />
+            <Metric label="피크 시간" value={`${stats.peakHour}시`} foot={`${Math.round(stats.peak).toLocaleString()} ${unit}`} />
             <Metric label="부하율" value={(stats.loadFactor * 100).toFixed(0)} unit="%" foot="평균 ÷ 피크" />
             <Metric label="패턴" value={stats.pattern} small foot={`최저 ${stats.minHour}시 · 피크/최저 ${(stats.peak / stats.min).toFixed(2)}배`} />
           </Metrics>
@@ -205,7 +215,7 @@ export default function PublicData() {
               </ResponsiveContainer>
               {stats.missingHours > 0 && <p className="hint">빈 시간 {stats.missingHours}개는 보간하지 않고 비워 두었습니다.</p>}
             </Section>
-            <Section title={`지역별 일 사용량 · ${CONTRACT_LABEL[contract]}`} description="막대를 누르면 그 지역이 선택되고, Shift+클릭은 비교 지역이 됩니다.">
+            <Section title={`지역별 일 사용량${ds.hasContract ? ` · ${CONTRACT_LABEL[contract]}` : ''}`} description="막대를 누르면 그 지역이 선택되고, Shift+클릭은 비교 지역이 됩니다.">
               <div className="legend" style={{ marginBottom: 8 }}>
                 <span><i style={{ background: CHART.accent }} />선택 지역</span>
                 <span><i style={{ background: '#7b808b' }} />비교 지역</span>
@@ -214,9 +224,9 @@ export default function PublicData() {
                 <ResponsiveContainer width="100%" height={260}>
                   <BarChart data={barData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }} onMouseLeave={() => setHover(null)}>
                     <CartesianGrid stroke={CHART.grid} vertical={false} />
-                    <XAxis dataKey="region" interval={0} {...axis} tick={{ ...CHART.tick, fontSize: 10.5 }} angle={narrow ? -90 : 0} textAnchor={narrow ? 'end' : 'middle'} height={narrow ? 40 : 30} />
+                    <XAxis dataKey="region" interval={0} {...axis} tick={{ ...CHART.tick, fontSize: 10.5 }} tickFormatter={(r: string) => r.replace(/본부$/, '')} angle={narrow ? -90 : -40} textAnchor="end" height={narrow ? 70 : 56} />
                     <YAxis {...axis} width={48} />
-                    <Tooltip cursor={{ fill: 'rgba(49,87,224,0.07)' }} formatter={(v) => [`${Number(v).toLocaleString()} kWh`, '일 사용량']} />
+                    <Tooltip cursor={{ fill: 'rgba(49,87,224,0.07)' }} formatter={(v) => [`${Math.round(Number(v)).toLocaleString()} ${unit}`, '일 사용량']} />
                     <Bar dataKey="total" name="일 사용량" radius={[4, 4, 0, 0]} isAnimationActive={false} cursor="pointer" onClick={pickRegion} onMouseEnter={(d: unknown) => setHover((d as { region?: string })?.region ?? null)}>
                       {barData.map((d) => (
                         <Cell key={d.region} fill={d.region === region ? CHART.accent : d.region === compare ? '#7b808b' : d.region === hover ? '#9fb2ee' : '#e0e2e8'} style={{ transition: 'fill 120ms' }} />
