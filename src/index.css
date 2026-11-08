@@ -932,3 +932,18 @@ body { background: linear-gradient(180deg, #e6effc 0%, #f1f6fd 380px, #f6f9fe 10
 
 .reconnect-banner { margin: 16px 40px 0; }
 @media (max-width: 960px) { .reconnect-banner { margin: 12px 16px 0; } }
+
+/* 가상 대단지 */
+.cx-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 12px; }
+.cx-bldg { border: 1px solid var(--line); border-radius: var(--r); padding: 8px; background: var(--fill); }
+.cx-bldg.has-fault { border-color: var(--err); background: var(--err-tint); }
+.cx-bldg-head { display: flex; justify-content: space-between; align-items: baseline; gap: 4px; margin-bottom: 6px; font-size: 12px; }
+.cx-units { display: grid; gap: 2px; }
+.cx-cell { height: 8px; min-width: 0; padding: 0; border: 0; border-radius: 2px; cursor: pointer; }
+.cx-cell.sel, .cx-lamp.sel { outline: 2px solid var(--accent); outline-offset: 1px; }
+.cx-lamps { display: flex; gap: 3px; margin-top: 6px; }
+.cx-lamp { width: 10px; height: 10px; padding: 0; border: 0; border-radius: 50%; cursor: pointer; }
+.cx-log { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.cx-alarm { background: var(--err-tint); color: var(--err); }
+.cx-alarm strong { color: var(--err); }
+.cx-range { width: 100%; margin-top: 12px; height: 4px; padding: 0; border: 0; accent-color: var(--accent); }

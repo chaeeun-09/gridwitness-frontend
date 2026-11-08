@@ -1,0 +1,298 @@
+{
+ "year": 2024,
+ "time_basis": "KST, 행 = 1시간 구간의 시작 시각 (원본 '기준시' h 는 (h-1)~h시)",
+ "unit": "MWh",
+ "source": {
+  "dataset": "한국전력공사_전국 시간별 전력사용량 (15개 지역본부, MWh)",
+  "url": "https://www.data.go.kr/data/15151157/fileData.do",
+  "license": "공공데이터포털 이용허락범위 제한 없음",
+  "file": "kepco_hourly_15151157_20241231.csv",
+  "sha256": "d6ee8b70b1c49f6b4f0bdd198992e81b783a0d070447a4153e3101863ee89df1",
+  "note": "사용량은 그 지역본부 모든 고객(주택·일반·산업 등)의 합계. 계약 종별 구분 없음"
+ },
+ "model": {
+  "dir": "models/load_hourly/KR",
+  "fleet_joblib_sha256": "ac4c45febc5ffaa6045aa59bf2ca806e865c1e9d9447cc34dcb1231da33a9e7e",
+  "version": {
+   "model": "fleet-hgb-v1"
+  },
+  "trained_until": "2023-12-31 23:00:00",
+  "z_node": 10.08,
+  "z_wide": 4.84,
+  "code_commit": "5427369bc87bc6ac34d1377c93abbf3a00607328",
+  "code_dirty": false,
+  "note": "2024년은 학습에 쓰지 않은 시험 기간. 공휴일은 판단 보류(z=null)"
+ },
+ "regions": [
+  {
+   "region": "강원본부",
+   "file": "a582627d.json",
+   "missing_hours": 0
+  },
+  {
+   "region": "경기본부",
+   "file": "a82b07fa.json",
+   "missing_hours": 0
+  },
+  {
+   "region": "경기북부본부",
+   "file": "18baa878.json",
+   "missing_hours": 0
+  },
+  {
+   "region": "경남본부",
+   "file": "22682885.json",
+   "missing_hours": 0
+  },
+  {
+   "region": "경북본부",
+   "file": "46307d09.json",
+   "missing_hours": 0
+  },
+  {
+   "region": "광주전남본부",
+   "file": "fe32bfe1.json",
+   "missing_hours": 0
+  },
+  {
+   "region": "남서울본부",
+   "file": "4c51a0fd.json",
+   "missing_hours": 0
+  },
+  {
+   "region": "대구본부",
+   "file": "cffe75ce.json",
+   "missing_hours": 0
+  },
+  {
+   "region": "대전세종충남본부",
+   "file": "69d15eaa.json",
+   "missing_hours": 0
+  },
+  {
+   "region": "부산울산본부",
+   "file": "61d1b0fe.json",
+   "missing_hours": 0
+  },
+  {
+   "region": "서울본부",
+   "file": "51bd683d.json",
+   "missing_hours": 0
+  },
+  {
+   "region": "인천본부",
+   "file": "771c4807.json",
+   "missing_hours": 0
+  },
+  {
+   "region": "전북본부",
+   "file": "78a91e66.json",
+   "missing_hours": 0
+  },
+  {
+   "region": "제주본부",
+   "file": "a52daa54.json",
+   "missing_hours": 0
+  },
+  {
+   "region": "충북본부",
+   "file": "cfdb43d9.json",
+   "missing_hours": 0
+  }
+ ],
+ "events": [
+  {
+   "node": "제주본부",
+   "kind": "SPIKE",
+   "scope": "local",
+   "start": "2024-01-22 16:00:00",
+   "end": "2024-01-22 16:00:00",
+   "hours": 1,
+   "worst_z": 10.95,
+   "worst_ratio": 1.385,
+   "expected": 621.7,
+   "actual": 861.0,
+   "data_check": null
+  },
+  {
+   "node": "충북본부",
+   "kind": "DROP",
+   "scope": "local",
+   "start": "2024-04-14 05:00:00",
+   "end": "2024-04-14 05:00:00",
+   "hours": 1,
+   "worst_z": -11.5,
+   "worst_ratio": 0.836,
+   "expected": 2457.1,
+   "actual": 2053.0,
+   "data_check": null
+  },
+  {
+   "node": "충북본부",
+   "kind": "DROP",
+   "scope": "local",
+   "start": "2024-05-12 23:00:00",
+   "end": "2024-05-12 23:00:00",
+   "hours": 1,
+   "worst_z": -10.49,
+   "worst_ratio": 0.842,
+   "expected": 2601.3,
+   "actual": 2190.0,
+   "data_check": null
+  },
+  {
+   "node": "충북본부",
+   "kind": "DROP",
+   "scope": "local",
+   "start": "2024-05-13 04:00:00",
+   "end": "2024-05-13 05:00:00",
+   "hours": 2,
+   "worst_z": -11.14,
+   "worst_ratio": 0.841,
+   "expected": 2527.7,
+   "actual": 2125.0,
+   "data_check": null
+  },
+  {
+   "node": "충북본부",
+   "kind": "SPIKE",
+   "scope": "local",
+   "start": "2024-05-21 03:00:00",
+   "end": "2024-05-21 05:00:00",
+   "hours": 3,
+   "worst_z": 11.05,
+   "worst_ratio": 1.158,
+   "expected": 2508.4,
+   "actual": 2905.0,
+   "data_check": null
+  },
+  {
+   "node": "대전세종충남본부",
+   "kind": "SPIKE",
+   "scope": "local",
+   "start": "2024-10-31 03:00:00",
+   "end": "2024-10-31 03:00:00",
+   "hours": 1,
+   "worst_z": 15.06,
+   "worst_ratio": 1.372,
+   "expected": 6023.2,
+   "actual": 8262.0,
+   "data_check": null
+  }
+ ],
+ "wide_area": [
+  {
+   "start": "2024-05-01 07:00:00",
+   "end": "2024-05-01 11:00:00",
+   "hours": 5,
+   "max_nodes": 10,
+   "nodes": [
+    "경기본부",
+    "경기북부본부",
+    "경남본부",
+    "경북본부",
+    "남서울본부",
+    "대구본부",
+    "대전세종충남본부",
+    "부산울산본부",
+    "서울본부",
+    "인천본부",
+    "충북본부"
+   ]
+  },
+  {
+   "start": "2024-05-01 13:00:00",
+   "end": "2024-05-01 18:00:00",
+   "hours": 6,
+   "max_nodes": 6,
+   "nodes": [
+    "경기본부",
+    "경남본부",
+    "경북본부",
+    "대구본부",
+    "부산울산본부",
+    "인천본부",
+    "충북본부"
+   ]
+  },
+  {
+   "start": "2024-07-30 02:00:00",
+   "end": "2024-07-30 02:00:00",
+   "hours": 1,
+   "max_nodes": 4,
+   "nodes": [
+    "경남본부",
+    "대구본부",
+    "부산울산본부",
+    "충북본부"
+   ]
+  },
+  {
+   "start": "2024-07-30 04:00:00",
+   "end": "2024-07-30 05:00:00",
+   "hours": 2,
+   "max_nodes": 4,
+   "nodes": [
+    "경남본부",
+    "대구본부",
+    "부산울산본부",
+    "충북본부"
+   ]
+  },
+  {
+   "start": "2024-09-21 18:00:00",
+   "end": "2024-09-21 19:00:00",
+   "hours": 2,
+   "max_nodes": 4,
+   "nodes": [
+    "경기북부본부",
+    "남서울본부",
+    "서울본부",
+    "충북본부"
+   ]
+  },
+  {
+   "start": "2024-09-23 19:00:00",
+   "end": "2024-09-23 23:00:00",
+   "hours": 5,
+   "max_nodes": 7,
+   "nodes": [
+    "경기본부",
+    "경기북부본부",
+    "경남본부",
+    "경북본부",
+    "남서울본부",
+    "대구본부",
+    "부산울산본부",
+    "서울본부",
+    "인천본부",
+    "충북본부"
+   ]
+  },
+  {
+   "start": "2024-09-24 08:00:00",
+   "end": "2024-09-24 08:00:00",
+   "hours": 1,
+   "max_nodes": 4,
+   "nodes": [
+    "경기본부",
+    "남서울본부",
+    "서울본부",
+    "충북본부"
+   ]
+  },
+  {
+   "start": "2024-09-24 19:00:00",
+   "end": "2024-09-24 21:00:00",
+   "hours": 3,
+   "max_nodes": 4,
+   "nodes": [
+    "경기본부",
+    "경북본부",
+    "대전세종충남본부",
+    "서울본부",
+    "충북본부"
+   ]
+  }
+ ]
+}
