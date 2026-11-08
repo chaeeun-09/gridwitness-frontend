@@ -175,6 +175,16 @@ export default function Village() {
         ) : (
           <div className={`scene-hud glass ${alarm ? 'alarm' : ''}`} aria-live="polite">
             <Status tone={NODE_TONE[snap.status]} live={alarm}><strong>{STATUS_LABEL[snap.status]}</strong></Status>
+            {snap.diagnosis && (
+              <span className="small" title="실측으로 학습한 조합별 정상 전류표와 비교한 결과. 센서가 1개라 비슷한 전류의 채널끼리는 구분하지 못해 후보로 보여 줍니다">
+                {snap.diagnosis.kind === 'LOW'
+                  ? '켠 채널 중 전류를 안 흘리는 것이 있음'
+                  : snap.diagnosis.candidates.length
+                    ? '끈 채널에 전류가 흐름 (릴레이 고착 의심)'
+                    : '예상보다 전류가 많음 (누설·단락 의심)'}
+                {snap.diagnosis.candidates.length > 0 && ` · 의심: ${snap.diagnosis.candidates.map((id) => snap.leds[id].name).join(', ')}`}
+              </span>
+            )}
             <div className="hud-nums num">
               <span><b>{snap.v.toFixed(2)}</b> V</span>
               <span><b>{snap.i.toFixed(2)}</b> A</span>

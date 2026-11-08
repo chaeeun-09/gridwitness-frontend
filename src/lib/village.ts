@@ -1,3 +1,4 @@
+import COMBO_JSON from '../data/village_combo.json'
 import { useSyncExternalStore } from 'react'
 import type { IotPoint } from '../types'
 import { NO_GRANTED_PORT, onSerialPlug, openSerial, parseFrame, serialSupported, type SerialLink, type SerialReading } from './serial'
@@ -67,7 +68,8 @@ export const DEVICE_INFO: Record<DataSource, { deviceId: string; sensor: string;
 export const IOT_MODEL = 'iot-anomaly-0.2 (전체 전류 잔차)'
 export const NOMINAL_V = 5
 /** LED 1개(저항 포함)가 흘리는 전류 A 기본값. 실제 LED·저항·전원 전압에 따라 크게 달라서 관리자 화면에서 보정할 수 있음 */
-export const DEFAULT_LED_A = 0.056
+// 실측 (2026-11-08, USB 전원): LED 1개 9~12 mA. 여러 개를 켜면 전압이 내려가 합이 맞지 않으므로 판정은 아래 조합표를 쓴다
+export const DEFAULT_LED_A = 0.011
 const LED_KEY = 'gridwitness.ledA.v1'
 function loadLedA(): number {
   try {
@@ -197,6 +199,47 @@ export interface Scenario {
   hour: number
 }
 
+// ── 조합별 정상 전류표 (실측 학습) ─────────────────────
+// 32가지 채널 조합마다 실제로 잰 정상 전류(중앙값)와 흔들림. 키는 장치 채널 1~5(D3~D7) 순서
+interface ComboTable {
+  source: string
+  k_sigma: number
+  mean_a: Record<string, number>
+  sigma_a: Record<string, number>
+  eval: { normal_false_alarm: { rate: number; samples: number }; open_circuit: { detected: number }; stuck_relay: { detected: number }; candidates: Record<string, { true_channel_in_candidates: number; mean_candidates: number }> }
+}
+export const COMBO = COMBO_JSON as ComboTable
+/** 지금 켜라고 한 채널 조합 (장치 채널 순서) */
+function commandKey(): string {
+  return [1, 2, 3, 4, 5].map((n) => (enabled[IOT_CHANNELS.find((c) => c.ch === n)!.id] ? '1' : '0')).join('')
+}
+export interface ComboDiagnosis {
+  /** LOW: 켜라고 한 채널 중 전류를 안 흘리는 것이 있음 (단선 의심) · HIGH: 끈 채널에 전류가 흐름(고착 의심) 또는 누설 */
+  kind: 'LOW' | 'HIGH'
+  z: number
+  /** 한 채널만 바꿨을 때 측정과 맞는 채널 (센서가 1개라 여러 개일 수 있음) */
+  candidates: ChannelId[]
+}
+/** 조합표로 판정: 점수(0~1)와 진단. 표에 없는 조합이면 null */
+function comboJudge(key: string, i: number): { expected: number; score: number; diag: ComboDiagnosis | null } | null {
+  const mu = COMBO.mean_a[key]
+  const sd = COMBO.sigma_a[key]
+  if (mu == null || sd == null) return null
+  const z = (i - mu) / sd
+  const s = Math.abs(z) / COMBO.k_sigma
+  // 기준(k)의 80%부터 주의, 기준을 넘으면 이상 (THRESHOLDS 0.3 / 0.6 에 맞춤)
+  const score = s < 0.8 ? (0.3 * s) / 0.8 : Math.min(1, 0.3 + (0.3 * (s - 0.8)) / 0.2)
+  if (s <= 1) return { expected: mu, score, diag: null }
+  const candidates: ChannelId[] = []
+  for (let j = 0; j < 5; j++) {
+    const alt = key.slice(0, j) + (key[j] === '1' ? '0' : '1') + key.slice(j + 1)
+    const m2 = COMBO.mean_a[alt]
+    const s2 = COMBO.sigma_a[alt]
+    if (m2 != null && s2 != null && Math.abs(i - m2) <= COMBO.k_sigma * s2) candidates.push(IOT_CHANNELS.find((c) => c.ch === j + 1)!.id)
+  }
+  return { expected: mu, score, diag: { kind: z < 0 ? 'LOW' : 'HIGH', z: Math.round(z * 10) / 10, candidates } }
+}
+
 export interface VillageSnapshot {
   source: DataSource
   connected: boolean
@@ -234,6 +277,8 @@ export interface VillageSnapshot {
   needsGrant: boolean
   /** 구간별 측정. 구간 측정이 없는 예전 장치는 null */
   zones: Record<ChannelKind, ZoneState> | null
+  /** 조합표 판정 결과 (실측 장치, 이상일 때) */
+  diagnosis: ComboDiagnosis | null
   history: (Omit<IotPoint, 't'> & { t: number; p: number })[]
   events: VillageEvent[]
   faults: Partial<Record<ChannelId, FaultKind>>
@@ -392,6 +437,7 @@ function initial(): VillageSnapshot {
     channelPending: {},
     canControl: true,
     zones: null,
+    diagnosis: null,
     reconnecting: false,
     needsGrant: false,
     history: [],
@@ -458,8 +504,21 @@ function tick() {
   const { v, i } = m
   const eh = expectedZone('HOUSE')
   const el = expectedZone('LAMP')
-  const expected = eh + el
+  let expected = eh + el
   let score = anomalyScore(v, i, expected)
+  // 센서 1개(구간 측정 없음)인 실측 장치: 실측으로 학습한 조합표로 판정 (USB 전원 전압 강하까지 반영됨)
+  let diagnosis: ComboDiagnosis | null = null
+  let comboLit: number | null = null
+  if (!m.zones && relay) {
+    const key = commandKey()
+    const j = comboJudge(key, i)
+    if (j) {
+      expected = j.expected
+      score = j.score
+      diagnosis = j.diag
+      comboLit = key.split('').filter((c) => c === '1').length - (j.diag?.kind === 'LOW' && j.diag.candidates.length ? 1 : 0)
+    }
+  }
   let zones: VillageSnapshot['zones'] = null
   if (m.zones) {
     // 구간마다 따로 점수를 내서, 한 구간의 누설과 다른 구간의 단선이 합계에서 서로 가려지지 않게 함
@@ -473,7 +532,7 @@ function tick() {
     score = Math.max(score, zones.HOUSE.score, zones.LAMP.score)
   }
   const status = classify(v, i, score, relay)
-  const estLit = zones ? zones.HOUSE.estLit + zones.LAMP.estLit : Math.max(0, Math.min(IOT_CHANNELS.length, Math.round(i / ledA())))
+  const estLit = zones ? zones.HOUSE.estLit + zones.LAMP.estLit : comboLit ?? Math.max(0, Math.min(IOT_CHANNELS.length, Math.round(i / ledA())))
   const point: IotPoint = { t: now, v, i, expected, score, ...(m.zones && { ih: m.zones.house.i, il: m.zones.lamp.i, eh, el }) }
 
   const events = [...snap.events]
@@ -513,6 +572,7 @@ function tick() {
     status,
     estLit,
     zones,
+    diagnosis,
     lastPacketAt: source === 'SERIAL' ? latest!.at : now,
     packets: snap.packets + 1,
     history: [...snap.history, { ...point, p: v * i }].slice(-HISTORY),
