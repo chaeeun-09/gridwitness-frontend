@@ -175,6 +175,7 @@ export default function Complex() {
           <>
             <div className="row gap" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
               <strong className="num" style={{ fontSize: 18 }}>{now}</strong>
+              {data.station && <Badge tone="neutral">{data.station} 관측 {data.ta?.[s.hour] != null ? `${data.ta[s.hour]}℃` : '기온 없음'}</Badge>}
               {holiday && <Badge tone="neutral">공휴일 · AI 판단 보류</Badge>}
               <button className="btn btn-sm" onClick={() => setHour(s.hour - 24)}>−1일</button>
               <button className="btn btn-sm" onClick={() => setHour(s.hour - 1)}>−1시간</button>
@@ -303,6 +304,11 @@ function TruthNote({ index }: { index: ComplexIndex | null }) {
               지역본부 시간별 사용량·고객호수: <a href={index?.source.url} target="_blank" rel="noreferrer">{index?.source.dataset ?? '한전 공공데이터'}</a> (2024년, 원본 값)
             </li>
             <li>AI 예측·이상 점수·사건: 우리 KR 부하 모델 ({index?.model.version.model ?? ''}, {index?.model.trained_until?.slice(0, 10)}까지 학습)이 실제로 계산한 값</li>
+            {index?.model.weather && (
+              <li>
+                기온·습도: <a href="https://www.data.go.kr/data/15057210/openapi.do" target="_blank" rel="noreferrer">기상청 ASOS 시간자료</a> 관측값 (AI 입력으로 사용)
+              </li>
+            )}
             <li>
               세대 월평균 {ANCHOR_KWH_MONTH} kWh: <a href={ANCHOR_URL} target="_blank" rel="noreferrer">{ANCHOR_SOURCE}</a>
             </li>
@@ -312,6 +318,7 @@ function TruthNote({ index }: { index: ComplexIndex | null }) {
           <Badge tone="warn">가정 (실제 아님)</Badge>
           <ul className="small" style={{ margin: '8px 0 0 16px' }}>
             <li>단지 구성(동·층·호)과 가로등 개수·{LAMP_KW * 1000} W·18~6시 점등</li>
+            {index?.model.weather && <li>지역본부마다 대표 기상 관측소 1곳 (예: 경기본부 → 수원)</li>}
             <li>모든 세대가 같은 양을 씀. 시간 패턴은 지역 전체(주택·상가·산업 합계) 패턴을 씀. 세대별 실측 데이터는 없음</li>
             <li>가상 고장의 크기(누설 +1 kW, 전압 85%)와 측정은 잡음 없는 계산값</li>
           </ul>

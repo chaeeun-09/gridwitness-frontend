@@ -69,7 +69,7 @@ export interface ComplexIndex {
   time_basis: string
   unit: string
   source: { dataset: string; url: string; license: string; file: string; sha256: string; note: string }
-  model: { version: Record<string, string>; trained_until: string; z_node: number; z_wide: number; code_commit: string; fleet_joblib_sha256: string; note: string }
+  model: { version: Record<string, string>; trained_until: string; z_node: number; z_wide: number; code_commit: string; fleet_joblib_sha256: string; note: string; weather?: string | null }
   regions: { region: string; file: string; missing_hours: number }[]
   events: RealEvent[]
   wide_area: WideEvent[]
@@ -83,6 +83,9 @@ export interface RegionData {
   exp: (number | null)[]
   z: (number | null)[]
   holiday: number[]
+  /** 지역 대표 기상청 ASOS 관측소 이름과 관측 기온(℃, 빈 값은 null) */
+  station?: string
+  ta?: (number | null)[]
 }
 
 /** 지역 고객 1호당 시간 사용량(kWh) */
