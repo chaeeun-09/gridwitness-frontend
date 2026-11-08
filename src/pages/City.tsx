@@ -4,6 +4,7 @@ import { IconMoon, IconSun } from '../components/Icons'
 import SceneBoundary from '../components/SceneBoundary'
 import { Badge, ErrorState, Metric, Metrics, PageHeader, Section, Segmented, Skeleton, Status, Switch, type Tone } from '../components/ui'
 import { nightness, SUB_COLOR, type CitySelection } from '../components/city/shared'
+import { Link } from 'react-router-dom'
 import { CHART } from '../lib/chart'
 import {
   CITY,
@@ -33,7 +34,10 @@ import {
   type CitySnap,
   type FeederState,
   type SubStatus,
+  COMPLEX_UNITS,
+  HOUSEHOLD,
 } from '../lib/city'
+import { ANCHOR_KWH_MONTH } from '../lib/complex'
 import { loadKepcoDataset, type DayType } from '../lib/publicData'
 
 const CityScene = lazy(() => import('../components/city/CityScene'))
@@ -126,7 +130,7 @@ function CityView({ regions }: { regions: string[] }) {
           <Metric label="공급" value={mw(snap.servedKw)} unit="MW" foot={unserved > 1 ? `미공급 ${mw(unserved)} MW` : '모두 공급 중'}>
             <Status tone={unserved > 1 ? 'err' : 'ok'} live={unserved > 1}>{unserved > 1 ? '공급 부족' : '정상'}</Status>
           </Metric>
-          <Metric label="정전 건물" value={snap.outBuildings.toLocaleString()} unit={`/ ${snap.totalBuildings.toLocaleString()}`} foot={`정전 블록 ${snap.outBlocks}개`} />
+          <Metric label="정전 세대" value={snap.outHouseholds.toLocaleString()} unit={HOUSEHOLD ? `/ ${HOUSEHOLD.households.toLocaleString()}` : ''} foot={`정전 건물 ${snap.outBuildings.toLocaleString()} / ${snap.totalBuildings.toLocaleString()} · 블록 ${snap.outBlocks}개`} />
           <Metric label="최대 변전소 이용률" value={pct(worstSub.util)} foot={`${worstSub.def.name} 변전소`} />
           <Metric label="누적 정전" value={Math.round(snap.outBuildingHours).toLocaleString()} unit="건물·시간" foot="정전 건물 수 × 시간" />
         </Metrics>
@@ -225,6 +229,7 @@ function CityView({ regions }: { regions: string[] }) {
           description="행을 누르면 3D에서 해당 구역이 밝게 표시됩니다. 선로가 용량의 110%를 15분(시뮬레이션) 넘기면 트립합니다."
           actions={selection && <button className="btn btn-sm btn-ghost" onClick={() => setSelection(null)}>선택 해제</button>}
         >
+          {(selFeeder || selSub) && <SelectionHouseholds blocks={selFeeder ? selFeeder.def.blocks : selSub!.def.feeders.flatMap((f) => CITY.feeders[f].blocks)} name={selFeeder ? `${selFeeder.def.name} 선로` : `${selSub!.def.name} 변전소`} region={snap.region} />}
           <div className="table-wrap">
             <table className="city-table">
               <thead>
@@ -297,14 +302,38 @@ function CityView({ regions }: { regions: string[] }) {
       <div className="section">
         <Section title="모형의 가정과 한계">
           <ul className="plain-list small">
-            <li>건물 수요 = 기준 용량(가정) × 시간대 패턴(한전 지역본부 실제 시간별 사용량 평균, 계약종별 구분 없음) × 기온 배율. 전압·위상·손실은 계산하지 않습니다.</li>
+            <li>건물 수요 = 기준 용량 × 시간대 패턴(한전 지역본부 실제 시간별 사용량 평균, 계약종별 구분 없음) × 기온 배율. 전압·위상·손실은 계산하지 않습니다.</li>
+            <li>주거 기준 용량 = 세대 수 × 세대 1곳의 피크 부하. 세대 1곳은 한전 발표 8월 가구 평균 {ANCHOR_KWH_MONTH} kWh(평균 {HOUSEHOLD ? HOUSEHOLD.avgKw.toFixed(2) : '–'} kW)를 서울본부 8월 평일 실제 패턴에 맞춘 값(피크 {HOUSEHOLD ? HOUSEHOLD.peakKw.toFixed(2) : '–'} kW)입니다. 세대 수는 가정입니다: 아파트 1동 = <Link to="/complex?from=city">가상 대단지</Link> 1곳({COMPLEX_UNITS}세대), 단독주택 1채 = 1세대.</li>
+            <li>상업·산업 구역의 기준 용량(52.4 MW · 130.4 MW)은 근거 자료가 없는 가정값입니다.</li>
             <li>선로·변전소 용량은 설계 조건(서울 · 8월 · 평일)의 하루 최대 부하로 정해져 있어, 지역·월을 바꾸거나 배율을 올리면 설비가 모자랄 수 있습니다.</li>
             <li>자동 절체는 블록 단위로 이웃 선로에 부하를 넘기는 단순화입니다. 실제 계통의 개폐기 위치와 보호 협조는 반영하지 않습니다.</li>
-            <li>마을 모형(Arduino·INA219)의 IoT 데이터, 고장파형 AI와는 섞지 않는 별개 시뮬레이션입니다.</li>
+            <li>마을 모형(Arduino·INA219)의 측정값과 고장파형 AI는 이 계산에 쓰지 않습니다. 연결되는 것은 세대 기준(모형 집 1채 = 대단지 1세대 = 도시 1세대)뿐입니다.</li>
           </ul>
         </Section>
       </div>
     </>
+  )
+}
+
+/** 선택한 선로·변전소가 공급하는 세대 (대단지 화면으로 이어짐) */
+function SelectionHouseholds({ blocks, name, region }: { blocks: number[]; name: string; region: string }) {
+  let hh = 0
+  let cx = 0
+  for (const k of blocks) {
+    hh += CITY.households[k]
+    cx += CITY.complexes[k]
+  }
+  return (
+    <div className="card small row gap" style={{ padding: 12, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+      <span>
+        <strong>{name}</strong>: 세대 {hh.toLocaleString()} (대단지 {cx}곳 × {COMPLEX_UNITS} + 단독주택 {(hh - cx * COMPLEX_UNITS).toLocaleString()})
+      </span>
+      {cx > 0 && (
+        <Link className="btn btn-sm" to={`/complex?from=city&region=${encodeURIComponent(region)}`}>
+          대단지 1곳 안을 세대 단위로 보기 →
+        </Link>
+      )}
+    </div>
   )
 }
 

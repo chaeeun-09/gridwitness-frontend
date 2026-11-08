@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Badge, ErrorState, Metric, Metrics, PageHeader, Section, Skeleton, Status, Switch, type Tone } from '../components/ui'
+import { Link, useSearchParams } from 'react-router-dom'
 import { CHART } from '../lib/chart'
 import {
   ANCHOR_KWH_MONTH,
@@ -59,7 +60,9 @@ type Sel = { kind: 'unit' | 'lamp'; b: number; i: number } | null
 export default function Complex() {
   const s = useComplex()
   const [index, setIndex] = useState<ComplexIndex | null>(null)
-  const [region, setRegion] = useState('서울본부')
+  const [params] = useSearchParams()
+  const fromCity = params.get('from') === 'city'
+  const [region, setRegion] = useState(params.get('region') || '서울본부')
   const [data, setData] = useState<RegionData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [sel, setSel] = useState<Sel>(null)
@@ -70,7 +73,10 @@ export default function Complex() {
   useEffect(() => {
     if (!index) return
     const r = index.regions.find((x) => x.region === region)
-    if (!r) return
+    if (!r) {
+      if (region !== '서울본부') setRegion('서울본부')
+      return
+    }
     setData(null)
     let alive = true
     loadRegion(r.file).then(
@@ -146,6 +152,11 @@ export default function Complex() {
         }
       />
 
+      {fromCity && (
+        <div className="card small" style={{ padding: 12, marginBottom: 16 }}>
+          도시 시뮬레이션의 <strong>아파트 1동 = 이 대단지 1곳</strong>입니다. 세대 하나는 스마트 마을 모형의 집 1채와 같은 규칙으로 판정합니다. <Link to="/city">← 도시 시뮬레이션으로 돌아가기</Link>
+        </div>
+      )}
       <TruthNote index={index} />
 
       <Section
