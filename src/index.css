@@ -1392,3 +1392,13 @@ body { background-attachment: fixed; }
 .ga-size { display: inline-flex; align-items: center; gap: 5px; padding: 0 9px; font-size: 12.5px; color: var(--text-2); white-space: nowrap; }
 .ga-size:hover { color: var(--ink); }
 @media (max-width: 420px) { .ga-size span { display: none; } }
+
+/* ── FRTU 상세 · 실시간 분석 탭 ─────────────────────────── */
+.frtu .tabs { margin: 4px 0 14px; }
+.live { display: grid; gap: 14px; }
+.live .section { margin-top: 0; }
+.live-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.live-empty { display: flex; justify-content: space-between; align-items: center; gap: 16px 24px; flex-wrap: wrap; padding: 22px 24px; border-radius: 18px; background: #fff; box-shadow: var(--card-shadow); border-left: 4px solid var(--warn); }
+.live-empty strong { font-size: 16px; color: var(--ink); }
+.live-empty p { margin: 4px 0 0; color: var(--text-2); font-size: 13.5px; }
+.live-empty-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
