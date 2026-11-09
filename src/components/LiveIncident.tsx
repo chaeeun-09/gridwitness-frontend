@@ -5,11 +5,12 @@ import { api } from '../api'
 import { getActor } from '../lib/actor'
 import { CHART } from '../lib/chart'
 import { FRTUS } from '../lib/frtu'
-import { dismissIncident, FI_SHORT, markIncidentRegistered, observeVillage, openIncident, useLiveIncidents, type LiveIncident } from '../lib/liveIncident'
+import { assignIncident, dismissIncident, FI_SHORT, markIncidentRegistered, observeVillage, openIncident, setIncidentStage, STAGE_LABEL, STAGES, useLiveIncidents, type LiveIncident } from '../lib/liveIncident'
 import { ASSISTANT_OPEN_EVENT, askAssistantVillage, INCIDENT_OPEN_EVENT, PANEL_OPEN_EVENT } from '../lib/panels'
 import { getVillage, linkEventToCase, useVillage } from '../lib/village'
 import { useVillageEvents } from '../lib/villageEvents'
 import { inspectionCandidate } from '../lib/gis'
+import { alertIncident } from '../lib/notify'
 import { IconX } from './Icons'
 import SingleLineDiagram, { InspectionCard } from './SingleLineDiagram'
 import { Badge } from './ui'
@@ -33,12 +34,14 @@ export function IncidentWatcher() {
   const snap = useVillage()
   const { pathname } = useLocation()
   const { incidents } = useLiveIncidents()
-  const seen = useRef(0)
+  // 저장돼 있던 지난 사건은 새 사건으로 치지 않음 (새로고침해도 다시 울리지 않게)
+  const seen = useRef(incidents[0]?.id ?? 0)
   useEffect(() => observeVillage(snap), [snap])
   useEffect(() => {
     const top = incidents[0]
-    if (!top || top.id === seen.current) return
+    if (!top || top.id <= seen.current) return
     seen.current = top.id
+    alertIncident(top.title)
     if (pathname === '/village') openIncident(top.id)
   }, [incidents, pathname])
   return null
@@ -59,6 +62,36 @@ export function IncidentBanner() {
       <span className="ib-time">{live ? `${secs(now - top.startedAt)} 전 발생` : top.title}</span>
       <button type="button" className="btn btn-sm" onClick={() => openIncident(top.id)}>보기</button>
       <button type="button" className="ib-x" onClick={() => dismissIncident(top.id)} aria-label="알림 닫기"><IconX /></button>
+    </div>
+  )
+}
+
+/** 처리 단계(접수 → 출동 → 점검 → 복구 → 종결)와 담당자. 담당자가 직접 단계를 넘긴다 */
+export function StageBar({ inc }: { inc: LiveIncident }) {
+  const [name, setName] = useState(inc.assignee ?? '')
+  const at = STAGES.indexOf(inc.stage)
+  const next = STAGES[at + 1]
+  return (
+    <div className="stagebar">
+      <ol>
+        {STAGES.map((s, k) => {
+          const log = [...inc.stageLog].reverse().find((l) => l.stage === s)
+          return (
+            <li key={s} className={k < at ? 'done' : k === at ? 'now' : ''}>
+              <b>{STAGE_LABEL[s]}</b>
+              <span>{log ? new Date(log.at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false }) : '—'}</span>
+            </li>
+          )
+        })}
+      </ol>
+      <div className="stagebar-ctl">
+        <input value={name} onChange={(e) => setName(e.target.value)} onBlur={() => assignIncident(inc.id, name)} placeholder="담당자 이름" aria-label="담당자" />
+        {next && (
+          <button type="button" className="btn btn-sm btn-primary" onClick={() => { assignIncident(inc.id, name); setIncidentStage(inc.id, next, name.trim() || getActor()) }}>
+            {STAGE_LABEL[next]}(으)로
+          </button>
+        )}
+      </div>
     </div>
   )
 }
@@ -124,8 +157,11 @@ function SheetBody({ inc }: { inc: LiveIncident }) {
           <h2>{inc.title}</h2>
         </div>
         <Badge tone={live ? 'err' : 'ok'}>{live ? `진행 중 · ${secs(now - inc.startedAt)}` : `복구됨 · ${secs(inc.clearedAt! - inc.startedAt)} 만에`}</Badge>
+        <Link to={`/report/live/${inc.id}`} className="btn btn-sm" onClick={() => openIncident(null)}>보고서</Link>
         <button type="button" className="btn btn-ghost btn-icon btn-sm" onClick={() => openIncident(null)} aria-label="닫기"><IconX /></button>
       </header>
+
+      <StageBar inc={inc} />
 
       <div className="is-grid">
         <div className="is-wave">
