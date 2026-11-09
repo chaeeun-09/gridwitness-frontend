@@ -3,6 +3,7 @@
 // 대화로 장치를 조작하지 않는다. LED·릴레이 조작은 마을 화면의 제어판에서만 한다.
 // 교류 고장파형 사건에 대한 현장 대응 대화는 components/AssistantChat (사건별) 이 맡는다.
 
+import { FRTUS, frtuViews, locateFault } from './frtu'
 import { getVillage, IOT_CHANNELS, STATUS_LABEL } from './village'
 import type { AnalyzedEvent } from './villageEvents'
 
@@ -11,7 +12,7 @@ export interface ChatMsg {
   text: string
 }
 
-export const SUGGESTIONS = ['지금 상태 어때?', '왜 이상이야?', '마지막 사건 판정은?', '전류는?']
+export const SUGGESTIONS = ['지금 상태 어때?', '어느 분기가 문제야?', 'FRTU별 전류는?', '왜 이상이야?', '마지막 사건 판정은?']
 
 const has = (t: string, ...words: string[]) => words.some((w) => t.includes(w))
 
@@ -37,6 +38,13 @@ export function answer(text: string, events: AnalyzedEvent[]): string {
   // 조작 요청은 거절 (제어 로직과 대화 분리)
   if ((has(t, '정전') && has(t, '발생', '일으', '내줘', '시켜')) || has(t, '복구', '다시 켜', '꺼줘', '켜줘', '끄', '차단')) return CONTROL_REFUSAL
 
+  // 위치·구간: FRTU별 고장표시로 좁힌 결과를 그대로 읽어 줌
+  if (has(t, '어디', '위치', '구간', '분기', '먼저', '점검', 'FRTU', 'frtu')) {
+    const loc = locateFault(s)
+    if (loc.scope === 'NONE' || loc.scope === 'OFF' || loc.scope === 'NO_DATA') return `${loc.title}.`
+    return `${loc.title}.\n근거:\n${loc.reasons.map((r) => `· ${r}`).join('\n')}\n분기 안의 어느 LED인지는 제어판의 채널 점검으로 확인해 주세요.`
+  }
+
   // 조회
   if (has(t, '마지막', '최근', '판정', '사건')) {
     if (!events.length) return '아직 AI가 판정할 사건 파형이 없어요. LED를 끄거나 켜면 사건이 기록돼요.'
@@ -50,13 +58,16 @@ export function answer(text: string, events: AnalyzedEvent[]): string {
     if (events[0]) return verdictText(events[0])
     return `지금은 이상 근거가 없어요. 이상 점수 ${s.score.toFixed(2)}로 기준(주의 0.3) 아래입니다.`
   }
-  if (has(t, '전류')) return `마을 전체 전류는 ${(s.i * 1000).toFixed(1)} mA, 예상값은 ${(s.expected * 1000).toFixed(1)} mA예요.`
+  if (has(t, '전류')) {
+    const fv = frtuViews(s)
+    return FRTUS.map((f) => `${f.name}: ${fv[f.id].available ? `${(fv[f.id].i * 1000).toFixed(1)} mA (예상 ${(fv[f.id].expected * 1000).toFixed(1)} mA)` : '값 없음'}`).join('\n')
+  }
   if (has(t, '전압')) return `전압은 ${s.v.toFixed(2)} V예요.`
   if (has(t, '상태', '어때', '괜찮', '현황')) {
     if (!s.connected) return '실측 장치와 연결이 끊겨 있어요. 메뉴의 실측 장치에서 다시 연결해 주세요.'
     const off = IOT_CHANNELS.filter((c) => !s.leds[c.id].channelOn).map((c) => c.name)
     return `마을은 '${STATUS_LABEL[s.status]}' 상태예요. ${s.v.toFixed(2)} V, ${(s.i * 1000).toFixed(1)} mA, 이상 점수 ${s.score.toFixed(2)}${off.length ? `. 꺼 둔 LED: ${off.join(', ')}` : '. LED는 모두 켜져 있어요'}.`
   }
-  return "아직 그 질문은 이해하지 못해요. '지금 상태 어때?', '왜 이상이야?', '주택 2 꺼줘'처럼 물어봐 주세요."
+  return "아직 그 질문은 이해하지 못해요. '지금 상태 어때?', '어느 분기가 문제야?', '왜 이상이야?'처럼 물어봐 주세요."
 }
 
