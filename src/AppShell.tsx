@@ -8,6 +8,7 @@ import { connectSerial, DEVICE_INFO, useVillage } from './lib/village'
 import CaseDetail from './pages/CaseDetail'
 import CaseList from './pages/CaseList'
 import Dashboard from './pages/Dashboard'
+import FieldAssistant from './pages/FieldAssistant'
 import FrtuDetail from './pages/FrtuDetail'
 import Admin from './pages/Admin'
 import LiveData from './pages/LiveData'
@@ -165,6 +166,7 @@ export function Shell({ extraRoutes }: { extraRoutes?: ReactNode } = {}) {
               <Route path="/cases" element={<CaseList />} />
               <Route path="/cases/new" element={<NewCase />} />
               <Route path="/cases/:id" element={<CaseDetail />} />
+              <Route path="/field/:id" element={<FieldAssistant />} />
               <Route path="/public-data" element={<PublicData />} />
               <Route path="/history" element={<Navigate to="/cases" replace />} />
               <Route path="/history/:id" element={<HistoryRedirect />} />
