@@ -9,7 +9,9 @@ import { dismissIncident, FI_SHORT, markIncidentRegistered, observeVillage, open
 import { ASSISTANT_OPEN_EVENT, askAssistantVillage, INCIDENT_OPEN_EVENT, PANEL_OPEN_EVENT } from '../lib/panels'
 import { getVillage, linkEventToCase, useVillage } from '../lib/village'
 import { useVillageEvents } from '../lib/villageEvents'
+import { inspectionCandidate } from '../lib/gis'
 import { IconX } from './Icons'
+import SingleLineDiagram, { InspectionCard } from './SingleLineDiagram'
 import { Badge } from './ui'
 
 const secs = (ms: number) => {
@@ -95,6 +97,8 @@ function SheetBody({ inc }: { inc: LiveIncident }) {
   // 우노가 녹화해 보낸 사건 파형이 이 시각 근처에 있으면 그 AI 판정도 함께 (실측 장치)
   const recorded = events.find((a) => Math.abs(new Date(a.e.receivedAt).getTime() - inc.startedAt) < 8000)
   const v = recorded?.verdict
+  // 고장 구간 → 설비 연결정보(GIS)로 점검 후보와 순서
+  const cand = inspectionCandidate(inc.scope)
 
   async function register() {
     const ev = getVillage().events.find((e) => e.id === inc.ruleEventId)
@@ -146,6 +150,7 @@ function SheetBody({ inc }: { inc: LiveIncident }) {
             {inc.caseId && <li><b>등록</b> IoT 사건 {inc.caseId}</li>}
             <li className={live ? 'wait' : 'ok'}>{live ? <><b>대기</b> 아직 복구되지 않음</> : <><b>{new Date(inc.clearedAt!).toLocaleTimeString('ko-KR', { hour12: false })}</b> 복구 ({secs(inc.clearedAt! - inc.startedAt)})</>}</li>
           </ol>
+          <SingleLineDiagram highlight={cand?.branches} fi={inc.fi} candidate={cand} />
         </div>
 
         <div className="is-side">
@@ -153,6 +158,7 @@ function SheetBody({ inc }: { inc: LiveIncident }) {
             <span>원인 판정 <small>계측값 규칙</small></span>
             <strong>{inc.cause}</strong>
           </div>
+          <InspectionCard candidate={cand} />
           {v && (
             <div className="is-card">
               <span>사건 파형 AI <small>우노 녹화</small></span>
