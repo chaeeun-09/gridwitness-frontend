@@ -134,12 +134,15 @@ export default function GlobalAssistant() {
                 { value: 'village', label: '마을 상태' },
               ]}
             />
-            <button type="button" className="btn btn-ghost btn-icon btn-sm" onClick={() => setFull(!full)} aria-label={full ? '작게 보기' : '전체화면으로 보기'} title={full ? '작게 보기 (Esc)' : '전체화면'}>
+            <button type="button" className="btn btn-ghost btn-sm ga-size" onClick={() => setFull(!full)} aria-label={full ? '작은 창으로 보기' : '전체화면으로 보기'} title={full ? '작은 창으로 (Esc)' : '전체화면으로'}>
               {full ? (
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /></svg>
+                // 대각선 화살표가 안쪽으로: 작은 창
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7" /></svg>
               ) : (
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
+                // 대각선 화살표가 바깥으로: 전체화면
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" /></svg>
               )}
+              <span>{full ? '작은 창' : '전체화면'}</span>
             </button>
             <button type="button" className="btn btn-ghost btn-icon btn-sm" onClick={() => setOpen(false)} aria-label="닫기"><IconX /></button>
           </header>
