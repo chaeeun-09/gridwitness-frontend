@@ -4,7 +4,7 @@ import { Bloom, EffectComposer, N8AO, SMAA, ToneMapping, Vignette } from '@react
 import { ToneMappingMode } from 'postprocessing'
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { CatmullRomCurve3, Vector3, type Group, type Mesh } from 'three'
-import { FRTUS, frtuViews, type FrtuId } from '../../lib/frtu'
+import { FRTUS, frtuViews, locateFault, type FrtuId } from '../../lib/frtu'
 import { IOT_CHANNELS, lightView, speech, type ChannelId, type NodeStatus, type VillageSnapshot } from '../../lib/village'
 import House from './House'
 import { BOX_FLOOR, HOUSE_POS, LAMP_POS, POLES, routePoints, type HouseChannel, type LampChannel } from './layout'
@@ -16,21 +16,27 @@ import Underground, { partCenter } from './Underground'
 import type { PartId } from '../../lib/hardware'
 
 // ── 전선 + 전류 흐름 ─────────────────────────────────────
-function Feeder({ id, status, flowing, night }: { id: ChannelId; status: NodeStatus; flowing: boolean; night: boolean }) {
+/** hot: 실시간 사건의 고장 분기에 속한 선 → 빨갛게 깜빡임 */
+function Feeder({ id, status, flowing, night, hot = false }: { id: ChannelId; status: NodeStatus; flowing: boolean; night: boolean; hot?: boolean }) {
   const pts = useMemo(() => routePoints(id), [id])
   const curve = useMemo(() => new CatmullRomCurve3(pts.map((p) => new Vector3(...p))), [pts])
   const N = 8
   const refs = useRef<(Mesh | null)[]>([])
   const phase = useRef(0)
-  useFrame((_, dt) => {
+  const line = useRef<{ material: { opacity: number; transparent: boolean } } | null>(null)
+  useFrame(({ clock }, dt) => {
     phase.current = (phase.current + dt * 0.09) % 1
     refs.current.forEach((m, k) => m && m.position.copy(curve.getPointAt((phase.current + k / N) % 1)))
+    if (line.current) {
+      line.current.material.transparent = hot
+      line.current.material.opacity = hot ? 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(clock.elapsedTime * 6)) : 1
+    }
   })
-  const idle = status === 'NORMAL' || status === 'OFF' || status === 'NO_DATA'
-  const wireColor = idle ? (night ? '#8090a6' : '#2b2f33') : STATUS_COLOR[status]
+  const idle = !hot && (status === 'NORMAL' || status === 'OFF' || status === 'NO_DATA')
+  const wireColor = hot ? STATUS_COLOR.FAULT : idle ? (night ? '#8090a6' : '#2b2f33') : STATUS_COLOR[status]
   return (
     <group>
-      <Line points={pts} color={wireColor} lineWidth={idle ? 1.4 : 2.6} />
+      <Line ref={line as never} points={pts} color={wireColor} lineWidth={hot ? 3.4 : idle ? 1.4 : 2.6} />
       {flowing &&
         Array.from({ length: N }, (_, k) => (
           <mesh key={k} ref={(m) => void (refs.current[k] = m)}>
@@ -232,6 +238,8 @@ export default function VillageScene({
 }) {
   const shot = useMemo(() => (underground ? (selectedPart ? partShot(selectedPart) : UNDER) : frtu ? frtuShot(frtu) : SURFACE), [underground, selectedPart, frtu])
   const fv = frtuViews(snap)
+  // 지금 고장 구간 (고장표시로 좁힌 분기) → 그 분기의 전선을 강조
+  const hotScope = locateFault(snap, fv).scope
   const bg = useMemo(() => (night ? skyGradient('#070d1c', '#1b2b4d') : skyGradient('#9fcbf2', '#e9f3fb')), [night])
   const [wrap, active] = useOnScreen<HTMLDivElement>()
   const dpr = fx ? Math.min(window.devicePixelRatio, 1.75) : Math.min(window.devicePixelRatio, 1.25)
@@ -272,7 +280,8 @@ export default function VillageScene({
             ))}
           {IOT_CHANNELS.map((c) => {
             const view = lightView(snap.leds[c.id], snap)
-            return <Feeder key={c.id} id={c.id} status={view.status} flowing={snap.leds[c.id].lit} night={night} />
+            const hot = hotScope === 'BOTH' || hotScope === 'UPSTREAM' || (hotScope === 'HOUSE' && c.kind === 'HOUSE') || (hotScope === 'LAMP' && c.kind === 'LAMP')
+            return <Feeder key={c.id} id={c.id} status={view.status} flowing={snap.leds[c.id].lit} night={night} hot={hot} />
           })}
           {IOT_CHANNELS.map((c) => {
             const view = lightView(snap.leds[c.id], snap)
