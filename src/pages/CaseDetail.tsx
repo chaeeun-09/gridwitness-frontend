@@ -55,7 +55,7 @@ export function WaveformCaseView({ c, onChange }: { c: IncidentCase; onChange: (
             <span className="num">{fmtTime(c.createdAt)}</span>
           </>
         }
-        actions={<button className="btn no-print" onClick={() => window.print()}>PDF로 내보내기</button>}
+        actions={<><Link className="btn btn-primary no-print" to={`/report/case/${c.id}`}>사고조사 보고서</Link><button className="btn no-print" onClick={() => window.print()}>화면 인쇄</button></>}
       />
       <Steps steps={WAVEFORM_STEPS} done={waveformStepsDone(c.stage)} />
       <TrustStrip c={c} onGo={setTab} />
