@@ -81,7 +81,7 @@ function BotMeta({ m, text }: { m: AssistantMeta; text: string }) {
 }
 
 /** 사건 하나에 대한 현장 대응 AI 대화. 글·음성으로 묻고, 근거와 판단 보류 이유를 함께 보여준다. 설비는 조작하지 않는다 */
-export default function AssistantChat({ c, variant = 'panel' }: { c: IncidentCase; variant?: 'panel' | 'field' }) {
+export default function AssistantChat({ c, variant = 'panel' }: { c: IncidentCase; variant?: 'panel' | 'field' | 'popup' }) {
   const [turns, setTurns] = useState<AssistantTurn[]>([])
   const [loading, setLoading] = useState(true)
   const [pending, setPending] = useState(false)
