@@ -6,6 +6,7 @@ import GlobalAssistant from './components/GlobalAssistant'
 import { Dot, PageSkeleton } from './components/ui'
 import { useActor } from './lib/actor'
 import { useBackendHealth } from './lib/backend'
+import { toggleAlerts, useAlertsOn } from './lib/notify'
 import { connectSerial, DEVICE_INFO, useVillage } from './lib/village'
 import CaseDetail from './pages/CaseDetail'
 import CaseList from './pages/CaseList'
@@ -16,6 +17,7 @@ import Admin from './pages/Admin'
 import LiveData from './pages/LiveData'
 import NewCase from './pages/NewCase'
 import PublicData from './pages/PublicData'
+import Report from './pages/Report'
 import Settings from './pages/Settings'
 import VillageLoads from './pages/VillageLoads'
 
@@ -120,6 +122,20 @@ function ReconnectBanner() {
   )
 }
 
+/** 사건 알림(소리·브라우저 알림) 켜고 끄기 */
+function AlertBell() {
+  const on = useAlertsOn()
+  return (
+    <button type="button" className={`tb-icon ${on ? 'active' : ''}`} onClick={() => void toggleAlerts()} title={on ? '사건 알림 켜짐 (누르면 끔)' : '사건 알림 꺼짐 (누르면 켬)'} aria-label={on ? '사건 알림 끄기' : '사건 알림 켜기'} aria-pressed={on}>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+        <path d="M13.7 21a2 2 0 0 1-3.4 0" />
+        {!on && <path d="M3 3l18 18" />}
+      </svg>
+    </button>
+  )
+}
+
 /** 상단 바 오른쪽: 데이터 출처·연결 상태를 점 하나와 짧은 글자로 */
 function StatusChip() {
   const snap = useVillage()
@@ -152,6 +168,7 @@ function TopBar({ actor }: { actor: string }) {
       </nav>
       <div className="tb-right">
         <StatusChip />
+        <AlertBell />
         <NavLink to="/admin" className="tb-icon" title="관리자" aria-label="관리자"><IconShieldCheck /></NavLink>
         <NavLink to="/settings" className="tb-icon" title="설정" aria-label="설정"><IconSettings /></NavLink>
         <button type="button" className="tb-icon tb-burger" onClick={() => setOpen(!open)} aria-expanded={open} aria-label="메뉴"><IconMenu /></button>
@@ -210,6 +227,7 @@ export function Shell({ extraRoutes }: { extraRoutes?: ReactNode } = {}) {
               <Route path="/cases/:id" element={<CaseDetail />} />
               <Route path="/field/:id" element={<FieldAssistant />} />
               <Route path="/impact" element={<Navigate to="/public-data#outage" replace />} />
+              <Route path="/report/:kind/:id" element={<Report />} />
               <Route path="/public-data" element={<PublicData />} />
               <Route path="/history" element={<Navigate to="/cases" replace />} />
               <Route path="/history/:id" element={<HistoryRedirect />} />
