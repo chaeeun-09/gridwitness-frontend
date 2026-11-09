@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import AiPanel from '../components/AiPanel'
 import Channels from '../components/Channels'
@@ -10,6 +10,7 @@ import Sparkline from '../components/Sparkline'
 import { Badge, NODE_TONE, Section, Segmented, Status } from '../components/ui'
 import VillageScene from '../components/village/VillageScene'
 import { isFrtuId, type FrtuId } from '../lib/frtu'
+import { announcePanelOpen, ASSISTANT_OPEN_EVENT } from '../lib/panels'
 import { NET_COLOR, NET_KIND_LABEL, type NetKind, type PartId } from '../lib/hardware'
 import {
   clearFault,
@@ -103,6 +104,20 @@ export default function Village() {
   const [params] = useSearchParams()
   const [frtu, setFrtu] = useState<FrtuId | null>(() => (isFrtuId(params.get('frtu')) ? (params.get('frtu') as FrtuId) : params.get('ai') === '1' ? 'inlet' : null))
   const [controls, setControls] = useState(false)
+  // AI 도우미가 열리면 화면의 카드 패널(FRTU 요약·제어판·LED 상세)은 내려감
+  useEffect(() => {
+    const onAssistant = () => {
+      setFrtu(null)
+      setControls(false)
+      setSelected(null)
+    }
+    window.addEventListener(ASSISTANT_OPEN_EVENT, onAssistant)
+    return () => window.removeEventListener(ASSISTANT_OPEN_EVENT, onAssistant)
+  }, [])
+  // 반대로 카드 패널을 열면 AI 도우미가 접힘
+  useEffect(() => {
+    if (frtu || controls || selected) announcePanelOpen()
+  }, [frtu, controls, selected])
   const sel = selected ? snap.leds[selected] : null
   const selView = sel ? lightView(sel, snap) : null
   const mock = snap.source === 'MOCK'
