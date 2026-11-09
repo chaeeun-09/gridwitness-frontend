@@ -10,7 +10,7 @@ import Sparkline from '../components/Sparkline'
 import { Badge, NODE_TONE, Section, Segmented, Status } from '../components/ui'
 import VillageScene from '../components/village/VillageScene'
 import { isFrtuId, type FrtuId } from '../lib/frtu'
-import { announcePanelOpen, ASSISTANT_OPEN_EVENT } from '../lib/panels'
+import { announcePanelOpen, ASSISTANT_OPEN_EVENT, INCIDENT_OPEN_EVENT } from '../lib/panels'
 import { NET_COLOR, NET_KIND_LABEL, type NetKind, type PartId } from '../lib/hardware'
 import {
   clearFault,
@@ -112,7 +112,12 @@ export default function Village() {
       setSelected(null)
     }
     window.addEventListener(ASSISTANT_OPEN_EVENT, onAssistant)
-    return () => window.removeEventListener(ASSISTANT_OPEN_EVENT, onAssistant)
+    // 실시간 사건 화면이 올라와도 같은 자리를 비켜 줌
+    window.addEventListener(INCIDENT_OPEN_EVENT, onAssistant)
+    return () => {
+      window.removeEventListener(ASSISTANT_OPEN_EVENT, onAssistant)
+      window.removeEventListener(INCIDENT_OPEN_EVENT, onAssistant)
+    }
   }, [])
   // 반대로 카드 패널을 열면 AI 도우미가 접힘
   useEffect(() => {
