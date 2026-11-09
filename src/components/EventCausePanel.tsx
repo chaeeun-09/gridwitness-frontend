@@ -1,14 +1,14 @@
 import { useState } from 'react'
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { CHART } from '../lib/chart'
+import { IOT_CHANNELS } from '../lib/village'
 import { clearVillageEvents, EVENT_MODEL, eventModelReady, useVillageEvents, type AnalyzedEvent } from '../lib/villageEvents'
 import { Badge, Section } from './ui'
 
-const CH_NAME = ['주택 1', '주택 2', '주택 3', '가로등 1', '가로등 2']
 
 function cmdText(cmd: string): string {
   const m = /^CH (\d) ([01])$/.exec(cmd)
-  if (m) return `${CH_NAME[Number(m[1]) - 1]} ${m[2] === '1' ? '켜기' : '끄기'} 명령`
+  if (m) return `${IOT_CHANNELS.find((c) => c.ch === Number(m[1]))?.name ?? `채널 ${m[1]}`} ${m[2] === '1' ? '켜기' : '끄기'} 명령`
   if (cmd === 'RELAY 0') return '마을 전원 차단 명령'
   if (cmd === 'RELAY 1') return '마을 전원 복구 명령'
   return cmd
