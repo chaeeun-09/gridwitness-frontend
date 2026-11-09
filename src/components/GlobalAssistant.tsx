@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { api } from '../api'
-import { ASSISTANT_OPEN_EVENT, PANEL_OPEN_EVENT } from '../lib/panels'
+import { ASSISTANT_ASK_EVENT, ASSISTANT_OPEN_EVENT, PANEL_OPEN_EVENT } from '../lib/panels'
 import type { AnyCase, CaseSummary } from '../types'
 import AssistantChat from './AssistantChat'
 import { CaseBriefSide, VillageLiveSide } from './AssistantSide'
@@ -97,6 +97,20 @@ export default function GlobalAssistant() {
     const onPanel = () => setOpen(false)
     window.addEventListener(PANEL_OPEN_EVENT, onPanel)
     return () => window.removeEventListener(PANEL_OPEN_EVENT, onPanel)
+  }, [])
+
+  // 대시보드 등에서 "AI에게 묻기": 그 사건으로 바로 열기
+  useEffect(() => {
+    const onAsk = (e: Event) => {
+      const id = (e as CustomEvent<string>).detail
+      if (!id) return
+      setPickId(id)
+      setMode('case')
+      setOpen(true)
+      window.dispatchEvent(new Event(ASSISTANT_OPEN_EVENT))
+    }
+    window.addEventListener(ASSISTANT_ASK_EVENT, onAsk)
+    return () => window.removeEventListener(ASSISTANT_ASK_EVENT, onAsk)
   }, [])
 
   function openAssistant() {
