@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { api } from '../api'
 import { useActor } from '../lib/actor'
@@ -6,15 +7,13 @@ import { CHART } from '../lib/chart'
 import { STATUS_LABEL, type VillageSnapshot } from '../lib/village'
 import { MODEL_SCOPE, parseCsv, diagnose } from '../lib/waveform'
 import type { AnalysisResult, InputDiagnosis } from '../types'
-import EventCausePanel from './EventCausePanel'
+import { useVillageEvents } from '../lib/villageEvents'
 import FaultAnalysis from './FaultAnalysis'
-import { IconX } from './Icons'
-import { Badge, NODE_TONE, Segmented, Status } from './ui'
-
-type Tab = 'live' | 'csv'
+import { IconArrowRight, IconX } from './Icons'
+import { Badge, NODE_TONE, Status } from './ui'
 
 /** FRTU가 보내는 실시간 계측 (마을 전체 전류·전압, 최근 1분) */
-function LiveWave({ snap }: { snap: VillageSnapshot }) {
+export function LiveWave({ snap }: { snap: VillageSnapshot }) {
   const t0 = snap.history.length ? snap.history[snap.history.length - 1].t : 0
   const data = snap.history.map((h) => ({ t: (h.t - t0) / 1000, mA: h.i * 1000, v: h.v }))
   return (
@@ -43,7 +42,7 @@ function LiveWave({ snap }: { snap: VillageSnapshot }) {
 }
 
 /** CSV 고장파형을 넣으면 바로 그려 보고, 서버 AI 분석을 요청 */
-function CsvAnalysis() {
+export function CsvAnalysis() {
   const [actor] = useActor()
   const [file, setFile] = useState<File | null>(null)
   const [matrix, setMatrix] = useState<number[][] | null>(null)
@@ -103,49 +102,33 @@ function CsvAnalysis() {
   )
 }
 
-/** 화면 오른쪽에 붙는 AI 분석 패널 (FRTU를 누르면 열림) */
+/** 화면 오른쪽에 붙는 FRTU 요약 패널 (FRTU를 누르면 열림). 자세한 분석·대화는 상세 화면에서 */
 export default function AiPanel({ snap, onClose }: { snap: VillageSnapshot; onClose: () => void }) {
-  const [tab, setTab] = useState<Tab>('live')
-  const alarm = useMemo(() => ['WARNING', 'FAULT', 'OUTAGE'].includes(snap.status), [snap.status])
+  const events = useVillageEvents()
+  const alarm = ['WARNING', 'FAULT', 'OUTAGE'].includes(snap.status)
+  const v = events[0]?.verdict
+  const suspects = snap.diagnosis?.candidates.map((id) => snap.leds[id].name).join(', ')
   return (
-    <aside className="ai-panel" aria-label="AI 분석">
+    <aside className="ai-panel" aria-label="FRTU 요약">
       <div className="ai-head">
         <div style={{ minWidth: 0 }}>
-          <div className="small muted">FRTU · 마을 인입 구간</div>
-          <strong>AI 분석</strong>
+          <strong className="ai-title">마을 인입 FRTU</strong>
+          <div className="small muted">배전자동화 단말장치</div>
         </div>
-        <button className="btn btn-ghost btn-icon" onClick={onClose} aria-label="닫기"><IconX /></button>
+        <button className="btn btn-ghost btn-icon ai-close" onClick={onClose} aria-label="닫기"><IconX /></button>
       </div>
-      <Segmented
-        value={tab}
-        onChange={(v) => setTab(v as Tab)}
-        options={[
-          { value: 'live', label: '실시간 파형' },
-          { value: 'csv', label: 'CSV 고장파형' },
-        ]}
-      />
       <div className="ai-body">
-        {tab === 'live' ? (
-          <>
-            <div className={`ai-verdict ${alarm ? 'alarm' : ''}`}>
-              <Status tone={NODE_TONE[snap.status]} live={alarm}><strong>{STATUS_LABEL[snap.status]}</strong></Status>
-              <span className="num small">이상 점수 {snap.score.toFixed(2)}</span>
-            </div>
-            {snap.diagnosis && (
-              <p className="small" style={{ margin: '8px 0 0' }}>
-                {snap.diagnosis.kind === 'LOW' ? '켠 채널 중 전류를 안 흘리는 것이 있습니다' : '예상보다 전류가 많습니다'}
-                {snap.diagnosis.candidates.length > 0 && ` · 의심: ${snap.diagnosis.candidates.map((id) => snap.leds[id].name).join(', ')}`}
-              </p>
-            )}
-            <LiveWave snap={snap} />
-            <div className="ai-events">
-              <EventCausePanel />
-            </div>
-          </>
-        ) : (
-          <CsvAnalysis />
-        )}
+        <span className={`ai-chip ${alarm ? 'alarm' : ''}`}><Status tone={NODE_TONE[snap.status]} live={alarm}>{STATUS_LABEL[snap.status]}</Status></span>
+        <dl className="ai-kv">
+          <div><dt>현재 전류</dt><dd>{(snap.i * 1000).toFixed(1)} mA</dd></div>
+          <div><dt>예상 전류</dt><dd>{(snap.expected * 1000).toFixed(1)} mA</dd></div>
+          <div><dt>전압</dt><dd>{snap.v.toFixed(2)} V</dd></div>
+          <div><dt>이상 점수</dt><dd>{snap.score.toFixed(2)}</dd></div>
+          <div><dt>의심 위치</dt><dd>{suspects || '—'}</dd></div>
+          <div><dt>마지막 AI 판정</dt><dd>{!v ? '—' : v.kind === 'ANSWERED' ? v.labelKo : v.kind === 'WITHHELD' ? '보류' : v.kind === 'NO_MODEL' ? '모델 학습 전' : '입력 거부'}</dd></div>
+        </dl>
       </div>
+      <Link to="/frtu" className="ai-more">FRTU 상세 열기 <IconArrowRight /></Link>
     </aside>
   )
 }

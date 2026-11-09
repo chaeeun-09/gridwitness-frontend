@@ -1087,3 +1087,86 @@ body { background: linear-gradient(180deg, #e6effc 0%, #f1f6fd 380px, #f6f9fe 10
 .embed-app .float-menu { display: none; }
 .embed-app .app.no-sidebar:not(.immersive) .page { padding-top: 20px; }
 .dash-back { margin-left: 0; }
+
+/* ── FRTU 요약 패널 (사진 55 형식) ─────────────────────── */
+.ai-panel { padding: 26px 26px 18px; border-radius: 26px; background: #fff; gap: 14px; }
+.ai-title { font-size: 26px !important; font-weight: 800; letter-spacing: -0.02em; }
+.ai-close { width: 44px; height: 44px; border-radius: 50%; background: #f1f3f7; }
+.ai-chip { display: inline-flex; padding: 6px 14px; border-radius: 999px; box-shadow: inset 0 0 0 1px var(--line); font-size: 14px; }
+.ai-chip.alarm { background: var(--err-tint); box-shadow: none; }
+.ai-kv { margin: 14px 0 0; }
+.ai-kv > div { display: flex; justify-content: space-between; padding: 9px 0; font-size: 15px; }
+.ai-kv dt { color: var(--text-2); }
+.ai-kv dd { margin: 0; font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums; }
+.ai-h { margin: 20px 0 6px; font-size: 18px; font-weight: 700; color: var(--ink); }
+.ai-note { margin: 0; padding: 12px 14px; border-radius: 14px; background: #f6f7fa; font-size: 14px; }
+.ai-more { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 14px 18px; border-radius: 999px; background: #101827; color: #fff; text-decoration: none; font-weight: 600; }
+.ai-more svg { width: 16px; height: 16px; }
+
+/* ── FRTU 상세 (사진 57 형식) ─────────────────────────── */
+.crumb-row { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.crumb-row .dash-back-icon { color: var(--ink); }
+.frtu .dash-head { margin-top: 18px; align-items: center; }
+.frtu .dash-cols { grid-template-columns: minmax(0, 1.7fr) minmax(340px, 1fr); }
+.judge-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.judge { display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: 16px; background: #f6f7fa; min-width: 0; }
+.judge > span { font-size: 13px; color: var(--text-2); }
+.judge strong { font-size: 20px; font-weight: 800; color: var(--ink); overflow-wrap: anywhere; }
+.judge .badge { align-self: flex-start; }
+.evidence { margin-top: 16px; }
+.evidence-row { display: grid; grid-template-columns: 180px 1fr 60px; align-items: center; gap: 12px; padding: 6px 0; font-size: 14px; }
+.meter { height: 8px; border-radius: 999px; background: #eef0f4; overflow: hidden; }
+.meter i { display: block; height: 100%; border-radius: 999px; background: #2f6bff; }
+.meter i.ok { background: #2f6bff; } .meter i.warn { background: #f59f00; } .meter i.err { background: #e03e4f; }
+.info-box { display: flex; flex-direction: column; gap: 10px; padding: 18px 20px; margin-bottom: 12px; border-radius: 18px; box-shadow: inset 0 0 0 1px var(--line); }
+.info-box > span { color: var(--text-2); font-size: 14px; }
+.info-box strong { font-size: 30px; font-weight: 800; color: var(--ink); }
+.info-box small { color: var(--text-2); font-size: 13px; }
+.info-kv { grid-template-columns: 1fr; gap: 0; margin-top: 8px; }
+.info-kv > div { display: flex !important; flex-direction: row !important; justify-content: space-between; align-items: center; padding: 10px 0; }
+.info-kv dd { margin: 0; font-weight: 600; }
+@media (max-width: 1100px) { .frtu .dash-cols { grid-template-columns: 1fr; } .judge-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* ── 대화 도우미 (사진 56 형식) ───────────────────────── */
+.chat { display: flex; flex-direction: column; gap: 10px; }
+.chat-log { display: flex; flex-direction: column; gap: 10px; height: 340px; overflow: auto; padding: 4px; }
+.chat-msg { max-width: 86%; padding: 12px 16px; border-radius: 20px; font-size: 14px; line-height: 1.55; white-space: pre-line; }
+.chat-msg.bot { align-self: flex-start; background: #fff; box-shadow: 0 2px 10px rgba(20, 30, 60, .08); }
+.chat-msg.user { align-self: flex-end; background: #101827; color: #fff; }
+.chat-msg.listening { opacity: .6; }
+.chat-chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+.chat-chip { flex-shrink: 0; padding: 9px 16px; border: 0; border-radius: 999px; background: #f1f3f7; color: var(--ink); font-size: 13px; cursor: pointer; }
+.chat-chip:hover { background: #e6e9ef; }
+.chat-input { display: flex; gap: 8px; align-items: center; }
+.chat-input input { flex: 1; min-width: 0; height: 48px; padding: 0 18px; border: 1px solid var(--line); border-radius: 999px; font-size: 15px; background: #fff; }
+.chat-send, .chat-mic { display: grid; place-items: center; width: 48px; height: 48px; border: 0; border-radius: 50%; background: #e6e9ef; color: var(--text-2); cursor: pointer; flex-shrink: 0; }
+.chat-send:not(:disabled) { background: #101827; color: #fff; }
+.chat-mic.on { background: #e03e4f; color: #fff; animation: pulse-mic 1.2s infinite; }
+@keyframes pulse-mic { 50% { box-shadow: 0 0 0 8px rgba(224, 62, 79, .2); } }
+.chat-voice { display: flex; gap: 6px; align-items: center; }
+.ai-panel { bottom: auto; max-height: calc(100% - 28px); }
+.ai-more { align-self: flex-start; padding: 13px 22px; }
+.reasons { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 15px; color: var(--ink); }
+
+/* ── 잘림·겹침 보정 ───────────────────────────────── */
+.chat-chips { flex-wrap: wrap; overflow: visible; }
+.dash-list strong { white-space: normal; overflow-wrap: anywhere; }
+.app.no-sidebar:not(.immersive) .float-menu { position: absolute; }
+body { background-attachment: fixed; }
+.scene.scene-full .scene-tools { row-gap: 8px; }
+@media (max-width: 1200px) {
+  .ai-panel { width: 360px; }
+  .scene.scene-full.with-panel .scene-tools { right: 384px; }
+}
+@media (max-width: 1000px) {
+  .scene.scene-full .scene-tools { left: 14px; top: 70px; }
+  .scene.scene-full.with-panel .scene-tools { right: 14px; }
+  .ai-panel { top: auto; bottom: 8px; left: 8px; right: 8px; width: auto; max-height: 58%; overflow: auto; }
+}
+@media (max-width: 600px) {
+  .scene.scene-full .scene-tools .btn-power { padding: 0 14px; height: 38px; font-size: 14px; }
+  .scene.scene-full .scene-hud { bottom: 8px; left: 8px; right: 8px; }
+  .judge-row { grid-template-columns: 1fr 1fr; }
+  .evidence-row { grid-template-columns: 1fr 70px 48px; }
+  .dash-list li { flex-direction: column; align-items: flex-start; }
+}
