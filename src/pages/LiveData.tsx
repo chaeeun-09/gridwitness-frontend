@@ -1,14 +1,40 @@
-import { Link } from 'react-router-dom'
+import { useState } from 'react'
+import { Link, Navigate } from 'react-router-dom'
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import Channels from '../components/Channels'
 import EventList from '../components/EventList'
 import HardwareFlow from '../components/HardwareFlow'
-import { Badge, Metric, Metrics, NODE_TONE, PageHeader, Section, Status } from '../components/ui'
+import { Badge, Metric, Metrics, NODE_TONE, Section, Status } from '../components/ui'
 import { CHART } from '../lib/chart'
-import { IOT_MODEL, ledA, NOMINAL_V, STATUS_LABEL, THRESHOLDS, TICK_MS, useVillage, ZONE_LABEL, ZONE_SENSOR, zoneChannels } from '../lib/village'
+import { connectSerial, ledA, NOMINAL_V, STATUS_LABEL, switchToMock, THRESHOLDS, TICK_MS, useVillage, ZONE_LABEL, ZONE_SENSOR, zoneChannels } from '../lib/village'
 
-/** 실시간 분석: 판정, 전류·전압 추이, 채널 상태, 점수가 나온 이유, 경고 이력 */
+/** 예전 주소(/live)는 FRTU 상세의 실시간 분석 탭으로 */
 export default function LiveData() {
+  return <Navigate to="/frtu?tab=live" replace />
+}
+
+/** 장치 값이 없을 때: 0과 빈 그래프 대신 연결 방법만 보여줌 */
+function NoDevice({ real, reconnecting }: { real: boolean; reconnecting: boolean }) {
+  const [busy, setBusy] = useState(false)
+  return (
+    <div className="live-empty">
+      <div>
+        <strong>{real ? (reconnecting ? '장치를 다시 찾는 중이에요' : '장치에서 측정값을 받지 못하고 있어요') : '시뮬레이터 통신이 끊긴 상태예요'}</strong>
+        <p>{real ? 'USB 케이블과 Arduino 전원을 확인하고 다시 연결하세요. 모형 없이 화면만 보려면 시뮬레이터를 쓰면 돼요.' : '마을 화면 제어판의 고장 시뮬레이션에서 전체 복구를 누르세요.'}</p>
+      </div>
+      {real && (
+        <div className="live-empty-actions">
+          <button className="btn btn-primary" disabled={busy} onClick={() => { setBusy(true); void connectSerial().finally(() => setBusy(false)) }}>{busy ? '연결 중…' : '실측 장치 연결'}</button>
+          <button className="btn" onClick={() => void switchToMock()}>시뮬레이터로 보기</button>
+          <Link to="/settings" className="small">연결 진단 →</Link>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** 실시간 분석: 판정, 전류·전압 추이, 채널 상태, 점수가 나온 이유, 경고 이력. FRTU 상세의 탭으로 보여줌 */
+export function LiveAnalysis() {
   const snap = useVillage()
   const t0 = snap.history[0]?.t ?? 0
   const data = snap.history.map((h) => ({
@@ -46,27 +72,20 @@ export default function LiveData() {
     labelFormatter: (l: unknown) => `${l}초`,
   })
 
-  return (
-    <>
-      <PageHeader
-        title="실시간 분석"
-        description={`켜라고 한 채널 조합의 정상 전류(우노 실측으로 학습한 조합표)와 INA219가 잰 실제 전류를 비교해 이상 점수를 계산합니다. 최근 ${seconds}초.`}
-        meta={
-          <>
-            <Badge tone={real ? 'accent' : 'neutral'}>{real ? '실측 장치' : '시뮬레이터'}</Badge>
-            <span className="mono">{IOT_MODEL}</span>
-          </>
-        }
-      />
+  if (noData)
+    return (
+      <div className="live">
+        <NoDevice real={real} reconnecting={snap.reconnecting} />
+        <HardwareFlow />
+      </div>
+    )
 
-      {noData && (
-        <div className="alert alert-warn" role="status">
-          <span>
-            <strong>장치에서 측정값을 받지 못하고 있습니다.</strong>{' '}
-            {real ? <>{snap.reconnecting ? '자동으로 다시 연결하는 중입니다. ' : ''}케이블과 Arduino 전원을 확인하세요. 자세한 상태는 <Link to="/settings">설정 → 연결 진단</Link>에서 볼 수 있습니다.</> : '시뮬레이터의 통신 끊김 재현이 켜져 있습니다. 스마트 마을에서 전체 복구를 누르세요.'}
-          </span>
-        </div>
-      )}
+  return (
+    <div className="live">
+      <div className="live-meta">
+        <Badge tone={real ? 'accent' : 'neutral'}>{real ? '실측 장치' : '시뮬레이터'}</Badge>
+        <span className="small muted">켜 둔 LED 조합의 정상 전류와 실제 전류를 비교해 이상 점수를 내요 · 최근 {seconds}초</span>
+      </div>
 
       <Metrics cols={4}>
         <Metric
@@ -76,23 +95,23 @@ export default function LiveData() {
         />
         <Metric
           label="전류"
-          value={noData ? '–' : snap.i.toFixed(3)}
+          value={snap.i.toFixed(3)}
           unit={`A / 예상 ${snap.expected.toFixed(3)}`}
           foot={<span className={Math.abs(residual) > unit * 0.6 ? 'bad' : ''}>차이 {residual >= 0 ? '+' : ''}{residual.toFixed(3)} A · LED {ledUnits >= 0 ? '+' : ''}{ledUnits.toFixed(1)}개 분량</span>}
         />
         <Metric
           label="전압"
-          value={noData ? '–' : snap.v.toFixed(2)}
+          value={snap.v.toFixed(2)}
           unit="V"
           foot={<span className={lowV ? 'bad' : ''}>{lowV ? `하한 ${THRESHOLDS.vMin.toFixed(2)} V보다 낮음` : `하한 ${THRESHOLDS.vMin.toFixed(2)} V · 정격 ${NOMINAL_V} V`}</span>}
         />
-        <Metric label="켜진 LED" value={noData ? '–' : snap.estLit} unit="/ 5 (추정)" foot={`채널 ${onCount}개 켜짐 · ${snap.p.toFixed(2)} W`} />
+        <Metric label="켜진 LED" value={snap.estLit} unit="/ 5 (추정)" foot={`채널 ${onCount}개 켜짐 · ${snap.p.toFixed(2)} W`} />
       </Metrics>
 
       <div className="section">
         <Section
           title="채널 현황"
-          description={snap.canControl ? '스위치로 LED를 하나씩 끄고 켜면 아래 그래프에 변화가 표시됩니다.' : snap.connected ? '이 장치는 채널 상태를 보고하지 않아 조종할 수 없습니다.' : '장치가 연결되지 않았습니다. 사이드바에서 장치를 연결하세요.'}
+          description={snap.canControl ? '스위치로 LED를 끄고 켜면 아래 그래프에 바로 나타나요.' : '이 장치는 채널 상태를 보고하지 않아 조종할 수 없어요.'}
           actions={<Link to="/village/loads" className="small">채널 점검 →</Link>}
         >
           <Channels snap={snap} controls />
@@ -193,7 +212,7 @@ export default function LiveData() {
       </Section>
 
       <HardwareFlow />
-    </>
+    </div>
   )
 }
 
