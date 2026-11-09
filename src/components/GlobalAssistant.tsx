@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { api } from '../api'
+import { ASSISTANT_OPEN_EVENT, PANEL_OPEN_EVENT } from '../lib/panels'
 import type { AnyCase, CaseSummary } from '../types'
 import AssistantChat from './AssistantChat'
 import { IconX } from './Icons'
@@ -68,6 +69,19 @@ export default function GlobalAssistant() {
     return () => window.removeEventListener('keydown', onKey)
   }, [open])
 
+  // 화면의 다른 패널(FRTU 요약·제어판 등)이 열리면 AI 패널은 접는다
+  useEffect(() => {
+    const onPanel = () => setOpen(false)
+    window.addEventListener(PANEL_OPEN_EVENT, onPanel)
+    return () => window.removeEventListener(PANEL_OPEN_EVENT, onPanel)
+  }, [])
+
+  function openAssistant() {
+    setOpen(true)
+    // 화면에 떠 있던 카드 패널은 내려가게 알림
+    window.dispatchEvent(new Event(ASSISTANT_OPEN_EVENT))
+  }
+
   // 현장용 화면은 이미 대화 화면 전체라 버튼을 숨김
   if (pathname.startsWith('/field/')) return null
 
@@ -76,7 +90,7 @@ export default function GlobalAssistant() {
   return (
     <>
       {!open && (
-        <button type="button" className="ga-fab" onClick={() => setOpen(true)} aria-label="AI 도우미 열기">
+        <button type="button" className="ga-fab" onClick={openAssistant} aria-label="AI 도우미 열기">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z" />
             <path d="M9 11.5h.01M12 11.5h.01M15 11.5h.01" strokeWidth="2.6" />
