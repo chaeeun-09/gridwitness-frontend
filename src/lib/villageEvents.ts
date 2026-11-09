@@ -155,7 +155,8 @@ export function features(e: VillageEvent): number[] {
   ]
 }
 
-export function forestPredict(trees: EventTree[], x: number[]): { proba: number[]; contrib: number[][] } {
+export function forestPredict(trees: EventTree[], x0: number[]): { proba: number[]; contrib: number[][] } {
+  const x = x0.map(Math.fround) // sklearn 은 입력을 float32 로 바꿔 비교한다
   const nC = trees[0].v[0].length
   const proba = new Array<number>(nC).fill(0)
   const contrib = x.map(() => new Array<number>(nC).fill(0))
