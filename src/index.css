@@ -1170,3 +1170,14 @@ body { background-attachment: fixed; }
   .evidence-row { grid-template-columns: 1fr 70px 48px; }
   .dash-list li { flex-direction: column; align-items: flex-start; }
 }
+/* 제어판 안에서는 채널 줄을 두 줄로 접어 잘리지 않게 */
+.control-drawer { overflow-x: hidden; }
+.control-drawer .channel { grid-template-columns: minmax(0, 1fr) auto auto; gap: 4px 12px; margin: 0; }
+.control-drawer .channel > :nth-child(1) { grid-column: 1; grid-row: 1; }
+.control-drawer .channel > :nth-child(2) { grid-column: 1; grid-row: 2; padding-left: 38px; }
+.control-drawer .channel > :nth-child(3) { grid-column: 2 / 4; grid-row: 2; text-align: right; }
+.control-drawer .channel > :nth-child(4) { grid-column: 2; grid-row: 1; }
+.control-drawer .channel > :nth-child(5) { grid-column: 3; grid-row: 1; }
+.control-drawer .sim-grid { grid-template-columns: 1fr !important; }
+.control-drawer .section, .control-drawer .card, .control-drawer section { min-width: 0; max-width: 100%; }
+@media (max-width: 1000px) { .control-drawer { top: 116px; } }
