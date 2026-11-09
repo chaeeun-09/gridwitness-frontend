@@ -142,7 +142,7 @@ export default function GlobalAssistant() {
                 // 대각선 화살표가 바깥으로: 전체화면
                 <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" /></svg>
               )}
-              <span>{full ? '작은 창' : '전체화면'}</span>
+              {!full && <span>전체화면</span>}
             </button>
             <button type="button" className="btn btn-ghost btn-icon btn-sm" onClick={() => setOpen(false)} aria-label="닫기"><IconX /></button>
           </header>
