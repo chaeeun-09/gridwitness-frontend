@@ -1,12 +1,19 @@
 import { Link, useSearchParams } from 'react-router-dom'
 import { CsvAnalysis, FaultLocationBox, FrtuStrip, LiveWave } from '../components/AiPanel'
 import VillageStatusChat from '../components/VillageStatusChat'
+import { LiveAnalysis } from './LiveData'
 import EventCausePanel from '../components/EventCausePanel'
 import { IconChevron } from '../components/Icons'
 import { Badge, NODE_TONE, Status } from '../components/ui'
 import { FI_LABEL, frtuViews, isFrtuId, type FrtuId } from '../lib/frtu'
 import { DEVICE_INFO, IOT_CHANNELS, STATUS_LABEL, THRESHOLDS, useVillage } from '../lib/village'
 import { useVillageEvents } from '../lib/villageEvents'
+
+type Tab = 'overview' | 'live'
+const TABS: [Tab, string][] = [
+  ['overview', 'FRTU 요약'],
+  ['live', '실시간 분석'],
+]
 
 function Bar({ value, tone }: { value: number; tone: 'ok' | 'warn' | 'err' }) {
   return <div className="meter"><i className={tone} style={{ width: `${Math.max(2, Math.min(100, value * 100))}%` }} /></div>
@@ -16,7 +23,16 @@ function Bar({ value, tone }: { value: number; tone: 'ok' | 'warn' | 'err' }) {
 export default function FrtuDetail() {
   const [params, setParams] = useSearchParams()
   const id: FrtuId = isFrtuId(params.get('id')) ? (params.get('id') as FrtuId) : 'inlet'
-  const pick = (next: FrtuId) => setParams(next === 'inlet' ? {} : { id: next }, { replace: true })
+  const tab: Tab = params.get('tab') === 'live' ? 'live' : 'overview'
+  const setQuery = (next: { id?: FrtuId; tab?: Tab }) => {
+    const q: Record<string, string> = {}
+    const nid = next.id ?? id
+    const ntab = next.tab ?? tab
+    if (nid !== 'inlet') q.id = nid
+    if (ntab !== 'overview') q.tab = ntab
+    setParams(q, { replace: true })
+  }
+  const pick = (next: FrtuId) => setQuery({ id: next })
   const snap = useVillage()
   const events = useVillageEvents()
   const f = frtuViews(snap)[id]
@@ -53,6 +69,16 @@ export default function FrtuDetail() {
         <Status tone={f.fi !== 'NONE' ? 'err' : NODE_TONE[f.status]} live={alarm}><strong>{STATUS_LABEL[f.status]}</strong></Status>
       </div>
 
+      <div className="tabs" role="tablist">
+        {TABS.map(([k, label]) => (
+          <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setQuery({ tab: k })}>{label}</button>
+        ))}
+      </div>
+
+      {tab === 'live' ? (
+        <div className="tab-panel"><LiveAnalysis /></div>
+      ) : (
+      <>
       <section className="dash-card frtu-overview">
         <FrtuStrip snap={snap} value={id} onPick={pick} />
         <FaultLocationBox snap={snap} />
@@ -144,6 +170,8 @@ export default function FrtuDetail() {
           </section>
         </div>
       </div>
+      </>
+      )}
     </div>
   )
 }
