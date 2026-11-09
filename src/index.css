@@ -1350,3 +1350,12 @@ body { background-attachment: fixed; }
 .ai-body .frtu-strip { margin-bottom: 4px; }
 /* 오른쪽 아래 AI 버튼과 겹치지 않게 */
 .scene-full .scene-hint { right: 96px; }
+
+/* AI 도우미 전체화면: 화면을 덮고 대화는 읽기 좋은 폭으로 가운데 */
+.ga-panel.full { left: 0; top: 0; right: 0; bottom: 0; width: auto; height: calc(100vh / var(--z, 1)); padding: 18px max(16px, calc((100% - 860px) / 2)) 18px; border-radius: 0; z-index: 70; animation: ga-full .22s var(--ease); }
+@keyframes ga-full { from { opacity: 0; transform: scale(.985); } to { opacity: 1; transform: none; } }
+.ga-panel.full .ga-head strong { font-size: 17px; }
+.ga-panel.full .ga-body .chat-log { padding: 16px; }
+.ga-panel.full .ga-body .chat-msg { max-width: 78%; font-size: 14.5px; }
+.ga-panel.full .ga-body .chat-chips { flex-wrap: wrap; overflow: visible; }
+@media (max-width: 640px) { .ga-panel.full { height: 100dvh; padding: 12px; } .ga-panel.full .ga-body .chat-msg { max-width: 92%; } }
