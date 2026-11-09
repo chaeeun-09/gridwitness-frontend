@@ -4,6 +4,7 @@ import { Bloom, EffectComposer, N8AO, SMAA, ToneMapping, Vignette } from '@react
 import { ToneMappingMode } from 'postprocessing'
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { CatmullRomCurve3, Vector3, type Group, type Mesh } from 'three'
+import { FRTUS, frtuViews, type FrtuId } from '../../lib/frtu'
 import { IOT_CHANNELS, lightView, speech, type ChannelId, type NodeStatus, type VillageSnapshot } from '../../lib/village'
 import House from './House'
 import { BOX_FLOOR, HOUSE_POS, LAMP_POS, POLES, routePoints, type HouseChannel, type LampChannel } from './layout'
@@ -134,9 +135,16 @@ function useOnScreen<T extends Element>() {
 type Shot = { pos: Vector3; target: Vector3 }
 const SURFACE: Shot = { pos: new Vector3(-9, 19, 25), target: new Vector3(0, 0, 0) }
 const UNDER: Shot = { pos: new Vector3(-4, BOX_FLOOR + 35, 22), target: new Vector3(-4, BOX_FLOOR, -1.5) }
-/** FRTU가 붙은 전봇대 (마을 인입 구간) */
-export const FRTU_POLE = 1
-const FRTU_SHOT: Shot = { pos: new Vector3(POLES[FRTU_POLE][0] + 5.5, 5.5, POLES[FRTU_POLE][2] + 9.5), target: new Vector3(POLES[FRTU_POLE][0] + 2.2, 1.6, POLES[FRTU_POLE][2]) }
+/** FRTU 3대의 자리: 인입은 변전소에서 나온 첫 전봇대, 두 분기 FRTU는 주택·가로등 선이 갈라지는 전봇대에 나란히 */
+const FRTU_PLACE: Record<FrtuId, { pole: number; dx: number; labelY: number }> = {
+  inlet: { pole: 0, dx: 0, labelY: 2.7 },
+  house: { pole: 1, dx: -0.6, labelY: 3.6 },
+  lamp: { pole: 1, dx: 0.6, labelY: 2.5 },
+}
+const frtuShot = (id: FrtuId): Shot => {
+  const p = POLES[FRTU_PLACE[id].pole]
+  return { pos: new Vector3(p[0] + 5.5, 5.5, p[2] + 9.5), target: new Vector3(p[0] + 2.2, 1.6, p[2]) }
+}
 function partShot(id: PartId): Shot {
   const [x, y, z] = partCenter(id)
   return { pos: new Vector3(x, y + 10.5, z + 4.5), target: new Vector3(x, y, z - 0.6) }
@@ -203,7 +211,7 @@ export default function VillageScene({
   selectedPart = null,
   onPart = () => {},
   showPins = false,
-  frtu = false,
+  frtu = null,
   onFrtu,
 }: {
   snap: VillageSnapshot
@@ -217,12 +225,13 @@ export default function VillageScene({
   selectedPart?: PartId | null
   onPart?: (id: PartId | null) => void
   showPins?: boolean
-  /** FRTU를 골라 확대해 보는 중 */
-  frtu?: boolean
-  /** 있으면 FRTU를 그리고 누를 수 있게 함 */
-  onFrtu?: () => void
+  /** 골라서 확대해 보는 FRTU */
+  frtu?: FrtuId | null
+  /** 있으면 FRTU 3대를 그리고 누를 수 있게 함 */
+  onFrtu?: (id: FrtuId) => void
 }) {
-  const shot = useMemo(() => (underground ? (selectedPart ? partShot(selectedPart) : UNDER) : frtu ? FRTU_SHOT : SURFACE), [underground, selectedPart, frtu])
+  const shot = useMemo(() => (underground ? (selectedPart ? partShot(selectedPart) : UNDER) : frtu ? frtuShot(frtu) : SURFACE), [underground, selectedPart, frtu])
+  const fv = frtuViews(snap)
   const bg = useMemo(() => (night ? skyGradient('#070d1c', '#1b2b4d') : skyGradient('#9fcbf2', '#e9f3fb')), [night])
   const [wrap, active] = useOnScreen<HTMLDivElement>()
   const dpr = fx ? Math.min(window.devicePixelRatio, 1.75) : Math.min(window.devicePixelRatio, 1.25)
@@ -247,7 +256,20 @@ export default function VillageScene({
 
         <Lift away={underground}>
           <Static status={snap.status} />
-          {onFrtu && <Frtu p={POLES[FRTU_POLE]} status={snap.status} selected={frtu} onSelect={onFrtu} />}
+          {onFrtu &&
+            FRTUS.map((f) => (
+              <Frtu
+                key={f.id}
+                p={POLES[FRTU_PLACE[f.id].pole]}
+                dx={FRTU_PLACE[f.id].dx}
+                labelY={FRTU_PLACE[f.id].labelY}
+                name={f.short}
+                status={fv[f.id].status}
+                fi={fv[f.id].fi !== 'NONE'}
+                selected={frtu === f.id}
+                onSelect={() => onFrtu(f.id)}
+              />
+            ))}
           {IOT_CHANNELS.map((c) => {
             const view = lightView(snap.leds[c.id], snap)
             return <Feeder key={c.id} id={c.id} status={view.status} flowing={snap.leds[c.id].lit} night={night} />
