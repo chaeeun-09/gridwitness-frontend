@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
-import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { Link, Navigate, NavLink, Route, Routes, useLocation, useParams } from 'react-router-dom'
+import { IncidentBanner, IncidentSheet, IncidentWatcher } from './components/LiveIncident'
 import { IconAnalysis, IconDashboard, IconShieldCheck, IconDatabase, IconLive, IconLogo, IconMenu, IconBolt, IconSettings, IconVillage } from './components/Icons'
 import GlobalAssistant from './components/GlobalAssistant'
 import { Dot, PageSkeleton } from './components/ui'
@@ -45,6 +46,16 @@ const NAV: { label: string; items: { to: string; label: string; icon: ReactNode;
       { to: '/settings', label: '설정', icon: <IconSettings /> },
     ],
   },
+]
+
+/** 상단 바에 바로 보이는 주요 화면 (나머지는 ☰ 메뉴) */
+const TOP_NAV = [
+  { to: '/dashboard', label: '대시보드' },
+  { to: '/village', label: '3D 마을' },
+  { to: '/frtu', label: 'FRTU' },
+  { to: '/cases', label: '사건 기록' },
+  { to: '/public-data', label: '공공데이터' },
+  { to: '/city', label: '도시' },
 ]
 
 /** 예전 주소(/history/:id)로 들어와도 사건 화면으로 보냄 */
@@ -109,18 +120,44 @@ function ReconnectBanner() {
   )
 }
 
-/** 대시보드 위에 떠 있는 메뉴 (누르면 펼쳐짐) */
-function FloatingMenu({ actor }: { actor: string }) {
-  const [open, setOpen] = useState(false)
+/** 상단 바 오른쪽: 데이터 출처·연결 상태를 점 하나와 짧은 글자로 */
+function StatusChip() {
+  const snap = useVillage()
+  const health = useBackendHealth()
+  const live = snap.connected && snap.status !== 'NO_DATA'
   return (
-    <div className="float-menu no-print">
-      <button className="float-menu-btn" onClick={() => setOpen(!open)} aria-expanded={open}>
+    <Link to="/settings" className="tb-status" title={`분석 서버: ${health.state === 'ok' ? '정상' : health.state === 'down' ? '연결 안 됨' : '확인 중'}`}>
+      <Dot tone={live ? 'ok' : 'err'} live={live} />
+      <span>{snap.source === 'MOCK' ? '시뮬레이터' : live ? '실측 연결됨' : '장치 끊김'}</span>
+      {health.state === 'down' && <span className="tb-warn">서버 끊김</span>}
+    </Link>
+  )
+}
+
+/** 모든 화면 위의 얇은 상단 바: 로고 · 주요 화면 · 연결 상태 · 관리. 좁은 화면에서는 ☰ 하나로 접힘 */
+function TopBar({ actor }: { actor: string }) {
+  const [open, setOpen] = useState(false)
+  const { pathname } = useLocation()
+  useEffect(() => setOpen(false), [pathname])
+  return (
+    <header className="topbar no-print">
+      <Link to="/dashboard" className="tb-brand" aria-label="GridWitness 대시보드">
         <span className="brand-mark"><IconLogo /></span>
         <span>GridWitness</span>
-        <IconMenu />
-      </button>
+      </Link>
+      <nav className="tb-nav" aria-label="주요 화면">
+        {TOP_NAV.map((n) => (
+          <NavLink key={n.to} to={n.to} className="tb-link">{n.label}</NavLink>
+        ))}
+      </nav>
+      <div className="tb-right">
+        <StatusChip />
+        <NavLink to="/admin" className="tb-icon" title="관리자" aria-label="관리자"><IconShieldCheck /></NavLink>
+        <NavLink to="/settings" className="tb-icon" title="설정" aria-label="설정"><IconSettings /></NavLink>
+        <button type="button" className="tb-icon tb-burger" onClick={() => setOpen(!open)} aria-expanded={open} aria-label="메뉴"><IconMenu /></button>
+      </div>
       {open && (
-        <div className="float-menu-pop" onClick={() => setOpen(false)}>
+        <div className="tb-pop" onClick={() => setOpen(false)}>
           {NAV.map((g) => (
             <div key={g.label} className="float-group">
               <div className="float-label">{g.label}</div>
@@ -135,22 +172,7 @@ function FloatingMenu({ actor }: { actor: string }) {
           </div>
         </div>
       )}
-    </div>
-  )
-}
-
-/** 대시보드가 아닌 화면의 왼쪽 위: 이전 페이지로. 주소로 바로 들어와 앱 안 이전 기록이 없으면 대시보드로 */
-function BackNav() {
-  const location = useLocation()
-  const navigate = useNavigate()
-  const hasHistory = location.key !== 'default'
-  return (
-    <div className="float-menu float-back no-print">
-      <button type="button" className="float-back-btn" onClick={() => (hasHistory ? navigate(-1) : navigate('/dashboard'))} aria-label={hasHistory ? '이전 페이지로' : '대시보드로'}>
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
-        <span>{hasHistory ? '이전' : '대시보드'}</span>
-      </button>
-    </div>
+    </header>
   )
 }
 
@@ -161,12 +183,13 @@ export function Shell({ extraRoutes }: { extraRoutes?: ReactNode } = {}) {
   const wide = location.pathname === '/city'
   // 대시보드(마을 시뮬)는 사이드바 없이 화면 전체를 쓰고, 메뉴는 왼쪽 위 떠 있는 버튼으로
   const immersive = location.pathname === '/village'
-  // 첫 화면(대시보드)에만 로고·메뉴, 나머지 화면은 그 자리에 '이전 페이지' 버튼
-  const home = location.pathname === '/dashboard'
 
   return (
-    <div className={`app no-sidebar ${immersive ? 'immersive' : ''}`}>
-      {home ? <FloatingMenu actor={actor} /> : <BackNav />}
+    <div className={`app no-sidebar with-topbar ${immersive ? 'immersive' : ''}`}>
+      <TopBar actor={actor} />
+      <IncidentWatcher />
+      <IncidentBanner />
+      <IncidentSheet />
       <GlobalAssistant />
 
       <div className="main">
