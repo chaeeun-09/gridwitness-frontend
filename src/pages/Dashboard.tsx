@@ -12,6 +12,7 @@ import { STATUS_LABEL, useVillage } from '../lib/village'
 import { useVillageEvents, type AnalyzedEvent } from '../lib/villageEvents'
 import type { AnyCase, CaseStage, CaseSummary } from '../types'
 import { DeviceConnectCard } from './LiveData'
+import { KEPCO_OUTAGE_2025, KEPCO_OUTAGE_SOURCE, loadRegion, outageTotals, saveRegion } from '../data/kepcoOutage'
 
 const hhmm = (iso: string) => new Date(iso).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
 
@@ -91,6 +92,32 @@ function ResponseCard({ cases, full, now }: { cases: CaseSummary[]; full: AnyCas
       <div className="flow-stats">
         <div><span>검토 완료까지 (중앙값)</span><strong>{med == null ? '—' : fmtDur(med)}</strong><small>{done.length ? `완료 ${done.length}건 기준` : '아직 검토 완료 없음'}</small></div>
         <div><span>가장 오래 기다리는 사건</span><strong className={oldest != null && oldest > 86_400_000 ? 'warn' : ''}>{oldest == null ? '—' : fmtDur(oldest)}</strong><small>{pending.length ? `대기 ${pending.length}건` : '대기 없음'}</small></div>
+      </div>
+    </section>
+  )
+}
+
+/** 한전 공공데이터: 고른 지역본부의 2025년 정전 건수와 전국 대비 */
+function RegionOutageCard() {
+  const [region, setRegionState] = useState(loadRegion)
+  const mine = KEPCO_OUTAGE_2025.find((r) => r.region === region)!
+  const total = outageTotals()
+  const rank = [...KEPCO_OUTAGE_2025].sort((a, b) => b.sustained - a.sustained).findIndex((r) => r.region === region) + 1
+  return (
+    <section className="dash-card">
+      <div className="dash-card-head">
+        <h2>지역 정전 · 2025</h2>
+        <select className="impact-select" value={region} onChange={(e) => (setRegionState(e.target.value), saveRegion(e.target.value))} aria-label="지역본부">
+          {KEPCO_OUTAGE_2025.map((r) => <option key={r.region} value={r.region}>{r.region}</option>)}
+        </select>
+      </div>
+      <div className="flow-stats">
+        <div><span>일시정전 (원인 조사 대상)</span><strong>{mine.sustained}건</strong><small>전국 {total.sustained.toLocaleString('ko-KR')}건 중 {rank}위</small></div>
+        <div><span>순시·순간정전</span><strong>{mine.momentary}건</strong><small>전국 {total.momentary.toLocaleString('ko-KR')}건</small></div>
+      </div>
+      <div className="region-foot">
+        <a href={KEPCO_OUTAGE_SOURCE.url} target="_blank" rel="noreferrer" className="xs muted">출처: 한전 배전 정전통계종합 (공공데이터포털)</a>
+        <Link to="/impact" className="small">사업화 근거 →</Link>
       </div>
     </section>
   )
@@ -210,6 +237,7 @@ export default function Dashboard() {
         </section>
 
         <div className="stack" style={{ gap: 14 }}>
+          <RegionOutageCard />
           {cases && !error && <ResponseCard cases={cases} full={full} now={now} />}
 
           <section className="dash-card">
