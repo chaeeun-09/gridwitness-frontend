@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../api'
 import AssistantChat from '../components/AssistantChat'
+import FieldNotes from '../components/FieldNotes'
 import { IconChevron } from '../components/Icons'
 import { Empty, ErrorState, PageSkeleton } from '../components/ui'
 import { eventKo } from '../lib/incidentContext'
@@ -52,6 +53,10 @@ function FieldView({ c }: { c: IncidentCase }) {
         </span>
         <span className={`field-chip ${last ? 'ok' : 'off'}`}><small>담당자 검토</small>{last ? '완료' : '대기'}</span>
       </div>
+      <details className="fnotes-fold">
+        <summary>현장 메모 남기기</summary>
+        <FieldNotes c={c} />
+      </details>
       <AssistantChat c={c} variant="field" />
     </div>
   )
