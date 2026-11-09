@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
-import { Link, Navigate, NavLink, Route, Routes, useLocation, useParams } from 'react-router-dom'
+import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { IconAnalysis, IconDashboard, IconShieldCheck, IconDatabase, IconLive, IconLogo, IconMenu, IconBolt, IconSettings, IconVillage } from './components/Icons'
 import GlobalAssistant from './components/GlobalAssistant'
 import { Dot, PageSkeleton } from './components/ui'
@@ -139,6 +139,21 @@ function FloatingMenu({ actor }: { actor: string }) {
   )
 }
 
+/** 대시보드가 아닌 화면의 왼쪽 위: 이전 페이지로. 주소로 바로 들어와 앱 안 이전 기록이 없으면 대시보드로 */
+function BackNav() {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const hasHistory = location.key !== 'default'
+  return (
+    <div className="float-menu float-back no-print">
+      <button type="button" className="float-back-btn" onClick={() => (hasHistory ? navigate(-1) : navigate('/dashboard'))} aria-label={hasHistory ? '이전 페이지로' : '대시보드로'}>
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
+        <span>{hasHistory ? '이전' : '대시보드'}</span>
+      </button>
+    </div>
+  )
+}
+
 /** 앱 화면 틀(사이드바 + 페이지). 소개 화면의 노트북에도 같은 것을 씀 */
 export function Shell({ extraRoutes }: { extraRoutes?: ReactNode } = {}) {
   const [actor] = useActor()
@@ -146,10 +161,12 @@ export function Shell({ extraRoutes }: { extraRoutes?: ReactNode } = {}) {
   const wide = location.pathname === '/city'
   // 대시보드(마을 시뮬)는 사이드바 없이 화면 전체를 쓰고, 메뉴는 왼쪽 위 떠 있는 버튼으로
   const immersive = location.pathname === '/village'
+  // 첫 화면(대시보드)에만 로고·메뉴, 나머지 화면은 그 자리에 '이전 페이지' 버튼
+  const home = location.pathname === '/dashboard'
 
   return (
     <div className={`app no-sidebar ${immersive ? 'immersive' : ''}`}>
-      <FloatingMenu actor={actor} />
+      {home ? <FloatingMenu actor={actor} /> : <BackNav />}
       <GlobalAssistant />
 
       <div className="main">
