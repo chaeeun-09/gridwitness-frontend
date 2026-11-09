@@ -18,7 +18,7 @@ function speak(text: string) {
 /** FRTU(마을 모형) 상태 조회 도우미: 글이나 음성으로 묻고 값을 듣는다. 장치는 조작하지 않음 */
 export default function VillageStatusChat() {
   const events = useVillageEvents()
-  const [msgs, setMsgs] = useState<ChatMsg[]>([{ role: 'bot', text: "마을 FRTU의 상태와 AI 판정을 알려 드려요.\n예: '지금 상태 어때?', '왜 이상이야?'\nLED·전원 조작은 마을 화면 제어판에서 해 주세요." }])
+  const [msgs, setMsgs] = useState<ChatMsg[]>([{ role: 'bot', text: "마을 FRTU 3대(인입·주택 분기·가로등 분기)의 상태와 고장 구간을 알려 드려요.\n예: '어느 분기가 문제야?', '왜 이상이야?'\nLED·전원 조작은 마을 화면 제어판에서 해 주세요." }])
   const [input, setInput] = useState('')
   const [listening, setListening] = useState(false)
   const [voiceReply, setVoiceReply] = useState(false)
