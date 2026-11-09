@@ -8,6 +8,9 @@ import SpeechBubble from '../three/SpeechBubble'
 import { POLE_H, SUBSTATION, type V3 } from './layout'
 import { glowTexture, gravelTexture, tiled } from './textures'
 
+/** 라벨에 상태 줄까지 보여줄 상태 (평소엔 이름만) */
+const ALARM_STATUS: NodeStatus[] = ['WARNING', 'FAULT', 'OUTAGE']
+
 export const STATUS_COLOR: Record<NodeStatus, string> = {
   NORMAL: '#ffd43b',
   OFF: '#495057',
@@ -111,7 +114,8 @@ export function Frtu({ p, status, selected, onSelect, name = 'FRTU', fi = false,
         <ringGeometry args={[0.55, 0.68, 40]} />
         <meshBasicMaterial color={tone} transparent opacity={0.6} toneMapped={false} depthWrite={false} />
       </mesh>
-      <Label lines={[alarm ? `${name} · 고장표시` : name]} position={[0, labelY, 0.1]} lineHeight={0.42} bg={tone} pointer />
+      {/* 평소에는 맥동 고리만, 고장표시가 떴거나 가리키거나 골랐을 때만 이름 */}
+      {(alarm || hover || selected) && <Label lines={[alarm ? `${name} · 고장표시` : name]} position={[0, labelY, 0.1]} lineHeight={0.3} bg={tone} pointer />}
     </group>
   )
 }
@@ -219,7 +223,7 @@ export const Substation = memo(function Substation({ status, showLabel = true }:
           ))}
         </group>
       ))}
-      {showLabel && <Label lines={['변전소', '5V 전원 공급']} position={[0, 4.3, 0]} bg="rgba(20,22,27,0.86)" lineHeight={0.6} />}
+      {showLabel && <Label lines={['변전소']} position={[0, 4.3, 0]} bg="rgba(20,22,27,0.82)" lineHeight={0.42} />}
     </group>
   )
 })
@@ -283,12 +287,12 @@ export function StreetLamp({ c, view, pos, rot, night, selected, onSelect, showL
         </mesh>
       )}
       {showLabel && <Label
-        lines={[c.name, `${c.fault ? '⚠ ' : ''}LED ${c.ch} · ${view.text}`]}
+        lines={selected || c.fault || ALARM_STATUS.includes(view.status) ? [c.name, `${c.fault ? '⚠ ' : ''}LED ${c.ch} · ${view.text}`] : [c.name]}
         position={[0, 3.55, 0]}
         bg={LAMP_LABEL_BG[view.status]}
         border="rgba(255,255,255,0.14)"
         pointer
-        lineHeight={0.42}
+        lineHeight={0.36}
       />}
       {showLabel && speech && <SpeechBubble text={speech} y={4.7} tone={view.status === 'FAULT' || view.status === 'OUTAGE' ? 'err' : 'warn'} />}
     </group>
