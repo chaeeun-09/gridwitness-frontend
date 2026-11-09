@@ -1,8 +1,9 @@
-// FRTU 상세 화면의 대화 도우미.
-// 지금은 LLM 없이 질문 의도를 규칙으로 골라 현재 계측·AI 판정 값을 그대로 읽어 줌 (값을 지어내지 않음).
-// shortcut: 정해진 질문 유형만 이해함, 서버에 대화 모델이 붙으면 answer()를 그 호출로 바꾸면 됨.
+// FRTU 상세 화면(마을 모형 DC 계측)의 상태 조회 도우미.
+// LLM 없이 질문 의도를 규칙으로 골라 현재 계측·AI 판정 값을 그대로 읽어 줌 (값을 지어내지 않음).
+// 대화로 장치를 조작하지 않는다. LED·릴레이 조작은 마을 화면의 제어판에서만 한다.
+// 교류 고장파형 사건에 대한 현장 대응 대화는 components/AssistantChat (사건별) 이 맡는다.
 
-import { getVillage, IOT_CHANNELS, setChannel, setRelay, STATUS_LABEL, type ChannelId } from './village'
+import { getVillage, IOT_CHANNELS, STATUS_LABEL } from './village'
 import type { AnalyzedEvent } from './villageEvents'
 
 export interface ChatMsg {
@@ -10,17 +11,11 @@ export interface ChatMsg {
   text: string
 }
 
-export const SUGGESTIONS = ['지금 상태 어때?', '왜 이상이야?', '마지막 사건 판정은?', '주택 2 꺼줘', '전체 다시 켜줘', '정전 발생시켜줘']
+export const SUGGESTIONS = ['지금 상태 어때?', '왜 이상이야?', '마지막 사건 판정은?', '전류는?']
 
 const has = (t: string, ...words: string[]) => words.some((w) => t.includes(w))
 
-function findChannel(t: string): ChannelId | null {
-  const s = t.replace(/\s/g, '')
-  for (const c of IOT_CHANNELS) if (s.includes(c.name.replace(/\s/g, ''))) return c.id
-  const m = /(?:LED|엘이디|채널)(\d)/i.exec(s)
-  if (m) return IOT_CHANNELS.find((c) => c.ch === Number(m[1]))?.id ?? null
-  return null
-}
+const CONTROL_REFUSAL = '대화 도우미는 장치를 켜고 끄지 않아요. LED·마을 전원 조작은 마을 화면의 제어판에서 직접 해 주세요.'
 
 function verdictText(a: AnalyzedEvent): string {
   const v = a.verdict
@@ -33,32 +28,14 @@ function verdictText(a: AnalyzedEvent): string {
   return `사건 #${a.e.ev}은(는) 입력 검사에서 거부됐어요: ${v.reasons[0]}`
 }
 
-/** 질문 하나에 대한 답. 조작 요청이면 실제로 장치(또는 시뮬레이터)에 명령을 보냄 */
+/** 질문 하나에 대한 답. 값을 읽어 줄 뿐, 장치에 명령을 보내지 않는다 */
 export function answer(text: string, events: AnalyzedEvent[]): string {
   const t = text.trim()
   const s = getVillage()
   if (!t) return '무엇이 궁금하신가요?'
 
-  // 조작
-  if (has(t, '정전') && has(t, '발생', '일으', '내줘', '시켜')) {
-    if (!s.connected) return '장치가 연결되어 있지 않아 정전을 일으킬 수 없어요.'
-    setRelay(false)
-    return '마을 전원을 차단했어요. 이상 감지와 AI 판정이 어떻게 바뀌는지 지켜보세요.'
-  }
-  if (has(t, '복구', '다시 켜', '전체 켜', '모두 켜')) {
-    if (!s.connected) return '장치가 연결되어 있지 않아요.'
-    if (!s.relay) setRelay(true)
-    IOT_CHANNELS.forEach((c) => !s.leds[c.id].channelOn && setChannel(c.id, true))
-    return '마을 전원과 모든 LED를 다시 켰어요.'
-  }
-  const ch = findChannel(t)
-  if (ch && has(t, '꺼', '끄', '켜')) {
-    const on = has(t, '켜') && !has(t, '꺼', '끄')
-    const name = s.leds[ch].name
-    if (!s.connected || !s.canControl) return `${name}을(를) 조종할 수 없어요 (장치 연결 또는 채널 제어 지원 확인).`
-    setChannel(ch, on)
-    return `${name}을(를) ${on ? '켰어요' : '껐어요'}.`
-  }
+  // 조작 요청은 거절 (제어 로직과 대화 분리)
+  if ((has(t, '정전') && has(t, '발생', '일으', '내줘', '시켜')) || has(t, '복구', '다시 켜', '꺼줘', '켜줘', '끄', '차단')) return CONTROL_REFUSAL
 
   // 조회
   if (has(t, '마지막', '최근', '판정', '사건')) {
