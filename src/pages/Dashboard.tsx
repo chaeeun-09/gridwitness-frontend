@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { api } from '../api'
+import { FaultLocationBox, FrtuStrip } from '../components/AiPanel'
 import { DiagnosisBadge, StageBadge } from '../components/Badges'
 import { IconAlert, IconArrowRight, IconBolt, IconBrain, IconChevron, IconInbox, IconWave } from '../components/Icons'
 import { Badge, ErrorState, TableSkeleton, type Tone } from '../components/ui'
@@ -54,7 +55,7 @@ export default function Dashboard() {
   const pending = cases?.filter((c) => c.stage !== 'REVIEWED') ?? []
   const subsBad = city.subs.filter((s) => s.status !== 'OK').length
   const t0 = snap.history.length ? snap.history[snap.history.length - 1].t : 0
-  const data = snap.history.map((h) => ({ t: (h.t - t0) / 1000, mA: h.i * 1000 }))
+  const data = snap.history.map((h) => ({ t: (h.t - t0) / 1000, mA: h.i * 1000, house: h.ih != null ? h.ih * 1000 : null, lamp: h.il != null ? h.il * 1000 : null }))
 
   // AI 판정과 규칙 기반 이상을 한 표에 시간순으로
   const rows = [
@@ -105,14 +106,19 @@ export default function Dashboard() {
             </table>
           )}
           <div className="dash-sub">
-            <span>실시간 전류 · 마을 인입 FRTU</span>
+            <span>FRTU 3대 · 고장표시</span>
+            <FrtuStrip snap={snap} value="inlet" onPick={(id) => nav(`/frtu${id === 'inlet' ? '' : `?id=${id}`}`)} />
+            <FaultLocationBox snap={snap} />
+            <span>실시간 전류 · 인입 / 주택 분기 / 가로등 분기</span>
             <ResponsiveContainer width="100%" height={120}>
               <LineChart data={data} margin={{ top: 6, right: 6, left: 0, bottom: 0 }}>
                 <CartesianGrid stroke={CHART.grid} vertical={false} />
                 <XAxis dataKey="t" type="number" domain={['dataMin', 0]} tick={CHART.tick} axisLine={false} tickLine={false} unit="s" />
                 <YAxis tick={CHART.tick} axisLine={false} tickLine={false} width={40} domain={['auto', 'auto']} />
                 <Tooltip formatter={(x) => (typeof x === 'number' ? `${x.toFixed(1)} mA` : x)} labelFormatter={(t) => `${Number(t).toFixed(1)} s`} />
-                <Line dataKey="mA" stroke="#2f6bff" dot={false} strokeWidth={1.8} isAnimationActive={false} />
+                <Line dataKey="mA" name="인입" stroke="#2f6bff" dot={false} strokeWidth={1.8} isAnimationActive={false} />
+                <Line dataKey="house" name="주택 분기" stroke="#e08a1e" dot={false} strokeWidth={1.4} isAnimationActive={false} connectNulls />
+                <Line dataKey="lamp" name="가로등 분기" stroke="#24835a" dot={false} strokeWidth={1.4} isAnimationActive={false} connectNulls />
               </LineChart>
             </ResponsiveContainer>
           </div>
