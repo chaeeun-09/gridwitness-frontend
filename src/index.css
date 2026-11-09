@@ -1330,3 +1330,23 @@ body { background-attachment: fixed; }
   .ga-fab { right: 14px; bottom: 14px; height: 48px; }
   .ga-panel { left: 8px; right: 8px; bottom: 8px; width: auto; height: calc(100dvh - 72px); border-radius: 20px; }
 }
+
+/* ── FRTU 3대 (인입·주택 분기·가로등 분기) ─────────────────── */
+.frtu-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.frtu-tab { display: grid; gap: 2px; justify-items: start; padding: 8px 10px; border: 1px solid var(--line); border-radius: 12px; background: #fff; font: inherit; font-size: 12.5px; text-align: left; cursor: pointer; min-width: 0; }
+.frtu-tab .num { font-size: 12px; color: var(--text-2); }
+.frtu-tab:hover { border-color: var(--line-strong); }
+.frtu-tab.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-ring); }
+.frtu-tab.fi { background: var(--err-tint); border-color: #f1b8b8; }
+.fault-loc { padding: 10px 12px; border-radius: 12px; background: #f6f7fa; border-left: 4px solid #cfd3db; font-size: 12.5px; }
+.fault-loc.ok { border-left-color: var(--ok); }
+.fault-loc.err { border-left-color: var(--err); background: var(--err-tint); }
+.fault-loc-head { display: grid; gap: 2px; }
+.fault-loc-head span { font-size: 11px; font-weight: 600; color: var(--text-2); }
+.fault-loc-head strong { font-size: 13.5px; color: var(--ink); }
+.fault-loc ul { margin: 6px 0 0; padding-left: 16px; color: var(--text-2); display: grid; gap: 2px; }
+.frtu-overview { display: grid; gap: 10px; margin-bottom: 14px; }
+.dash-sub .frtu-strip, .dash-sub .fault-loc { margin: 6px 0 10px; }
+.ai-body .frtu-strip { margin-bottom: 4px; }
+/* 오른쪽 아래 AI 버튼과 겹치지 않게 */
+.scene-full .scene-hint { right: 96px; }
