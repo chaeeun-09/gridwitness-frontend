@@ -1,9 +1,15 @@
 import { useSyncExternalStore } from 'react'
-import { EXAMPLE_DATASET, getProfile, type Contract, type DayType } from './publicData'
+import { ANCHOR_KWH_MONTH, DEFAULT_LAYOUT } from './complex'
+import { getProfile, type DayType, type UsageDataset } from './publicData'
 
 // 도시 전력 시뮬레이션 (교육용 단순 모형).
 //   발전소 → 변전소 5곳 → 배전선로(feeder) → 블록 → 건물
-// 건물 수요 = 건물 기준 용량 × 시간대 패턴(공공데이터 예시 프로파일) × 기상 배율.
+// 건물 수요 = 건물 기준 용량 × 시간대 패턴(한전 지역본부 실제 시간별 사용량의 월·평일/주말 평균) × 기상 배율.
+// 주거 기준 용량 = 세대 수 × 세대 1곳의 피크 부하. 세대 1곳은 가상 대단지 화면의 세대와 같은 기준(한전 발표 8월 가구 평균)을 쓴다.
+//   아파트 1동(3D) = 가상 대단지 1곳 (기본 구성 12동 × 15층 × 4세대 = 720세대, 가정), 단독주택 1채 = 1세대 (가정)
+//   → 모형 집 1채 = 대단지 1세대 = 도시 주거의 1세대로 이어진다.
+// 상업·산업 구역의 기준 용량은 여전히 가정값이다 (세대처럼 근거로 삼을 실제 자료가 없음).
+// 한전 시간별 자료에는 계약종별 구분이 없어 주거·상업·산업 구역이 같은 지역 패턴을 쓴다 (구역 차이는 건물 기준 용량뿐).
 // 선로·변전소 용량을 넘으면 트립하고, 자동 절체를 켜면 이웃 선로가 남는 용량만큼 부하를 넘겨받는다.
 // 전력 조류 계산(전압·위상)은 하지 않는다. 마을 모형(IoT)·고장파형 AI와는 별개 데이터다.
 
@@ -14,14 +20,18 @@ export const SPAN = GRID * PITCH
 
 export type Zone = 0 | 1 | 2 | 3
 export const ZONE_LABEL = ['주거', '상업', '산업', '공원'] as const
-const ZONE_CONTRACT: Contract[] = ['RESIDENTIAL', 'GENERAL', 'INDUSTRIAL']
+
+/** 아파트 1동이 나타내는 대단지 1곳의 세대 수 (가상 대단지 기본 구성) */
+export const COMPLEX_UNITS = DEFAULT_LAYOUT.buildings * DEFAULT_LAYOUT.floors * DEFAULT_LAYOUT.perFloor
+const AUG_HOURS = 31 * 24
 
 export const SAFE_TRANSFER = 1.05
 export const RISKY_TRANSFER = 1.25
 const TRIP_RATIO = 1.1
 const TRIP_AFTER_MIN = 15
 const FEEDER_HEADROOM = 1.1
-const SUB_DIVERSITY = 0.92
+// 변전소 용량 = 연결된 선로 용량 합 × 1.05 (가정). 실제 자료는 모든 구역이 같은 지역 패턴이라 피크가 겹치므로 부등률(<1)을 두지 않는다
+const SUB_HEADROOM = 1.05
 
 function mulberry32(seed: number) {
   let a = seed
@@ -56,8 +66,12 @@ export interface City {
   bx: Float32Array
   bz: Float32Array
   zone: Uint8Array
-  /** 블록 안 건물의 기준 용량 합 (kW) */
+  /** 블록 안 건물의 기준 용량 합 (kW). 주거는 실제 자료를 받은 뒤 세대 수로 채운다 */
   baseKw: Float32Array
+  /** 블록 안 세대 수 (주거만) */
+  households: Uint32Array
+  /** 블록 안 대단지(아파트 동) 수 */
+  complexes: Uint16Array
   blockFeeder: Int16Array
   /** 블록마다 절체 후보 선로 3개 (가까운 순) */
   alts: Int16Array
@@ -121,6 +135,8 @@ function generate(): City {
   const zone = new Uint8Array(nBlocks)
   const bld: { x: number; z: number; w: number; d: number; h: number; block: number; kw: number; r: number; type: number; pal: number }[] = []
   const baseKw = new Float32Array(nBlocks)
+  const households = new Uint32Array(nBlocks)
+  const complexes = new Uint16Array(nBlocks)
   const tank = new Uint8Array(nBlocks)
 
   for (let j = 0; j < GRID; j++) {
@@ -185,13 +201,22 @@ function generate(): City {
     }
   }
 
-  // 구역별 총 부하는 일정하게 맞춘다 (건물 수를 바꿔도 시나리오 결과가 같도록): 크기에 비례해 배분
-  const ZONE_TOTAL_KW = [83800, 52400, 130400]
+  // 주거: 세대 수만 센다 (용량은 실제 자료를 받은 뒤 designCapacity 에서). 아파트(모양 0·2) = 대단지 1곳, 주택(3·5) = 1세대
+  for (const b of bld) {
+    if (zone[b.block] !== 0) continue
+    if (b.type === 0 || b.type === 2) {
+      households[b.block] += COMPLEX_UNITS
+      complexes[b.block]++
+    } else households[b.block] += 1
+  }
+  // 상업·산업: 구역별 총 부하(가정)를 건물 크기에 비례해 배분
+  const ZONE_TOTAL_KW = [0, 52400, 130400]
   const zoneSum = [0, 0, 0]
   const weight = (b: (typeof bld)[number]) => b.w * b.d * (b.type === 4 ? 1 : 0.5 + b.h)
   for (const b of bld) zoneSum[zone[b.block]] += weight(b)
   for (const b of bld) {
     const zn = zone[b.block]
+    if (zn === 0) continue
     b.kw = (weight(b) / zoneSum[zn]) * ZONE_TOTAL_KW[zn]
     baseKw[b.block] += b.kw
   }
@@ -249,6 +274,8 @@ function generate(): City {
     bz,
     zone,
     baseKw,
+    households,
+    complexes,
     blockFeeder,
     alts,
     nBuild,
@@ -283,17 +310,45 @@ function generate(): City {
 export const CITY: City = generate()
 
 // ── 시간대 패턴 ────────────────────────────────────────
-function loadProfiles(region: string, month: number, day: DayType): number[][] {
-  return ZONE_CONTRACT.map((c) => {
-    const raw = getProfile(EXAMPLE_DATASET, region, c, month, day) ?? Array<number>(24).fill(1)
-    const max = Math.max(...raw.filter(Number.isFinite), 1e-9)
-    return raw.map((v) => (Number.isFinite(v) ? v / max : 0))
-  })
+let DATA: UsageDataset | null = null
+/** 구역(주거·상업·산업)별 24시간 패턴 (최대 = 1). 실제 자료가 아직 없으면 null */
+function loadProfiles(region: string, month: number, day: DayType): number[][] | null {
+  if (!DATA) return null
+  const raw = getProfile(DATA, region, 'RESIDENTIAL', month, day)
+  if (!raw) return null
+  const max = Math.max(...raw.filter(Number.isFinite), 1e-9)
+  const norm = raw.map((v) => (Number.isFinite(v) ? v / max : 0))
+  return [norm, norm, norm]
 }
 
-// 용량은 설계 조건(서울·8월·평일)의 하루 최대 부하로 정해 항상 같다
-;(() => {
-  const prof = loadProfiles('서울', 8, 'WEEKDAY')
+export interface HouseholdBasis {
+  /** 세대 1곳의 8월 평균 부하 (kW) = 363 kWh ÷ 744시간 */
+  avgKw: number
+  /** 세대 1곳의 기준(피크) 부하 (kW) = 평균 ÷ 서울본부 8월 평일 패턴의 평균(최대 = 1) */
+  peakKw: number
+  households: number
+  complexes: number
+  houses: number
+}
+export let HOUSEHOLD: HouseholdBasis | null = null
+
+// 용량은 설계 조건(서울본부·8월·평일)의 하루 최대 부하로 정해 항상 같다
+function designCapacity() {
+  const prof = loadProfiles('서울본부', 8, 'WEEKDAY')
+  if (!prof) return
+  // 주거 기준 용량: 세대 평균 부하가 그 패턴의 하루 평균과 맞도록 피크를 정한다
+  const mean = prof[0].reduce((a, b) => a + b, 0) / 24
+  const avgKw = ANCHOR_KWH_MONTH / AUG_HOURS
+  const peakKw = avgKw / Math.max(mean, 1e-9)
+  let hh = 0
+  let cx = 0
+  for (let k = 0; k < CITY.nBlocks; k++) {
+    if (CITY.zone[k] !== 0) continue
+    CITY.baseKw[k] = CITY.households[k] * peakKw
+    hh += CITY.households[k]
+    cx += CITY.complexes[k]
+  }
+  HOUSEHOLD = { avgKw, peakKw, households: hh, complexes: cx, houses: hh - cx * COMPLEX_UNITS }
   const peak = new Float64Array(CITY.feeders.length)
   for (let h = 0; h < 24; h++) {
     const load = new Float64Array(CITY.feeders.length)
@@ -306,8 +361,8 @@ function loadProfiles(region: string, month: number, day: DayType): number[][] {
     load.forEach((v, f) => (peak[f] = Math.max(peak[f], v)))
   }
   CITY.feeders.forEach((f, i) => (f.capKw = peak[i] * FEEDER_HEADROOM))
-  CITY.subs.forEach((s) => (s.capKw = s.feeders.reduce((sum, f) => sum + CITY.feeders[f].capKw, 0) * SUB_DIVERSITY))
-})()
+  CITY.subs.forEach((s) => (s.capKw = s.feeders.reduce((sum, f) => sum + CITY.feeders[f].capKw, 0) * SUB_HEADROOM))
+}
 
 // ── 상태 ────────────────────────────────────────────
 export type FeederState = 'OK' | 'FAULT' | 'TRIPPED'
@@ -368,6 +423,8 @@ export interface CitySnap {
   servedKw: number
   outBuildings: number
   totalBuildings: number
+  /** 정전된 블록의 세대 수 */
+  outHouseholds: number
   outBlocks: number
   /** 누적 정전 건물·시간 */
   outBuildingHours: number
@@ -387,13 +444,23 @@ const S = {
   auto: false,
   transferLimit: SAFE_TRANSFER,
   dr: false,
-  region: '서울',
+  region: '서울본부',
   month: 8,
   day: 'WEEKDAY' as DayType,
   scenario: 'normal' as ScenarioId,
   outBuildingHours: 0,
 }
-let profiles = loadProfiles(S.region, S.month, S.day)
+const FLAT = [0, 1, 2].map(() => Array<number>(24).fill(0))
+let profiles: number[][] = FLAT
+/** 실제 자료를 받은 뒤 한 번 부른다 (용량 설계 + 현재 패턴) */
+export function setCityData(ds: UsageDataset) {
+  if (DATA) return
+  DATA = ds
+  designCapacity()
+  profiles = loadProfiles(S.region, S.month, S.day) ?? FLAT
+  frame(0)
+}
+export const cityDataReady = () => DATA !== null
 const F = CITY.feeders.length
 const feederState = new Uint8Array(F) // 0 OK 1 FAULT 2 TRIPPED
 const subFault = new Uint8Array(CITY.subs.length)
@@ -489,11 +556,13 @@ function frame(dtMin: number) {
   let served = 0
   let outBuildings = 0
   let outBlocks = 0
+  let outHouseholds = 0
   for (let k = 0; k < CITY.nBlocks; k++) {
     if (CITY.zone[k] === 3) continue
     if (supplier[k] >= 0) served += blockDemand[k]
     else {
       outBlocks++
+      outHouseholds += CITY.households[k]
     }
   }
   for (let b = 0; b < CITY.nBuild; b++) if (supplier[CITY.bBlock[b]] < 0) outBuildings++
@@ -539,6 +608,7 @@ function frame(dtMin: number) {
     servedKw: served,
     outBuildings,
     totalBuildings: CITY.nBuild,
+    outHouseholds,
     outBlocks,
     outBuildingHours: S.outBuildingHours,
     capKw: CITY.subs.reduce((s, x) => s + x.capKw, 0),
@@ -614,7 +684,7 @@ export function setProfile(region: string, month: number, day: DayType) {
   S.region = region
   S.month = month
   S.day = day
-  profiles = loadProfiles(region, month, day)
+  profiles = loadProfiles(region, month, day) ?? FLAT
   frame(0)
 }
 export function faultFeeder(f: number) {

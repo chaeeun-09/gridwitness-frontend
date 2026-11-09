@@ -16,13 +16,13 @@ function Tower({ className }: { className?: string }) {
 
 const SIGNALS = [
   { icon: <IconWave />, title: '이벤트 유형 판단', text: 'SIF·MIF·PF·TD 4종으로 분류하고, 근거가 부족하면 판단을 보류합니다' },
-  { icon: <IconBars />, title: '신뢰할 수 있는 근거 제시', text: '피크값, RMS, 사건 시점 등 파형에서 직접 계산한 수치와 그래프를 함께 보여줍니다' },
+  { icon: <IconBars />, title: '신뢰할 수 있는 근거 제시', text: 'AI가 통과한 판단 기준과 점수를 움직인 파형 특징(SHAP)을 보여주고, 시험에서 얼마나 맞고 보류했는지도 공개합니다' },
   { icon: <IconPerson />, title: '사람의 최종 검토', text: 'AI 결과는 그대로 보존하고, 담당자의 판단과 조사 내용을 따로 기록합니다' },
 ]
 
 
 export default function Landing() {
-  // 앱의 사건 목록에 있는 것과 같은 합성 샘플 사건 (실제 계측 자료가 아님)
+  // 앱의 사건 목록에 있는 것과 같은 샘플 사건 = 실제 공개 파형 Xiong 87 원본
   const [demoCase, setDemoCase] = useState<IncidentCase | null>(null)
   useEffect(() => {
     void buildSampleCase().then(setDemoCase)
@@ -71,7 +71,7 @@ export default function Landing() {
         <Reveal className="land-laptop tilt">
           {demoCase ? <LandingDemo demoCase={demoCase} /> : <div className="laptop-screen laptop-wait" />}
           <div className="laptop-base" />
-          <div className="land-caption">합성 데이터 화면입니다. 실제 계측 자료가 아닙니다.</div>
+          <div className="land-caption">실제 공개 고장파형(Xiong et al., MIT) 원본입니다. 중국 10kV 배전 기록이며 국내 자료가 아닙니다.</div>
         </Reveal>
 
         <aside className="land-signals reveal-group">

@@ -6,6 +6,7 @@ import { ingest } from './ingest'
 import { buildIotCase } from './iotCase'
 import { summarize } from './util'
 import {
+  type AiDetail,
   ANALYSIS_LABEL,
   CHANNELS,
   EVENT_LABELS,
@@ -152,9 +153,48 @@ function toFeatures(f: Analysis['features']): ChannelFeatures[] {
   return CHANNELS.filter((ch) => f[ch]).map((ch) => ({ channel: ch, rms: f[ch].rms, peak: f[ch].peak, crestFactor: f[ch].crest_factor, diffRms: f[ch].derivative_rms }))
 }
 
+interface GwAi {
+  status?: string
+  prediction?: { label: string } | null
+  evidence?: { top_features?: { name: string; value: number; contribution: number }[]; top_features_method?: string; top_score?: number | null; margin?: number | null; ood_ratio?: number | null; thresholds?: Record<string, number> } | null
+  reasons?: { code: string }[]
+  versions?: Record<string, string>
+  model_country?: string | null
+  model_dataset?: string | null
+  file_sha256?: string | null
+  limitations?: string[]
+}
+
+/** 서버 분석의 features.gw_ai (AI 결과 원문)에서 근거·추적 정보만 꺼낸다. 없거나 모양이 다르면 undefined */
+function toAiDetail(raw: unknown): AiDetail | undefined {
+  const g = raw as GwAi | undefined
+  if (!g || typeof g !== 'object' || !g.status) return undefined
+  const ev = g.evidence ?? null
+  const top = ev?.top_features ?? []
+  // 1순위 유형: 답했으면 그 유형, 보류면 근거 계산에 쓴 1순위 (화면에서 답으로 보이지 않게만 씀)
+  const cls = g.prediction?.label ?? null
+  return {
+    status: g.status === 'ok' || g.status === 'abstained' || g.status === 'rejected' ? g.status : 'abstained',
+    method: ev?.top_features_method ?? '',
+    topFeatures: top.map((f) => ({ name: f.name, value: f.value, contribution: f.contribution })),
+    topLabel: cls,
+    topScore: ev?.top_score ?? null,
+    margin: ev?.margin ?? null,
+    oodRatio: ev?.ood_ratio ?? null,
+    thresholds: ev?.thresholds ?? {},
+    reasonCodes: (g.reasons ?? []).map((r) => r.code),
+    versions: g.versions ?? {},
+    modelCountry: g.model_country ?? null,
+    modelDataset: g.model_dataset ?? null,
+    fileSha256: g.file_sha256 ?? null,
+    limitations: g.limitations ?? [],
+  }
+}
+
 function toResult(a: Analysis): AnalysisResult {
   const features = toFeatures(a.features ?? {})
-  const base = { analysisType: 'EVENT_TYPE' as const, features, modelVersion: a.model_version, preprocessVersion: a.preprocessing_version || PREPROCESS_VERSION, executedAt: a.created_at }
+  const ai = toAiDetail((a.features as Record<string, unknown> | undefined)?.gw_ai)
+  const base = { analysisType: 'EVENT_TYPE' as const, features, modelVersion: a.model_version, preprocessVersion: a.preprocessing_version || PREPROCESS_VERSION, executedAt: a.created_at, ai }
   // 서버가 분류까지 내놓기 시작하면 { label, scores } 모양을 기대한다. 모양이 다르면 확정하지 않고 보류로 둔다.
   const cls = a.classification as { label?: string; predicted_label?: string; scores?: Record<string, number> } | null
   const label = cls?.predicted_label ?? cls?.label

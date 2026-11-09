@@ -1,15 +1,15 @@
 import type { DiagnosisIssue } from '../types'
 
 // 한전 지역·시간대별 전력사용량 분석.
-// 기본값은 화면 시연용 "예시 데이터"(실제 한전 수치 아님). 공공데이터 CSV를 가져오면 그 값으로 교체.
+// 기본 데이터 = 한전 공공데이터 15151157 (지역본부 시간별 전력사용량 2022~2024) 실제 값의 월·평일/주말별 평균
+// (gridwitness-ai scripts/export_profiles.py → public/data/profiles.json). 직접 받은 CSV를 가져오면 그 값으로 교체.
+// 한전 시간별 자료에는 계약종별(주택·일반·산업) 구분이 없어서, 기본 데이터에서는 계약종별을 고를 수 없다.
 
-export const REGIONS = ['서울', '부산', '대구', '인천', '광주', '대전', '울산', '세종', '경기', '강원', '충북', '충남', '전북', '전남', '경북', '경남', '제주'] as const
-export type Region = (typeof REGIONS)[number]
 export type Contract = 'RESIDENTIAL' | 'GENERAL' | 'INDUSTRIAL'
 export type DayType = 'WEEKDAY' | 'WEEKEND'
 
 export const CONTRACT_LABEL: Record<Contract, string> = { RESIDENTIAL: '주택용', GENERAL: '일반용', INDUSTRIAL: '산업용' }
-export const DAYTYPE_LABEL: Record<DayType, string> = { WEEKDAY: '평일', WEEKEND: '주말' }
+export const DAYTYPE_LABEL: Record<DayType, string> = { WEEKDAY: '평일', WEEKEND: '주말·공휴일' }
 
 export interface UsageRow {
   region: string
@@ -20,57 +20,63 @@ export interface UsageRow {
   kwh: number
 }
 
+type Profiles = Record<string, Record<string, Record<DayType, (number | null)[]>>>
+
 export interface UsageDataset {
   label: string
-  isExample: boolean
+  /** kepco = 한전 실제 시간별 자료(기본), csv = 사용자가 가져온 파일 */
+  kind: 'kepco' | 'csv'
   fileName?: string
   regions: string[]
   rows: UsageRow[] | null
+  profiles?: Profiles
+  /** 값 단위 */
+  unit: string
+  /** 계약종별로 나뉜 자료인지 */
+  hasContract: boolean
+  source?: { dataset: string; url: string; range: [string, string]; note: string }
 }
 
-export const EXAMPLE_DATASET: UsageDataset = { label: '기본 데이터 (실제 한전 수치 아님)', isExample: true, regions: [...REGIONS], rows: null }
-
-// ── 예시 데이터 생성 (형태만 그럴듯하게, 규모는 상대값) ──────────
-const REGION_SCALE: Record<string, number> = {
-  서울: 0.9, 부산: 0.45, 대구: 0.35, 인천: 0.4, 광주: 0.22, 대전: 0.22, 울산: 0.3, 세종: 0.08, 경기: 1, 강원: 0.2,
-  충북: 0.3, 충남: 0.55, 전북: 0.27, 전남: 0.4, 경북: 0.5, 경남: 0.48, 제주: 0.07,
-}
-const INDUSTRY_BIAS: Record<string, number> = { 울산: 1.8, 충남: 1.6, 전남: 1.5, 경북: 1.4, 경남: 1.2, 서울: 0.4, 제주: 0.5, 세종: 0.6 }
-
-const bump = (h: number, center: number, width: number) => Math.exp(-(((h - center) / width) ** 2))
-
-function hash(s: string): number {
-  let x = 2166136261
-  for (const ch of s) x = Math.imul(x ^ ch.charCodeAt(0), 16777619)
-  return ((x >>> 0) % 1000) / 1000
+interface ProfilesFile {
+  source: { dataset: string; url: string }
+  range: [string, string]
+  unit: string
+  regions: string[]
+  profiles: Profiles
+  note: string
 }
 
-function exampleProfile(region: string, contract: Contract, month: number, dayType: DayType): number[] {
-  const summer = month >= 7 && month <= 8 ? 1 : month === 6 || month === 9 ? 0.5 : 0
-  const winter = month === 12 || month <= 2 ? 1 : month === 11 || month === 3 ? 0.5 : 0
-  const weekend = dayType === 'WEEKEND'
-  const scale = (REGION_SCALE[region] ?? 0.3) * (contract === 'INDUSTRIAL' ? (INDUSTRY_BIAS[region] ?? 1) : 1) * 1000
-  return Array.from({ length: 24 }, (_, h) => {
-    let y: number
-    if (contract === 'RESIDENTIAL') {
-      y = 0.45 + 0.25 * bump(h, 7.5, 1.5) + 0.55 * bump(h, 20.5, 2.6) + (weekend ? 0.2 * bump(h, 13, 4) : 0)
-      y += summer * 0.35 * bump(h, 21, 4) + winter * (0.2 * bump(h, 8, 2) + 0.25 * bump(h, 21, 3))
-    } else if (contract === 'GENERAL') {
-      y = 0.35 + 0.65 * bump(h, 14, 4.2) - 0.08 * bump(h, 12, 0.6)
-      y *= weekend ? 0.62 : 1
-      y += summer * 0.3 * bump(h, 15, 3) + winter * 0.2 * bump(h, 10, 3)
-    } else {
-      y = 0.72 + 0.28 * bump(h, 13, 5) - 0.1 * bump(h, 12, 0.6)
-      y *= weekend ? 0.72 : 1
-      y += summer * 0.06
-    }
-    const n = (hash(`${region}${contract}${month}${dayType}${h}`) - 0.5) * 0.04
-    return Math.round(scale * (y + n))
-  })
+let kepcoPromise: Promise<UsageDataset> | null = null
+/** 한전 실제 시간대별 패턴 (지역본부 × 월 × 평일/주말·공휴일) */
+export function loadKepcoDataset(): Promise<UsageDataset> {
+  kepcoPromise ??= fetch(`${import.meta.env.BASE_URL}data/profiles.json`)
+    .then((r) => {
+      if (!r.ok) throw new Error(`profiles.json: HTTP ${r.status}`)
+      return r.json() as Promise<ProfilesFile>
+    })
+    .then((f) => ({
+      label: '한전 지역본부 시간별 전력사용량 (2022~2024 실제 값 평균)',
+      kind: 'kepco' as const,
+      regions: f.regions,
+      rows: null,
+      profiles: f.profiles,
+      unit: 'MWh',
+      hasContract: false,
+      source: { dataset: f.source.dataset, url: f.source.url, range: f.range, note: f.note },
+    }))
+    .catch((e) => {
+      kepcoPromise = null
+      throw e
+    })
+  return kepcoPromise
 }
 
 export function getProfile(ds: UsageDataset, region: string, contract: Contract, month: number, dayType: DayType): number[] | null {
-  if (!ds.rows) return exampleProfile(region, contract, month, dayType)
+  if (ds.profiles) {
+    const p = ds.profiles[region]?.[String(month)]?.[dayType]
+    return p ? p.map((v) => (v == null ? NaN : v)) : null
+  }
+  if (!ds.rows) return null
   const rows = ds.rows.filter((r) => r.region === region && r.contract === contract && r.month === month && r.dayType === dayType)
   if (rows.length === 0) return null
   const out = Array<number>(24).fill(NaN)
@@ -182,11 +188,10 @@ export function importUsageCsv(text: string, fileName: string): ImportResult {
 
   if (rows.length === 0) return { dataset: null, rowCount: lines.length - 1, issues: [{ code: 'NO_VALID_ROWS', severity: 'error', message: '유효한 행이 없습니다.' }, ...issues] }
   const regions = [...new Set(rows.map((r) => r.region))]
-  return { dataset: { label: `가져온 데이터: ${fileName}`, isExample: false, fileName, regions, rows }, rowCount: lines.length - 1, issues }
+  return { dataset: { label: `가져온 데이터: ${fileName}`, kind: 'csv', fileName, regions, rows, unit: 'kWh', hasContract: true }, rowCount: lines.length - 1, issues }
 }
 
-/** 다른 사람이 형식을 맞출 수 있게 내려받는 템플릿 */
+/** 다른 사람이 형식을 맞출 수 있게 내려받는 템플릿 (열 이름만. 값은 직접 받은 자료로 채운다) */
 export function templateCsv(): string {
-  const p = exampleProfile('서울', 'RESIDENTIAL', 8, 'WEEKDAY')
-  return ['지역,계약종별,월,요일구분,시간,사용량', ...p.map((v, h) => `서울,주택용,8,평일,${h},${v}`)].join('\n')
+  return ['지역', '계약종별', '월', '요일구분', '시간', '사용량'].join(',') + String.fromCharCode(10)
 }

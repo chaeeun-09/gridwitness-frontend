@@ -5,5 +5,5 @@
   "outputDirectory": "dist",
   "rewrites": [
     { "source": "/gw-api/:path*", "destination": "https://gridwitness-api.https.gsmsv.site/:path*" },
-    { "source": "/((?!assets/|favicon.svg|gw-api/).*)", "destination": "/index.html" }]
+    { "source": "/((?!assets/|data/|favicon.svg|gw-api/).*)", "destination": "/index.html" }]
 }

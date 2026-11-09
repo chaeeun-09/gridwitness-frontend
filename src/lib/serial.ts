@@ -34,9 +34,11 @@ interface SerialPortLike {
   close(): Promise<void>
   readable: ReadableStream<Uint8Array> | null
   writable: WritableStream<Uint8Array> | null
+  /** USB 장치면 제조사·제품 번호가 있음. 블루투스 직렬 포트에는 없음 */
+  getInfo?(): { usbVendorId?: number; usbProductId?: number }
 }
 interface SerialLike {
-  requestPort(): Promise<SerialPortLike>
+  requestPort(opts?: { filters: { usbVendorId: number }[] }): Promise<SerialPortLike>
   /** 사용자가 이전에 허용한 포트 (허용 창 없이 얻음) */
   getPorts?(): Promise<SerialPortLike[]>
   addEventListener?(type: 'connect' | 'disconnect', cb: () => void): void
@@ -69,6 +71,11 @@ export function parseFrame(line: string): SerialReading | null {
   }
 }
 
+/** 아두이노에 쓰이는 USB 직렬 칩 제조사 번호: Arduino · Arduino.org · CH340 · FTDI · CP210x.
+ *  포트 선택 창에 이것만 보여서 블루투스 직렬 포트(COM 여러 개)와 헷갈리지 않게 한다 */
+const BOARD_VIDS = [0x2341, 0x2a03, 0x1a86, 0x0403, 0x10c4]
+const vidOf = (p: SerialPortLike) => p.getInfo?.().usbVendorId
+
 /** 허용된 포트가 없을 때 던지는 오류 메시지 (자동 재연결이 조용히 넘어가도록) */
 export const NO_GRANTED_PORT = 'NO_GRANTED_PORT'
 
@@ -87,13 +94,27 @@ export async function openSerial(onLine: (line: string) => void, onClose: (reaso
   const serial = (navigator as unknown as { serial: SerialLike }).serial
   let port: SerialPortLike
   if (mode === 'granted') {
-    const ports = (await serial.getPorts?.()) ?? []
+    // 예전에 허용한 포트 중 아두이노(USB)만, 아는 칩 먼저. 블루투스 포트를 잘못 열고 멈추지 않게 하나씩 시도한다
+    const ports = ((await serial.getPorts?.()) ?? []).filter((p) => vidOf(p) !== undefined)
+    ports.sort((a, b) => Number(!BOARD_VIDS.includes(vidOf(a)!)) - Number(!BOARD_VIDS.includes(vidOf(b)!)))
     if (ports.length === 0) throw new Error(NO_GRANTED_PORT)
-    port = ports[0]
+    let opened: SerialPortLike | null = null
+    let lastErr: unknown = null
+    for (const p of ports) {
+      try {
+        await p.open({ baudRate: 115200 })
+        opened = p
+        break
+      } catch (e) {
+        lastErr = e
+      }
+    }
+    if (!opened) throw lastErr instanceof Error ? lastErr : new Error(String(lastErr))
+    port = opened
   } else {
-    port = await serial.requestPort()
+    port = await serial.requestPort({ filters: BOARD_VIDS.map((usbVendorId) => ({ usbVendorId })) })
+    await port.open({ baudRate: 115200 })
   }
-  await port.open({ baudRate: 115200 })
   if (!port.readable || !port.writable) throw new Error('포트를 열 수 없습니다.')
   // 일부 보드·브라우저는 DTR을 켜야 데이터를 보낸다 (지원하지 않으면 무시)
   await port.setSignals?.({ dataTerminalReady: true, requestToSend: true }).catch(() => {})

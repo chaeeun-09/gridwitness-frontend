@@ -50,7 +50,7 @@ export default function LiveData() {
     <>
       <PageHeader
         title="실시간 분석"
-        description={`켜져 있어야 할 LED 수로 예상 전류를 정하고, INA219가 잰 실제 전류·전압과 비교해 이상 점수를 계산합니다. 최근 ${seconds}초.`}
+        description={`켜라고 한 채널 조합의 정상 전류(우노 실측으로 학습한 조합표)와 INA219가 잰 실제 전류를 비교해 이상 점수를 계산합니다. 최근 ${seconds}초.`}
         meta={
           <>
             <Badge tone={real ? 'accent' : 'neutral'}>{real ? '실측 장치' : '시뮬레이터'}</Badge>
@@ -92,7 +92,7 @@ export default function LiveData() {
       <div className="section">
         <Section
           title="채널 현황"
-          description={snap.canControl ? '스위치로 LED를 하나씩 끄고 켜면 아래 그래프에 변화가 표시됩니다.' : '이 장치는 채널 상태를 보고하지 않아 조종할 수 없습니다.'}
+          description={snap.canControl ? '스위치로 LED를 하나씩 끄고 켜면 아래 그래프에 변화가 표시됩니다.' : snap.connected ? '이 장치는 채널 상태를 보고하지 않아 조종할 수 없습니다.' : '장치가 연결되지 않았습니다. 사이드바에서 장치를 연결하세요.'}
           actions={<Link to="/village/loads" className="small">채널 점검 →</Link>}
         >
           <Channels snap={snap} controls />

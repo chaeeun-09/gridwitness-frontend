@@ -138,62 +138,6 @@ export async function sha256Hex(buf: ArrayBuffer): Promise<string> {
   return [...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, '0')).join('')
 }
 
-export type SyntheticKind = 'fault' | 'broken'
-
-export interface SynthOptions {
-  /** 고장 상 0=A, 1=B, 2=C (여러 상이면 배열: 2상·3상 단락) */
-  phase?: 0 | 1 | 2 | (0 | 1 | 2)[]
-  systemHz?: 50 | 60
-  fs?: number
-  rows?: number
-  /** 고장 시작 샘플 */
-  onset?: number
-  /** 고장 지속 샘플 (생략하면 끝까지) */
-  duration?: number
-  /** 고장 상 전류 배율 */
-  currentGain?: number
-  /** 고장 상 전압 배율 */
-  voltageGain?: number
-  /** 같은 값이면 같은 파형 (예시 데이터 재현용) */
-  seed?: number
-}
-
-/** 시연용 합성 3상 파형 [샘플][Ia, Ib, Ic, In, Va, Vb, Vc]. 실제 계측 자료가 아님. */
-export function synthesize(o: SynthOptions = {}): number[][] {
-  const fs = o.fs ?? MODEL_SCOPE.samplingRateHz
-  const f = o.systemHz ?? MODEL_SCOPE.systemFrequencyHz
-  const n = o.rows ?? MODEL_SCOPE.rows
-  const onset = o.onset ?? 600
-  const end = o.duration === undefined ? Infinity : onset + o.duration
-  const faulted = new Set(Array.isArray(o.phase) ? o.phase : [o.phase ?? 0])
-  let seed = o.seed ?? Math.floor(Math.random() * 1e9)
-  const rnd = () => ((seed = (seed * 16807 + 11) % 2147483647) / 2147483647 - 0.5) * 2
-  const ang = [0, (-2 * Math.PI) / 3, (2 * Math.PI) / 3]
-  const out: number[][] = []
-  for (let i = 0; i < n; i++) {
-    const t = i / fs
-    const inFault = i >= onset && i < end
-    const hit = (k: number) => inFault && faulted.has(k as 0 | 1 | 2)
-    const cur = [0, 1, 2].map((k) => 150 * (hit(k) ? (o.currentGain ?? 6) : 1) * Math.sin(2 * Math.PI * f * t + ang[k]) + rnd() * 5)
-    const vol = [0, 1, 2].map((k) => 18700 * (hit(k) ? (o.voltageGain ?? 0.32) : 1) * Math.sin(2 * Math.PI * f * t + ang[k]) + rnd() * 50)
-    out.push([cur[0], cur[1], cur[2], cur[0] + cur[1] + cur[2], ...vol])
-  }
-  return out
-}
-
 export function toCsv(matrix: (number | string)[][], header: readonly string[] = CHANNELS): string {
   return [header.join(','), ...matrix.map((r) => r.map((x) => (typeof x === 'number' ? x.toFixed(3) : x)).join(','))].join('\n')
-}
-
-/** 시연용 합성 CSV. broken은 6채널 + NaN + 문자 섞인 오류 입력 */
-export function syntheticCsv(kind: SyntheticKind, o: SynthOptions = {}): string {
-  const m = synthesize(o)
-  if (kind === 'fault') return toCsv(m)
-  const broken: (number | string)[][] = m.map((r, i) => {
-    const row: (number | string)[] = r.slice(0, 6)
-    if (i === 200) row[1] = 'NaN'
-    if (i === 450) row[2] = 'err'
-    return row
-  })
-  return toCsv(broken, CHANNELS.slice(0, 6))
 }

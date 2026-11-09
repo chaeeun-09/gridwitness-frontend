@@ -1,0 +1,63 @@
+{
+ "dataset": "Xiong et al. Incipient fault waveform dataset",
+ "url": "https://github.com/xiongsiheng/Incipient-fault-waveform-dataset",
+ "license": "MIT (LICENSE 파일)",
+ "channels": [
+  "Ia",
+  "Ib",
+  "Ic",
+  "In",
+  "Va",
+  "Vb",
+  "Vc"
+ ],
+ "sampling_rate_hz": 4096,
+ "system_frequency_hz": 50,
+ "note": "원본 값 그대로(머리줄만 추가). 우리 CN 모델의 시험 세트(seed 42)에서 유형마다 분할 순서상 첫 파일을 골랐다 (AI 결과를 보고 고르지 않음). role=abstained_on_test 인 파일은 시험 세트에서 배포 모델이 실제로 보류한 파형이라 AI 결과를 보고 고른 것이다 (보류 시연용, scripts/export_model_card.py)",
+ "samples": [
+  {
+   "id": "xiong-87",
+   "label": "SIF",
+   "file": "xiong-87.csv",
+   "source_file": "waveform/87.txt",
+   "source_sha256": "d4c0d1613a9e84d61674452caee56e2cb25f9a444abc304637a4689ca83ba384"
+  },
+  {
+   "id": "xiong-214",
+   "label": "MIF",
+   "file": "xiong-214.csv",
+   "source_file": "waveform/214.txt",
+   "source_sha256": "21e6fd8dfc8624a9f921c8b27efeddeeb509f3c2bf1f65a3bb2f17bbef12cab2"
+  },
+  {
+   "id": "xiong-44",
+   "label": "PF",
+   "file": "xiong-44.csv",
+   "source_file": "waveform/44.txt",
+   "source_sha256": "f247ca74ce19d44285e1b3f513b674de5cef1384cb256f28e222efbf4a3416d5"
+  },
+  {
+   "id": "xiong-227",
+   "label": "TD",
+   "file": "xiong-227.csv",
+   "source_file": "waveform/227.txt",
+   "source_sha256": "15d4cc1fa71cfc1295cf88638570a77f1c28a3ee365eb796450da31321b30c7a"
+  },
+  {
+   "id": "xiong-1",
+   "label": "PF",
+   "file": "xiong-1.csv",
+   "source_file": "waveform/1.txt",
+   "source_sha256": "2849697befbe5370031eae78259dc14f27f8ced533499f0448bb7e90591f08ce",
+   "role": "abstained_on_test"
+  },
+  {
+   "id": "xiong-195",
+   "label": "PF",
+   "file": "xiong-195.csv",
+   "source_file": "waveform/195.txt",
+   "source_sha256": "c2f3ee9666403c3c1dcca20483794f51ea4b52133cfc8604d2ab7e36eca15469",
+   "role": "abstained_on_test"
+  }
+ ]
+}

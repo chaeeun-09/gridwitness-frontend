@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import Channels from '../components/Channels'
+import EventCausePanel from '../components/EventCausePanel'
 import EventList from '../components/EventList'
 import { IconMoon, IconPower, IconSun, IconX } from '../components/Icons'
 import PartPanel from '../components/PartPanel'
@@ -175,6 +176,18 @@ export default function Village() {
         ) : (
           <div className={`scene-hud glass ${alarm ? 'alarm' : ''}`} aria-live="polite">
             <Status tone={NODE_TONE[snap.status]} live={alarm}><strong>{STATUS_LABEL[snap.status]}</strong></Status>
+            {snap.diagnosis && (
+              <span className="small" title="실측으로 학습한 조합별 정상 전류표와 비교한 결과. 센서가 1개라 비슷한 전류의 채널끼리는 구분하지 못해 후보로 보여 줍니다">
+                {snap.diagnosis.kind === 'LOW'
+                  ? '켠 채널 중 전류를 안 흘리는 것이 있음'
+                  : snap.diagnosis.candidates.length
+                    ? '끈 채널에 전류가 흐름 (릴레이 고착 의심)'
+                    : '예상보다 전류가 많음 (누설·단락 의심)'}
+                {snap.diagnosis.candidates.length > 0 && ` · 의심: ${snap.diagnosis.candidates.map((id) => snap.leds[id].name).join(', ')}`}
+                {' · '}
+                <Link to="/village/loads">채널 점검으로 찾기 →</Link>
+              </span>
+            )}
             <div className="hud-nums num">
               <span><b>{snap.v.toFixed(2)}</b> V</span>
               <span><b>{snap.i.toFixed(2)}</b> A</span>
@@ -280,6 +293,10 @@ export default function Village() {
         <Section title="이상 이벤트" description="이상 점수가 기준을 넘으면 기록되고, 사건으로 등록할 수 있습니다." actions={<Link to="/village/loads" className="small">부하(LED 5개) 현황 →</Link>}>
           <EventList events={snap.events} limit={4} />
         </Section>
+      </div>
+
+      <div className="section">
+        <EventCausePanel />
       </div>
     </>
   )

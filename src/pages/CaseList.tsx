@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { DiagnosisBadge, StageBadge } from '../components/Badges'
 import { IconAnalysis, IconPlus } from '../components/Icons'
+import ModelCardPanel from '../components/ModelCardPanel'
 import { Badge, Empty, ErrorState, PageHeader, TableSkeleton } from '../components/ui'
 import { fmtTime } from '../lib/actor'
 import type { CaseSummary } from '../types'
@@ -57,7 +58,7 @@ export default function CaseList() {
         <Empty
           icon={<IconAnalysis />}
           title={filter === 'ALL' ? '분석한 고장파형이 없습니다' : `${FILTER_LABEL[filter]} 사건이 없습니다`}
-          description="CSV 파형을 올리면 해시를 남기고 입력 진단부터 시작합니다. 합성 샘플로 바로 시험해 볼 수도 있습니다."
+          description="CSV 파형을 올리면 해시를 남기고 입력 진단부터 시작합니다. 실제 공개 파형 샘플로 바로 시험해 볼 수도 있습니다."
           action={filter === 'ALL' ? <Link to="/cases/new" className="btn btn-primary">고장파형 등록</Link> : undefined}
         />
       ) : (
@@ -89,6 +90,9 @@ export default function CaseList() {
           </table>
         </div>
       )}
+      <div className="section">
+        <ModelCardPanel />
+      </div>
     </>
   )
 }

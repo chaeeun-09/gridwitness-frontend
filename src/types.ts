@@ -67,6 +67,26 @@ export interface ChannelFeatures {
 }
 
 /** ④ AI 결과 / ⑤ 추가 확인 필요 */
+/** 서버 AI(gw_ai)가 결과와 함께 돌려준 근거·추적 정보. 예전 기록이나 모델 없이 끝난 분석에는 없음 */
+export interface AiDetail {
+  status: 'ok' | 'abstained' | 'rejected'
+  /** treeshap = 이 사건에서 1순위 유형 점수를 실제로 올리고(+) 내린(-) 특징 */
+  method: string
+  topFeatures: { name: string; value: number; contribution: number }[]
+  /** 1순위 유형 (보류여도 계산은 함. 화면에서 답처럼 보이지 않게 쓴다) */
+  topLabel: string | null
+  topScore: number | null
+  margin: number | null
+  oodRatio: number | null
+  thresholds: Record<string, number>
+  reasonCodes: string[]
+  versions: Record<string, string>
+  modelCountry: string | null
+  modelDataset: string | null
+  fileSha256: string | null
+  limitations: string[]
+}
+
 export type AnalysisResult =
   | {
       kind: 'COMPLETED'
@@ -78,6 +98,7 @@ export type AnalysisResult =
       modelVersion: string
       preprocessVersion: string
       executedAt: string
+      ai?: AiDetail
     }
   | {
       kind: 'WITHHELD'
@@ -89,6 +110,7 @@ export type AnalysisResult =
       modelVersion: string | null
       preprocessVersion: string | null
       executedAt: string
+      ai?: AiDetail
     }
 
 /** ⑥ 사람 검토 — AI 결과와 분리 저장 */

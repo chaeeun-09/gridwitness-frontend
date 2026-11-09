@@ -932,3 +932,52 @@ body { background: linear-gradient(180deg, #e6effc 0%, #f1f6fd 380px, #f6f9fe 10
 
 .reconnect-banner { margin: 16px 40px 0; }
 @media (max-width: 960px) { .reconnect-banner { margin: 12px 16px 0; } }
+
+/* 가상 대단지 */
+.cx-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 12px; }
+.cx-bldg { border: 1px solid var(--line); border-radius: var(--r); padding: 8px; background: var(--fill); }
+.cx-bldg.has-fault { border-color: var(--err); background: var(--err-tint); }
+.cx-bldg-head { display: flex; justify-content: space-between; align-items: baseline; gap: 4px; margin-bottom: 6px; font-size: 12px; }
+.cx-units { display: grid; gap: 2px; }
+.cx-cell { height: 8px; min-width: 0; padding: 0; border: 0; border-radius: 2px; cursor: pointer; }
+.cx-cell.sel, .cx-lamp.sel { outline: 2px solid var(--accent); outline-offset: 1px; }
+.cx-lamps { display: flex; gap: 3px; margin-top: 6px; }
+.cx-lamp { width: 10px; height: 10px; padding: 0; border: 0; border-radius: 50%; cursor: pointer; }
+.cx-log { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.cx-alarm { background: var(--err-tint); color: var(--err); }
+.cx-alarm strong { color: var(--err); }
+.cx-range { width: 100%; margin-top: 12px; height: 4px; padding: 0; border: 0; accent-color: var(--accent); }
+
+/* AI 판단 근거 (AiEvidence) */
+.ai-gates { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.ai-gate { display: grid; grid-template-columns: 10px 1fr auto; column-gap: 8px; align-items: baseline; font-size: 13px; }
+.ai-gate .muted { grid-column: 2 / 4; font-size: 11.5px; }
+.ai-gate-dot { width: 8px; height: 8px; border-radius: 50%; align-self: center; }
+.ai-gate-dot.ok { background: var(--ok); }
+.ai-gate-dot.bad { background: var(--err); }
+.ai-feats { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.ai-feats li { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(60px, 1fr) 52px; gap: 8px; align-items: center; font-size: 12.5px; }
+.ai-feat-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ai-feat-bar { position: relative; height: 8px; background: var(--fill-2); border-radius: 4px; }
+.ai-feat-bar::after { content: ''; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--line-strong); }
+.ai-feat-bar i { position: absolute; top: 0; bottom: 0; border-radius: 4px; }
+.ai-feat-bar i.pos { left: 50%; background: var(--accent); }
+.ai-feat-bar i.neg { right: 50%; background: var(--warn); }
+.ai-feats .num { text-align: right; }
+
+/* 신뢰 체크 띠 (TrustStrip) */
+.trust-strip { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; margin-top: 16px; }
+.trust-item { text-align: left; border: 1px solid var(--line); border-radius: var(--r); padding: 10px 12px; background: var(--canvas); cursor: pointer; font: inherit; color: inherit; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.trust-item:hover { border-color: var(--accent); }
+.trust-item .t-head { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--muted); }
+.trust-item .t-val { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trust-item .t-sub { font-size: 11.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trust-item.ok { border-left: 3px solid var(--ok); }
+.trust-item.warn { border-left: 3px solid var(--warn); }
+.trust-item.err { border-left: 3px solid var(--err); }
+.trust-item.off { border-left: 3px solid var(--line-strong); }
+@media (max-width: 900px) { .trust-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* 모델 평가 카드 (ModelCardPanel) */
+.mc-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 900px) { .mc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

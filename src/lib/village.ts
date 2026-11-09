@@ -1,3 +1,6 @@
+import { parseEventLine, pushVillageEvent } from './villageEvents'
+import COMBO_JSON from '../data/village_combo.json'
+import { deviation } from './deviation'
 import { useSyncExternalStore } from 'react'
 import type { IotPoint } from '../types'
 import { NO_GRANTED_PORT, onSerialPlug, openSerial, parseFrame, serialSupported, type SerialLink, type SerialReading } from './serial'
@@ -29,8 +32,9 @@ export interface ChannelDef {
 /** 마을 부하: 주택 3 + 가로등 2. LED마다 채널 릴레이가 있고, 구간마다 INA219가 하나씩 있음 */
 export const IOT_CHANNELS: ChannelDef[] = [
   { id: 'h1', ch: 1, kind: 'HOUSE', name: '주택 1', relay: '릴레이 ① · D3' },
-  { id: 'h2', ch: 2, kind: 'HOUSE', name: '주택 2', relay: '릴레이 ② · D4' },
-  { id: 'h3', ch: 3, kind: 'HOUSE', name: '주택 3', relay: '릴레이 ③ · D5' },
+  // 실제 배선에서 주택 2·3 LED가 서로 바뀌어 있어 채널 번호를 맞바꿈 (주택 2 = 채널 ③ D5, 주택 3 = 채널 ② D4)
+  { id: 'h2', ch: 3, kind: 'HOUSE', name: '주택 2', relay: '릴레이 ③ · D5' },
+  { id: 'h3', ch: 2, kind: 'HOUSE', name: '주택 3', relay: '릴레이 ② · D4' },
   { id: 'l1', ch: 4, kind: 'LAMP', name: '가로등 1', relay: '릴레이 ④ · D6' },
   { id: 'l2', ch: 5, kind: 'LAMP', name: '가로등 2', relay: '릴레이 ⑤ · D7' },
 ]
@@ -63,10 +67,11 @@ export const DEVICE_INFO: Record<DataSource, { deviceId: string; sensor: string;
   MOCK: { deviceId: 'arduino-sim-01', sensor: 'INA219 ×2 (시뮬레이터)', port: 'SIM' },
   SERIAL: { deviceId: 'arduino-village', sensor: 'INA219 (실측, 감지된 개수만큼)', port: 'Web Serial 115200' },
 }
-export const IOT_MODEL = 'iot-anomaly-0.2 (전체 전류 잔차)'
+export const IOT_MODEL = 'iot-combo-v3 (채널 조합별 실측 정상 전류)'
 export const NOMINAL_V = 5
 /** LED 1개(저항 포함)가 흘리는 전류 A 기본값. 실제 LED·저항·전원 전압에 따라 크게 달라서 관리자 화면에서 보정할 수 있음 */
-export const DEFAULT_LED_A = 0.056
+// 실측 (2026-11-08, USB 전원): LED 1개 9~12 mA. 여러 개를 켜면 전압이 내려가 합이 맞지 않으므로 판정은 아래 조합표를 쓴다
+export const DEFAULT_LED_A = 0.011
 const LED_KEY = 'gridwitness.ledA.v1'
 function loadLedA(): number {
   try {
@@ -196,6 +201,95 @@ export interface Scenario {
   hour: number
 }
 
+// ── 조합별 정상 전류표 (실측 학습) ─────────────────────
+// 32가지 채널 조합마다 실제로 잰 정상 전류(중앙값)와 흔들림. 키는 장치 채널 1~5(D3~D7) 순서
+interface ComboTable {
+  source: string
+  k_sigma: number
+  mean_a: Record<string, number>
+  sigma_a: Record<string, number>
+  eval: { normal_false_alarm: { rate: number; samples: number }; open_circuit: { detected: number }; stuck_relay: { detected: number }; candidates: Record<string, { true_channel_in_candidates: number; mean_candidates: number }> }
+}
+export const COMBO = COMBO_JSON as ComboTable
+
+// 이 PC에서 다시 맞춘 기준 (USB 전원·포트가 바뀌면 정상 전류가 조금 달라진다). 흔들림(sigma)·기준(k)은 학습값을 그대로 쓴다
+export interface ComboCalibration {
+  at: string
+  mean_a: Record<string, number>
+  samplesPerCombo: number
+  /** 학습 기준과 가장 크게 달라진 조합의 차이 (A) */
+  maxShiftA: number
+}
+const CAL_KEY = 'gridwitness.comboCal.v1'
+function loadCal(): ComboCalibration | null {
+  try {
+    const raw = localStorage.getItem(CAL_KEY)
+    return raw ? (JSON.parse(raw) as ComboCalibration) : null
+  } catch {
+    return null
+  }
+}
+let comboCal: ComboCalibration | null = loadCal()
+export const getComboCalibration = () => comboCal
+export function setComboCalibration(cal: ComboCalibration | null) {
+  comboCal = cal
+  try {
+    if (cal) localStorage.setItem(CAL_KEY, JSON.stringify(cal))
+    else localStorage.removeItem(CAL_KEY)
+  } catch {
+    // 저장할 수 없는 환경이면 이 화면에서만 씀
+  }
+  emit()
+}
+/** 조합의 정상 전류: 이 PC에서 맞춘 값이 있으면 그것, 없으면 학습값 */
+export function comboMean(key: string): number | undefined {
+  return comboCal?.mean_a[key] ?? COMBO.mean_a[key]
+}
+/** 지금 명령한 조합 (장치 채널 1~5 순서, '1' = 켬) */
+export const currentCommandKey = () => commandKey()
+/** 지금 켜라고 한 채널 조합 (장치 채널 순서) */
+function commandKey(): string {
+  return [1, 2, 3, 4, 5].map((n) => (enabled[IOT_CHANNELS.find((c) => c.ch === n)!.id] ? '1' : '0')).join('')
+}
+export interface ComboDiagnosis {
+  /** LOW: 켜라고 한 채널 중 전류를 안 흘리는 것이 있음 (단선 의심) · HIGH: 끈 채널에 전류가 흐름(고착 의심) 또는 누설 */
+  kind: 'LOW' | 'HIGH'
+  z: number
+  /** 한 채널만 바꿨을 때 측정과 맞는 채널 (센서가 1개라 여러 개일 수 있음) */
+  candidates: ChannelId[]
+}
+/** 장치가 전류를 1 mA 단위로 보내므로 그 한 칸만큼은 허용 (다른 시점 실측에서 정상값이 1 mA 달라지는 것 확인, 2026-11-08) */
+export const COMBO_TOL_A = (COMBO_JSON as { tol_a?: number }).tol_a ?? 0.001
+/** 지금 조합에서 채널 하나를 끄면 줄어들 것으로 예상되는 전류 (조합표). 표에 없으면 null */
+export function expectedDrop(id: ChannelId): number | null {
+  const key = commandKey()
+  const j = IOT_CHANNELS.find((c) => c.id === id)!.ch - 1
+  if (key[j] !== '1') return null
+  const off = key.slice(0, j) + '0' + key.slice(j + 1)
+  const a = comboMean(key)
+  const b = comboMean(off)
+  return a == null || b == null ? null : a - b
+}
+/** 조합표로 판정: 점수(0~1)와 진단. 표에 없는 조합이면 null */
+function comboJudge(key: string, i: number): { expected: number; score: number; diag: ComboDiagnosis | null } | null {
+  const mu = comboMean(key)
+  const sd = COMBO.sigma_a[key]
+  if (mu == null || sd == null) return null
+  const z = (i - mu) / sd
+  // 대단지 세대 판정과 같은 규칙 (deviation.ts)
+  const dv = deviation(i, mu, { sigma: sd, k: COMBO.k_sigma, tol: COMBO_TOL_A })
+  const score = dv.score
+  if (dv.ratio <= 1) return { expected: mu, score, diag: null }
+  const candidates: ChannelId[] = []
+  for (let j = 0; j < 5; j++) {
+    const alt = key.slice(0, j) + (key[j] === '1' ? '0' : '1') + key.slice(j + 1)
+    const m2 = comboMean(alt)
+    const s2 = COMBO.sigma_a[alt]
+    if (m2 != null && s2 != null && Math.abs(i - m2) <= COMBO.k_sigma * s2 + COMBO_TOL_A) candidates.push(IOT_CHANNELS.find((c) => c.ch === j + 1)!.id)
+  }
+  return { expected: mu, score, diag: { kind: z < 0 ? 'LOW' : 'HIGH', z: Math.round(z * 10) / 10, candidates } }
+}
+
 export interface VillageSnapshot {
   source: DataSource
   connected: boolean
@@ -233,6 +327,8 @@ export interface VillageSnapshot {
   needsGrant: boolean
   /** 구간별 측정. 구간 측정이 없는 예전 장치는 null */
   zones: Record<ChannelKind, ZoneState> | null
+  /** 조합표 판정 결과 (실측 장치, 이상일 때) */
+  diagnosis: ComboDiagnosis | null
   history: (Omit<IotPoint, 't'> & { t: number; p: number })[]
   events: VillageEvent[]
   faults: Partial<Record<ChannelId, FaultKind>>
@@ -289,7 +385,25 @@ function setAutoPref(on: boolean) {
     // 저장 불가 환경은 무시
   }
 }
-let source: DataSource = autoPref() ? 'SERIAL' : 'MOCK'
+// 시뮬레이터는 사용자가 직접 고른 경우에만 켠다. 아무것도 고르지 않았으면 '실측 장치 · 연결 안 됨'으로 시작해
+// 장치 없이 계산한 값이 실측처럼 먼저 보이지 않게 한다
+const SIM_KEY = 'gridwitness.simulator.v1'
+function simPref(): boolean {
+  try {
+    return localStorage.getItem(SIM_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+function setSimPref(on: boolean) {
+  try {
+    if (on) localStorage.setItem(SIM_KEY, '1')
+    else localStorage.removeItem(SIM_KEY)
+  } catch {
+    // 저장 불가 환경은 무시
+  }
+}
+let source: DataSource = !autoPref() && simPref() ? 'MOCK' : 'SERIAL'
 let connected = source === 'MOCK'
 let link: SerialLink | null = null
 let latest: { at: number; frame: SerialReading } | null = null
@@ -379,18 +493,20 @@ function initial(): VillageSnapshot {
     packets: 0,
     relay,
     relayPending: null,
-    v: NOMINAL_V,
-    i: ledA() * 5,
-    p: NOMINAL_V * ledA() * 5,
-    expected: ledA() * 5,
+    // 장치 값이 오기 전에는 0 · 데이터 없음 (시뮬레이터만 계산값으로 시작)
+    v: source === 'MOCK' ? NOMINAL_V : 0,
+    i: source === 'MOCK' ? ledA() * 5 : 0,
+    p: source === 'MOCK' ? NOMINAL_V * ledA() * 5 : 0,
+    expected: source === 'MOCK' ? ledA() * 5 : 0,
     score: 0,
-    status: 'NORMAL',
-    estLit: 5,
+    status: source === 'MOCK' ? 'NORMAL' : 'NO_DATA',
+    estLit: source === 'MOCK' ? 5 : 0,
     leds: ledStates(null),
     channels: { ...enabled },
     channelPending: {},
     canControl: true,
     zones: null,
+    diagnosis: null,
     reconnecting: false,
     needsGrant: false,
     history: [],
@@ -449,16 +565,29 @@ function tick() {
   t++
   advanceScenario()
   const now = Date.now()
-  // 실측: 최근 2초 안에 받은 프레임이 없으면 데이터 없음 (정전으로 판정하지 않음)
-  const stale = source === 'SERIAL' && (!latest || now - latest.at > 2000)
+  // 실측: 최근 2.5초 안에 받은 프레임이 없으면 데이터 없음 (정전으로 판정하지 않음)
+  const stale = source === 'SERIAL' && (!latest || now - latest.at > 2500) // 스케치 v3 녹화(1.3초) 중 쉬는 시간 포함
   if (!connected || stale) return emit({ status: 'NO_DATA' })
 
   const m = source === 'SERIAL' ? latest!.frame : mockMeasure()
   const { v, i } = m
   const eh = expectedZone('HOUSE')
   const el = expectedZone('LAMP')
-  const expected = eh + el
+  let expected = eh + el
   let score = anomalyScore(v, i, expected)
+  // 센서 1개(구간 측정 없음)인 실측 장치: 실측으로 학습한 조합표로 판정 (USB 전원 전압 강하까지 반영됨)
+  let diagnosis: ComboDiagnosis | null = null
+  let comboLit: number | null = null
+  if (!m.zones && relay) {
+    const key = commandKey()
+    const j = comboJudge(key, i)
+    if (j) {
+      expected = j.expected
+      score = j.score
+      diagnosis = j.diag
+      comboLit = key.split('').filter((c) => c === '1').length - (j.diag?.kind === 'LOW' && j.diag.candidates.length ? 1 : 0)
+    }
+  }
   let zones: VillageSnapshot['zones'] = null
   if (m.zones) {
     // 구간마다 따로 점수를 내서, 한 구간의 누설과 다른 구간의 단선이 합계에서 서로 가려지지 않게 함
@@ -472,7 +601,7 @@ function tick() {
     score = Math.max(score, zones.HOUSE.score, zones.LAMP.score)
   }
   const status = classify(v, i, score, relay)
-  const estLit = zones ? zones.HOUSE.estLit + zones.LAMP.estLit : Math.max(0, Math.min(IOT_CHANNELS.length, Math.round(i / ledA())))
+  const estLit = zones ? zones.HOUSE.estLit + zones.LAMP.estLit : comboLit ?? Math.max(0, Math.min(IOT_CHANNELS.length, Math.round(i / ledA())))
   const point: IotPoint = { t: now, v, i, expected, score, ...(m.zones && { ih: m.zones.house.i, il: m.zones.lamp.i, eh, el }) }
 
   const events = [...snap.events]
@@ -512,6 +641,7 @@ function tick() {
     status,
     estLit,
     zones,
+    diagnosis,
     lastPacketAt: source === 'SERIAL' ? latest!.at : now,
     packets: snap.packets + 1,
     history: [...snap.history, { ...point, p: v * i }].slice(-HISTORY),
@@ -580,7 +710,7 @@ export function setRelay(on: boolean) {
       if (relayPending === null) return
       relayPending = null
       fail('릴레이 명령에 장치가 응답하지 않았습니다.')
-    }, 2000)
+    }, 3500) // 스케치 v3 는 명령 뒤 1.3초 녹화하는 동안 측정 줄을 쉰다
     return
   }
   commandTimer = setTimeout(() => {
@@ -604,7 +734,7 @@ export function setChannel(id: ChannelId, on: boolean) {
       if (chPending[id] === undefined) return
       delete chPending[id]
       fail(`${def.name}(채널 ${def.ch}) 명령에 장치가 응답하지 않았습니다.`)
-    }, 2000)
+    }, 3500) // 스케치 v3 는 명령 뒤 1.3초 녹화하는 동안 측정 줄을 쉰다
     return
   }
   chTimers[id] = setTimeout(() => {
@@ -623,6 +753,25 @@ function onSerialLine(line: string) {
     emit()
     return
   }
+  // 스케치 v3 의 사건 파형 (사건이 날 때만 옴): 원인 분석으로 넘긴다
+  if (line.startsWith('{"ev"')) {
+    const ev = parseEventLine(line)
+    if (ev) {
+      pushVillageEvent(ev)
+      // 녹화 중(1.3초)에는 측정 줄이 쉬므로, 사건 줄의 채널 상태로 명령 확인을 대신한다
+      if (ev.ch.length === 5) {
+        IOT_CHANNELS.forEach((c) => {
+          enabled[c.id] = ev.ch[c.ch - 1] === 1
+          if (chPending[c.id] === enabled[c.id]) {
+            delete chPending[c.id]
+            clearTimeout(chTimers[c.id])
+          }
+        })
+      }
+    } else badFrames++
+    emit()
+    return
+  }
   const frame = parseFrame(line)
   if (!frame) {
     badFrames++
@@ -636,8 +785,8 @@ function onSerialLine(line: string) {
     clearTimeout(commandTimer)
   }
   if (frame.ch) {
-    IOT_CHANNELS.forEach((c, k) => {
-      enabled[c.id] = frame.ch![k]
+    IOT_CHANNELS.forEach((c) => {
+      enabled[c.id] = frame.ch![c.ch - 1]
       if (chPending[c.id] === enabled[c.id]) {
         delete chPending[c.id]
         clearTimeout(chTimers[c.id])
@@ -684,6 +833,7 @@ export async function connectSerial() {
   try {
     const next = await openSerial(onSerialLine, onLost, 'ask')
     setAutoPref(true)
+    setSimPref(false)
     await attach(next)
     stopRetry()
   } finally {
@@ -735,6 +885,7 @@ function stopRetry() {
 /** 시뮬레이터로 전환 (자동 재연결도 끔) */
 export async function switchToMock() {
   setAutoPref(false)
+  setSimPref(true)
   stopRetry()
   await link?.close()
   link = null
