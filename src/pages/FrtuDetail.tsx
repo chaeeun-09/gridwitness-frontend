@@ -4,7 +4,9 @@ import VillageStatusChat from '../components/VillageStatusChat'
 import { LiveAnalysis } from './LiveData'
 import EventCausePanel from '../components/EventCausePanel'
 import { Badge, NODE_TONE, Status } from '../components/ui'
-import { FI_LABEL, frtuViews, isFrtuId, type FrtuId } from '../lib/frtu'
+import { FI_LABEL, frtuViews, isFrtuId, locateFault, type FrtuId } from '../lib/frtu'
+import { inspectionCandidate } from '../lib/gis'
+import SingleLineDiagram, { InspectionCard } from '../components/SingleLineDiagram'
 import { DEVICE_INFO, IOT_CHANNELS, STATUS_LABEL, THRESHOLDS, useVillage } from '../lib/village'
 import { useVillageEvents } from '../lib/villageEvents'
 
@@ -34,7 +36,10 @@ export default function FrtuDetail() {
   const pick = (next: FrtuId) => setQuery({ id: next })
   const snap = useVillage()
   const events = useVillageEvents()
-  const f = frtuViews(snap)[id]
+  const views = frtuViews(snap)
+  const f = views[id]
+  const fiAll = f.available ? { inlet: views.inlet.fi, house: views.house.fi, lamp: views.lamp.fi } : {}
+  const cand = inspectionCandidate(locateFault(snap, views).scope)
   const last = events[0]
   const v = last?.verdict
   const alarm = f.fi !== 'NONE' || ['WARNING', 'FAULT', 'OUTAGE'].includes(f.status)
@@ -76,7 +81,13 @@ export default function FrtuDetail() {
       <>
       <section className="dash-card frtu-overview">
         <FrtuStrip snap={snap} value={id} onPick={pick} />
-        <FaultLocationBox snap={snap} />
+        <div className="frtu-topo">
+          <SingleLineDiagram highlight={cand?.branches} fi={fiAll} candidate={cand} />
+          <div className="stack" style={{ gap: 10 }}>
+            <FaultLocationBox snap={snap} />
+            <InspectionCard candidate={cand} />
+          </div>
+        </div>
         <p className="xs muted">
           마을 모형의 INA219 두 개를 분기 FRTU로, 그 합을 인입 FRTU로 보여줘요. 분기가 병렬 두 갈래라 &lsquo;어느 분기인지&rsquo;까지만 좁힐 수 있고, 직류 계측이라 교류 고장파형 분석과는 섞지 않아요.
         </p>
