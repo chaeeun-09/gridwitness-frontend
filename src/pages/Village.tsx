@@ -265,22 +265,11 @@ export default function Village() {
             <strong>제어판</strong>
             <button className="btn btn-ghost btn-icon" onClick={() => setControls(false)} aria-label="닫기"><IconX /></button>
           </div>
-<div className="section">
-        <Section
-          title="LED 채널 제어"
-          description="채널 릴레이(D3~D7)로 LED를 하나씩 끄고 켭니다. 실측 장치가 연결되어 있으면 실제 LED가 꺼집니다."
-          actions={<Link to="/village/loads" className="small">채널 점검 →</Link>}
-        >
-          <Channels snap={snap} selected={selected} onSelect={setSelected} controls />
-        </Section>
-      </div>
+          <Section title="LED 채널 제어" actions={<Link to="/village/loads" className="small">채널 점검 →</Link>}>
+            <Channels snap={snap} selected={selected} onSelect={setSelected} controls />
+          </Section>
 
-<div className="section">
-      <Section
-        title="고장 시뮬레이션"
-        description="계측값만으로 판정하는지 확인하는 시뮬레이터 전용 기능입니다. 위 장면의 집이 상황에 맞게 말합니다."
-        actions={!mock && <Badge>실측 모드에서는 사용 안 함</Badge>}
-      >
+      <Section title="고장 시뮬레이션" actions={!mock && <Badge>실측 모드에서는 사용 안 함</Badge>}>
         <div className="sim-grid">
           <div className="form">
             <label className="field">
@@ -318,13 +307,10 @@ export default function Village() {
           </div>
         </div>
       </Section>
-</div>
 
-      <div className="section">
-        <Section title="이상 이벤트" description="이상 점수가 기준을 넘으면 기록되고, 사건으로 등록할 수 있습니다." actions={<Link to="/village/loads" className="small">부하(LED 5개) 현황 →</Link>}>
-          <EventList events={snap.events} limit={4} />
-        </Section>
-      </div>
+          <Section title="이상 이벤트" actions={<Link to="/village/loads" className="small">부하(LED 5개) 현황 →</Link>}>
+            <EventList events={snap.events} limit={4} />
+          </Section>
 
         </aside>
       )}
