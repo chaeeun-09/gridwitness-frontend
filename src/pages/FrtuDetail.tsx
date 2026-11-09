@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { CsvAnalysis, LiveWave } from '../components/AiPanel'
-import AssistantChat from '../components/AssistantChat'
+import VillageStatusChat from '../components/VillageStatusChat'
 import EventCausePanel from '../components/EventCausePanel'
 import { IconChevron } from '../components/Icons'
 import { Badge, NODE_TONE, Status } from '../components/ui'
@@ -125,8 +125,8 @@ export default function FrtuDetail() {
           </section>
 
           <section className="dash-card">
-            <div className="dash-card-head"><h2>AI 도우미</h2><span className="small muted">글 또는 음성</span></div>
-            <AssistantChat />
+            <div className="dash-card-head"><h2>상태 도우미</h2><span className="small muted">글 또는 음성 · 조회 전용</span></div>
+            <VillageStatusChat />
           </section>
         </div>
       </div>
