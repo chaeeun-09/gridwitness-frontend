@@ -1,9 +1,8 @@
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { CsvAnalysis, FaultLocationBox, FrtuStrip, LiveWave } from '../components/AiPanel'
 import VillageStatusChat from '../components/VillageStatusChat'
 import { LiveAnalysis } from './LiveData'
 import EventCausePanel from '../components/EventCausePanel'
-import { IconChevron } from '../components/Icons'
 import { Badge, NODE_TONE, Status } from '../components/ui'
 import { FI_LABEL, frtuViews, isFrtuId, type FrtuId } from '../lib/frtu'
 import { DEVICE_INFO, IOT_CHANNELS, STATUS_LABEL, THRESHOLDS, useVillage } from '../lib/village'
@@ -57,10 +56,6 @@ export default function FrtuDetail() {
 
   return (
     <div className="dash frtu">
-      <div className="crumb-row">
-        <Link to={`/village?frtu=${id}`} className="dash-back-icon" aria-label="마을로"><IconChevron /></Link>
-        <span className="muted">마을 시뮬레이션</span><span className="muted">›</span><span>{f.def.name}</span>
-      </div>
       <div className="dash-head">
         <div>
           <h1>{f.def.name}</h1>
