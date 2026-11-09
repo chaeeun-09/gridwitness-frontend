@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { Bar, BarChart, CartesianGrid, Cell, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { PageHeader, Section } from '../components/ui'
+import { Section } from './ui'
 import { CHART } from '../lib/chart'
 import { KEPCO_OUTAGE_2025, KEPCO_OUTAGE_SOURCE, loadRegion, outageTotals, saveRegion } from '../data/kepcoOutage'
 
 const fmt = (n: number) => n.toLocaleString('ko-KR')
 
-/** 사업화 근거: 문제 크기(한전 정전 통계) · 판독 시간 절감 계산(가정 입력) · 연계 구조 */
-export default function Impact() {
+/** 공공데이터 분석 화면 안의 사업화 근거: 문제 크기(한전 정전 통계) · 판독 시간 절감 계산(가정 입력) · 연계 구조 */
+export default function OutageInsight() {
   const [region, setRegionState] = useState(loadRegion)
   const setRegion = (r: string) => (setRegionState(r), saveRegion(r))
   const rows = [...KEPCO_OUTAGE_2025].sort((a, b) => b.sustained - a.sustained)
@@ -24,10 +24,9 @@ export default function Impact() {
 
   return (
     <>
-      <PageHeader title="사업화 근거" description="한전 공공데이터로 본 문제의 크기, 사고 판독 시간 절감 계산, GridWitness가 붙는 자리를 정리했어요." />
-
+      <div className="section" id="outage">
       <Section
-        title="문제 크기 · 2025년 배전 정전"
+        title="배전 정전 통계 · 2025년"
         description="일시정전은 원인을 조사해야 하는 정전, 순시·순간정전은 짧게 끊겼다 바로 돌아온 정전이에요."
         actions={
           <select className="impact-select" value={region} onChange={(e) => setRegion(e.target.value)} aria-label="지역본부">
@@ -60,6 +59,7 @@ export default function Impact() {
           출처: <a href={KEPCO_OUTAGE_SOURCE.url} target="_blank" rel="noreferrer">{KEPCO_OUTAGE_SOURCE.name}</a> · {KEPCO_OUTAGE_SOURCE.provider} · 기준 {KEPCO_OUTAGE_SOURCE.asOf} · {KEPCO_OUTAGE_SOURCE.license}. 통계 자료라 AI 학습·판정에는 쓰지 않아요.
         </p>
       </Section>
+      </div>
 
       <div className="section">
         <Section title="판독 시간 절감 계산" description="정전 1건마다 고장파형을 읽고 원인 후보를 정리하는 시간을 얼마나 줄이는지 계산해요.">
