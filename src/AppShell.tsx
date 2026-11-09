@@ -10,9 +10,7 @@ import { connectSerial, DEVICE_INFO, useVillage } from './lib/village'
 import CaseDetail from './pages/CaseDetail'
 import CaseList from './pages/CaseList'
 import Dashboard from './pages/Dashboard'
-import DemoGuide from './pages/DemoGuide'
 import FieldAssistant from './pages/FieldAssistant'
-import Impact from './pages/Impact'
 import FrtuDetail from './pages/FrtuDetail'
 import Admin from './pages/Admin'
 import LiveData from './pages/LiveData'
@@ -42,13 +40,6 @@ const NAV: { label: string; items: { to: string; label: string; icon: ReactNode;
     ],
   },
   {
-    label: '발표',
-    items: [
-      { to: '/impact', label: '사업화 근거', icon: <IconBolt /> },
-      { to: '/demo', label: '시연 가이드', icon: <IconLive /> },
-    ],
-  },
-  {
     label: '관리',
     items: [
       { to: '/admin', label: '관리자', icon: <IconShieldCheck /> },
@@ -64,8 +55,7 @@ const TOP_NAV = [
   { to: '/frtu', label: 'FRTU' },
   { to: '/cases', label: '사건 기록' },
   { to: '/public-data', label: '공공데이터' },
-  { to: '/impact', label: '사업화' },
-  { to: '/demo', label: '시연' },
+  { to: '/city', label: '도시' },
 ]
 
 /** 예전 주소(/history/:id)로 들어와도 사건 화면으로 보냄 */
@@ -219,8 +209,7 @@ export function Shell({ extraRoutes }: { extraRoutes?: ReactNode } = {}) {
               <Route path="/cases/new" element={<NewCase />} />
               <Route path="/cases/:id" element={<CaseDetail />} />
               <Route path="/field/:id" element={<FieldAssistant />} />
-              <Route path="/impact" element={<Impact />} />
-              <Route path="/demo" element={<DemoGuide />} />
+              <Route path="/impact" element={<Navigate to="/public-data#outage" replace />} />
               <Route path="/public-data" element={<PublicData />} />
               <Route path="/history" element={<Navigate to="/cases" replace />} />
               <Route path="/history/:id" element={<HistoryRedirect />} />
