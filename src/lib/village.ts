@@ -565,8 +565,8 @@ function tick() {
   t++
   advanceScenario()
   const now = Date.now()
-  // 실측: 최근 2.5초 안에 받은 프레임이 없으면 데이터 없음 (정전으로 판정하지 않음)
-  const stale = source === 'SERIAL' && (!latest || now - latest.at > 2500) // 스케치 v3 녹화(1.3초) 중 쉬는 시간 포함
+  // 실측: 최근 3.5초 안에 받은 프레임이 없으면 데이터 없음 (정전으로 판정하지 않음)
+  const stale = source === 'SERIAL' && (!latest || now - latest.at > 3500) // 스케치 v3.1 녹화(뒤 2.0초) 중 쉬는 시간 포함
   if (!connected || stale) return emit({ status: 'NO_DATA' })
 
   const m = source === 'SERIAL' ? latest!.frame : mockMeasure()
@@ -710,7 +710,7 @@ export function setRelay(on: boolean) {
       if (relayPending === null) return
       relayPending = null
       fail('릴레이 명령에 장치가 응답하지 않았습니다.')
-    }, 3500) // 스케치 v3 는 명령 뒤 1.3초 녹화하는 동안 측정 줄을 쉰다
+    }, 4500) // 스케치 v3.1 은 명령 뒤 2.0초 녹화하는 동안 측정 줄을 쉰다
     return
   }
   commandTimer = setTimeout(() => {
@@ -734,7 +734,7 @@ export function setChannel(id: ChannelId, on: boolean) {
       if (chPending[id] === undefined) return
       delete chPending[id]
       fail(`${def.name}(채널 ${def.ch}) 명령에 장치가 응답하지 않았습니다.`)
-    }, 3500) // 스케치 v3 는 명령 뒤 1.3초 녹화하는 동안 측정 줄을 쉰다
+    }, 4500) // 스케치 v3.1 은 명령 뒤 2.0초 녹화하는 동안 측정 줄을 쉰다
     return
   }
   chTimers[id] = setTimeout(() => {
@@ -758,7 +758,7 @@ function onSerialLine(line: string) {
     const ev = parseEventLine(line)
     if (ev) {
       pushVillageEvent(ev)
-      // 녹화 중(1.3초)에는 측정 줄이 쉬므로, 사건 줄의 채널 상태로 명령 확인을 대신한다
+      // 녹화 중(뒤 2.0초)에는 측정 줄이 쉬므로, 사건 줄의 채널 상태로 명령 확인을 대신한다
       if (ev.ch.length === 5) {
         IOT_CHANNELS.forEach((c) => {
           enabled[c.id] = ev.ch[c.ch - 1] === 1

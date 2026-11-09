@@ -10,12 +10,12 @@
 //     {"v":5.02,"i":0.281,"relay":1,"ch":[1,1,1,1,1],"vh":5.02,"ih":0.168,"vl":5.01,"il":0.113}
 //       v·i      : 마을 전체 (두 구간 합계)          relay : 마을 전원이 들어가 있으면 1
 //       ch       : 채널 1~5 릴레이 상태 (1 = 켜짐)   vh·ih : 주택 구간 (INA219 ①)   vl·il : 가로등 구간 (INA219 ②)
-//   장치 → 웹 (사건이 날 때만, v3): 사건 앞뒤 전류를 5 ms 간격으로 녹화한 '사건 파형'
-//     {"ev":3,"dt":5,"pre":60,"src":"auto","cmd":"","ch":[1,1,1,1,1],"i":[2841,2840,...]}
+//   장치 → 웹 (사건이 날 때만, v3.1): 사건 앞뒤 전류를 10 ms 간격으로 녹화한 '사건 파형'
+//     {"ev":3,"dt":10,"pre":60,"src":"auto","cmd":"","ch":[1,1,1,1,1],"i":[2841,2840,...]}
 //       ev  : 사건 번호         dt : 샘플 간격(ms)      pre : 사건 시점 앞쪽 샘플 수
 //       src : auto = 명령 없이 전류가 갑자기 변함 / cmd = 웹 명령(개폐) 직후
 //       cmd : src=cmd 일 때 받은 명령   ch : 녹화가 끝났을 때 채널 상태
-//       i   : 마을 전체 전류, 0.01 mA 단위 정수 (pre + post = 260개, 1.3초)
+//       i   : 마을 전체 전류, 0.01 mA 단위 정수 (pre + post = 260개, 2.6초: 앞 0.6초 + 뒤 2.0초)
 //   웹 → 장치:
 //     RELAY 0 / RELAY 1   마을 전체 정전 / 복구
 //     CH <1~5> <0|1>      채널 하나 끄기 / 켜기   (예: CH 3 0 → 주택 3 소등)
@@ -50,11 +50,13 @@ unsigned long lastSend = 0;
 String line;
 
 // ── 사건 녹화 (v3) ─────────────────────────────────────
-// 5 ms마다 전류를 링 버퍼에 넣다가, 평소 값에서 TRIG 이상 벗어나거나 명령을 받으면
+// 10 ms마다 전류를 링 버퍼에 넣다가, 평소 값에서 TRIG 이상 벗어나거나 명령을 받으면
 // 그 앞 PRE개 + 뒤 POST개를 한 줄로 보낸다. 녹화 중에는 0.5초 측정 줄을 쉰다 (샘플 간격이 흔들리지 않게)
-const uint8_t SAMPLE_MS = 5;
-const uint16_t PRE = 60;    // 0.3초
-const uint16_t POST = 200;  // 1.0초
+// v3 는 5 ms × 260 = 1.3초(뒤 1.0초)였는데, 손으로 선을 들었다 꽂는 데 1초를 넘는 일이 많아 순간 접촉 불량이
+// 녹화 안에서 단선처럼 보였다. 메모리는 그대로 두고 간격만 10 ms 로 늘려 뒤 2.0초를 본다 (깜빡임 수십~수백 ms 는 10 ms 로 충분)
+const uint8_t SAMPLE_MS = 10;
+const uint16_t PRE = 60;    // 0.6초
+const uint16_t POST = 200;  // 2.0초
 const uint16_t RB = PRE + POST;
 const int16_t TRIG = 150;   // 1.5 mA (0.01 mA 단위). LED 1개 ≈ 10 mA
 int16_t ring[RB];
@@ -187,7 +189,7 @@ void scanI2C() {
 void setup() {
   Serial.begin(115200);
   // '#'로 시작하는 줄은 웹이 진단용 안내로만 읽는다 (측정값이 아님)
-  Serial.println(F("#GridWitness village sketch v3 (event capture) - booting"));
+  Serial.println(F("#GridWitness village sketch v3.1 (event capture 10ms) - booting"));
   pinMode(MASTER_PIN, OUTPUT);
   for (uint8_t k = 0; k < 5; k++) pinMode(CH_PINS[k], OUTPUT);
   applyAll();

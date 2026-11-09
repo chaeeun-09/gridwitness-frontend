@@ -102,12 +102,12 @@ export default function EventCausePanel() {
   return (
     <Section
       title="사건 원인 분석"
-      description="모형에서 전류가 갑자기 바뀌면 우노가 그 앞뒤 1.3초를 녹화해 보냅니다. 파형으로 단선·순간/반복 접촉 불량·정상 개폐·복구를 가리고, 근거가 부족하면 보류합니다."
+      description="모형에서 전류가 갑자기 바뀌면 우노가 그 앞 0.6초·뒤 2.0초를 녹화해 보냅니다. 파형으로 단선·순간/반복 접촉 불량·정상 개폐·복구를 가리고, 근거가 부족하면 보류합니다."
       actions={list.length > 0 && <button className="btn btn-sm btn-ghost" onClick={clearVillageEvents}>목록 비우기</button>}
     >
       {list.length === 0 ? (
         <p className="muted small" style={{ margin: 0 }}>
-          아직 받은 사건이 없습니다. 모형에서 LED를 뽑거나 건드리거나, 스위치로 채널을 끄고 켜 보세요. (우노에 스케치 v3가 올라가 있어야 합니다)
+          아직 받은 사건이 없습니다. 모형에서 LED를 뽑거나 건드리거나, 스위치로 채널을 끄고 켜 보세요. (우노에 스케치 v3.1이 올라가 있어야 합니다)
         </p>
       ) : (
         <>

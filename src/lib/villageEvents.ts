@@ -1,4 +1,4 @@
-// 마을 모형 '사건 파형' 원인 분석 (스케치 v3 가 사건 앞뒤 1.3초를 5 ms 간격으로 녹화한 전류).
+// 마을 모형 '사건 파형' 원인 분석 (스케치 v3.1 이 사건 앞 0.6초·뒤 2.0초를 10 ms 간격으로 녹화한 전류).
 // 고장파형 AI 와 같은 흐름을 작게 재현: 입력 검사 → 특징 → 분류 → 근거 부족하면 보류 → 근거(경로 기여도).
 // 모델은 gridwitness-ai scripts/train_village_events.py 가 실측 사건으로 학습해 src/data/village_events_model.json 으로 내보낸다.
 // features() 는 gridwitness-ai gw_ai/iot/events.py 의 features() 와 똑같이 계산해야 한다.
@@ -51,6 +51,7 @@ export const eventModelReady = () => EVENT_MODEL.trees.length > 0
 const TRIG_MA = 1.5
 const EXPECTED_SAMPLES = 260
 const EXPECTED_PRE = 60
+const EXPECTED_DT_MS = 10
 
 export const FEATURE_KO: Record<string, string> = {
   src_cmd: '개폐 명령 직후인가',
@@ -92,7 +93,7 @@ export function parseEventLine(line: string): VillageEvent | null {
 /** 입력 검사: 스케치 v3 형식과 다르면 분석하지 않는다 */
 export function checkEvent(e: VillageEvent): string[] {
   const bad: string[] = []
-  if (e.dtMs !== 5) bad.push('샘플 간격이 5 ms가 아님')
+  if (e.dtMs !== EXPECTED_DT_MS) bad.push(`샘플 간격이 ${EXPECTED_DT_MS} ms가 아님 (스케치 v3.1 필요)`)
   if (e.i100.length !== EXPECTED_SAMPLES || e.pre !== EXPECTED_PRE) bad.push(`길이가 ${EXPECTED_SAMPLES}샘플(앞 ${EXPECTED_PRE})이 아님`)
   if (e.i100.some((x) => !Number.isFinite(x) || x < 0 || x >= 32767)) bad.push('측정 범위를 벗어난 값')
   return bad
