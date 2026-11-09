@@ -3,21 +3,37 @@ import { Link, useNavigate } from 'react-router-dom'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { api } from '../api'
 import { FaultLocationBox, FrtuStrip } from '../components/AiPanel'
-import { DiagnosisBadge, StageBadge } from '../components/Badges'
-import { IconAlert, IconArrowRight, IconBolt, IconBrain, IconChevron, IconInbox, IconWave } from '../components/Icons'
+import { IconAlert, IconArrowRight, IconBrain, IconChevron, IconInbox, IconLive, IconWave } from '../components/Icons'
 import { Badge, ErrorState, TableSkeleton, type Tone } from '../components/ui'
-import { fmtTime } from '../lib/actor'
 import { CHART } from '../lib/chart'
-import { useCity } from '../lib/city'
+import { frtuViews, locateFault } from '../lib/frtu'
+import { askAssistantAbout } from '../lib/panels'
 import { STATUS_LABEL, useVillage } from '../lib/village'
 import { useVillageEvents, type AnalyzedEvent } from '../lib/villageEvents'
-import type { CaseSummary } from '../types'
+import type { AnyCase, CaseStage, CaseSummary } from '../types'
+import { DeviceConnectCard } from './LiveData'
 
 const hhmm = (iso: string) => new Date(iso).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
 
-function Kpi({ label, value, chip, icon, primary }: { label: string; value: ReactNode; chip: ReactNode; icon: ReactNode; primary?: boolean }) {
+/** 경과 시간을 '3일 4시간', '5시간 12분', '8분'처럼 */
+function fmtDur(ms: number): string {
+  const m = Math.max(0, Math.round(ms / 60000))
+  if (m < 60) return `${m}분`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h}시간${m % 60 ? ` ${m % 60}분` : ''}`
+  const d = Math.floor(h / 24)
+  return `${d}일${h % 24 ? ` ${h % 24}시간` : ''}`
+}
+const median = (xs: number[]) => {
+  if (!xs.length) return null
+  const s = [...xs].sort((a, b) => a - b)
+  const k = Math.floor(s.length / 2)
+  return s.length % 2 ? s[k] : (s[k - 1] + s[k]) / 2
+}
+
+function Kpi({ label, value, chip, icon, primary, onClick }: { label: string; value: ReactNode; chip: ReactNode; icon: ReactNode; primary?: boolean; onClick?: () => void }) {
   return (
-    <div className={`kpi ${primary ? 'primary' : ''}`}>
+    <div className={`kpi ${primary ? 'primary' : ''} ${onClick ? 'clickable' : ''}`} onClick={onClick} role={onClick ? 'button' : undefined} tabIndex={onClick ? 0 : undefined} onKeyDown={onClick ? (e) => e.key === 'Enter' && onClick() : undefined}>
       <div className="kpi-top">
         <span>{label}</span>
         <span className="kpi-icon">{icon}</span>
@@ -36,24 +52,78 @@ function verdictOf(a: AnalyzedEvent): { tone: Tone; text: string; score: string 
   return { tone: 'err', text: '입력 거부', score: '—' }
 }
 
+/** 검토 대기 사건을 할 일로: AI 결과와 우선순위 (사람 손이 먼저 필요한 것부터) */
+const TODO: Partial<Record<CaseStage, { text: string; tone: Tone; rank: number }>> = {
+  WITHHELD: { text: 'AI 판단 보류', tone: 'warn', rank: 0 },
+  REGISTERED: { text: '분석 전', tone: 'neutral', rank: 1 },
+  DIAGNOSED: { text: '분석 전', tone: 'neutral', rank: 1 },
+  ANALYZED: { text: 'AI 답함 · 검토만', tone: 'accent', rank: 2 },
+}
+
+/** 사고 대응 흐름: 단계별 건수와 검토 완료까지 걸린 시간 */
+const FLOW: { key: string; label: string; stages: CaseStage[]; color: string }[] = [
+  { key: 'pre', label: '분석 전', stages: ['REGISTERED', 'DIAGNOSED'], color: '#c9ced8' },
+  { key: 'held', label: 'AI 보류', stages: ['WITHHELD'], color: '#f0a43a' },
+  { key: 'ans', label: 'AI 답함', stages: ['ANALYZED'], color: '#5b8cff' },
+  { key: 'done', label: '검토 완료', stages: ['REVIEWED'], color: '#2fa36b' },
+]
+
+function ResponseCard({ cases, full, now }: { cases: CaseSummary[]; full: AnyCase[]; now: number }) {
+  const total = cases.length || 1
+  const done = full.filter((c) => c.reviews.length > 0).map((c) => new Date(c.reviews[0].reviewedAt).getTime() - new Date(c.createdAt).getTime()).filter((x) => x >= 0)
+  const med = median(done)
+  const pending = cases.filter((c) => c.stage !== 'REVIEWED')
+  const oldest = pending.length ? Math.max(...pending.map((c) => now - new Date(c.createdAt).getTime())) : null
+  return (
+    <section className="dash-card">
+      <div className="dash-card-head"><h2>대응 현황</h2><span className="small muted">사건 {cases.length}건</span></div>
+      <div className="flow-bar" aria-label="단계별 사건 수">
+        {FLOW.map((f) => {
+          const n = cases.filter((c) => f.stages.includes(c.stage)).length
+          return n ? <i key={f.key} style={{ width: `${(n / total) * 100}%`, background: f.color }} title={`${f.label} ${n}건`} /> : null
+        })}
+      </div>
+      <ul className="flow-legend">
+        {FLOW.map((f) => (
+          <li key={f.key}><i style={{ background: f.color }} />{f.label}<b className="num">{cases.filter((c) => f.stages.includes(c.stage)).length}</b></li>
+        ))}
+      </ul>
+      <div className="flow-stats">
+        <div><span>검토 완료까지 (중앙값)</span><strong>{med == null ? '—' : fmtDur(med)}</strong><small>{done.length ? `완료 ${done.length}건 기준` : '아직 검토 완료 없음'}</small></div>
+        <div><span>가장 오래 기다리는 사건</span><strong className={oldest != null && oldest > 86_400_000 ? 'warn' : ''}>{oldest == null ? '—' : fmtDur(oldest)}</strong><small>{pending.length ? `대기 ${pending.length}건` : '대기 없음'}</small></div>
+      </div>
+    </section>
+  )
+}
+
 export default function Dashboard() {
   const snap = useVillage()
-  const city = useCity()
   const events = useVillageEvents()
   const nav = useNavigate()
   const [cases, setCases] = useState<CaseSummary[] | null>(null)
+  const [full, setFull] = useState<AnyCase[]>([])
   const [error, setError] = useState<string | null>(null)
   const load = useCallback(() => {
     setError(null)
-    api.listCases().then(setCases).catch((e: Error) => setError(e.message))
+    api
+      .listCases()
+      .then(async (list) => {
+        setCases(list)
+        setFull(await api.exportCases())
+      })
+      .catch((e: Error) => setError(e.message))
   }, [])
   useEffect(load, [load])
-  const [now] = useState(() => new Date())
+  const [now] = useState(() => Date.now())
 
   const open = snap.events.filter((e) => !e.clearedAt)
   const withheld = events.filter((a) => a.verdict.kind === 'WITHHELD').length
   const pending = cases?.filter((c) => c.stage !== 'REVIEWED') ?? []
-  const subsBad = city.subs.filter((s) => s.status !== 'OK').length
+  const todo = [...pending].sort((a, b) => (TODO[a.stage]?.rank ?? 3) - (TODO[b.stage]?.rank ?? 3) || a.createdAt.localeCompare(b.createdAt))
+  const fv = frtuViews(snap)
+  const fiCount = Object.values(fv).filter((f) => f.fi !== 'NONE').length
+  const loc = locateFault(snap, fv)
+  const live = snap.connected && snap.status !== 'NO_DATA'
   const t0 = snap.history.length ? snap.history[snap.history.length - 1].t : 0
   const data = snap.history.map((h) => ({ t: (h.t - t0) / 1000, mA: h.i * 1000, house: h.ih != null ? h.ih * 1000 : null, lamp: h.il != null ? h.il * 1000 : null }))
 
@@ -69,32 +139,62 @@ export default function Dashboard() {
       <div className="dash-head">
         <div>
           <h1>오늘의 관제 현황</h1>
-          <p>이상 신호, AI 판정, 검토할 사건을 한눈에 봐요.</p>
+          <p>처리할 사건과 마을 FRTU 상태를 한눈에 봐요.</p>
         </div>
-        <span className="dash-stamp">기준 {now.toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })}</span>
+        <span className="dash-stamp">기준 {new Date(now).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })}</span>
       </div>
 
       <div className="kpi-row">
-        <Kpi primary label="진행 중 이상" value={`${open.length}건`} chip={snap.connected ? `마을 ${STATUS_LABEL[snap.status]}` : '실측 장치 연결 끊김'} icon={<IconAlert />} />
+        <Kpi primary label="진행 중 이상" value={`${open.length}건`} chip={live ? `마을 ${STATUS_LABEL[snap.status]}` : '실측 장치 연결 끊김'} icon={<IconAlert />} />
         <Kpi label="AI 판정" value={`${events.length}건`} chip={`보류 ${withheld}건`} icon={<IconBrain />} />
-        <Kpi label="검토 대기 사건" value={cases ? `${pending.length}건` : '—'} chip={cases ? `전체 ${cases.length}건` : '불러오는 중'} icon={<IconInbox />} />
-        <Kpi label="도시 변전소" value={`${city.subs.length - subsBad}/${city.subs.length}`} chip={subsBad ? `이상 ${subsBad}곳` : '모두 정상'} icon={<IconBolt />} />
+        <Kpi label="검토 대기 사건" value={cases ? `${pending.length}건` : '—'} chip={cases ? `AI 보류 ${pending.filter((c) => c.stage === 'WITHHELD').length}건` : '불러오는 중'} icon={<IconInbox />} onClick={() => nav('/cases')} />
+        <Kpi
+          label="FRTU 고장표시"
+          value={live ? `${fiCount}/3` : '—'}
+          chip={!live ? '계측값 없음' : fiCount ? loc.title.split(' (')[0] : '모두 정상'}
+          icon={<IconLive />}
+          onClick={() => nav('/frtu')}
+        />
       </div>
 
       <div className="dash-cols">
         <section className="dash-card">
           <div className="dash-card-head">
+            <h2>마을 FRTU</h2>
+            <Link to="/frtu" className="pill-link">FRTU 상세 <IconArrowRight /></Link>
+          </div>
+          {!live ? (
+            <DeviceConnectCard real={snap.source === 'SERIAL'} reconnecting={snap.reconnecting} />
+          ) : (
+            <div className="dash-sub">
+              <FrtuStrip snap={snap} value="inlet" onPick={(id) => nav(`/frtu${id === 'inlet' ? '' : `?id=${id}`}`)} />
+              <FaultLocationBox snap={snap} />
+              <span>실시간 전류 · 인입 / 주택 분기 / 가로등 분기</span>
+              <ResponsiveContainer width="100%" height={120}>
+                <LineChart data={data} margin={{ top: 6, right: 6, left: 0, bottom: 0 }}>
+                  <CartesianGrid stroke={CHART.grid} vertical={false} />
+                  <XAxis dataKey="t" type="number" domain={['dataMin', 0]} tick={CHART.tick} axisLine={false} tickLine={false} unit="s" />
+                  <YAxis tick={CHART.tick} axisLine={false} tickLine={false} width={40} domain={['auto', 'auto']} />
+                  <Tooltip formatter={(x) => (typeof x === 'number' ? `${x.toFixed(1)} mA` : x)} labelFormatter={(t) => `${Number(t).toFixed(1)} s`} />
+                  <Line dataKey="mA" name="인입" stroke="#2f6bff" dot={false} strokeWidth={1.8} isAnimationActive={false} />
+                  <Line dataKey="house" name="주택 분기" stroke="#e08a1e" dot={false} strokeWidth={1.4} isAnimationActive={false} connectNulls />
+                  <Line dataKey="lamp" name="가로등 분기" stroke="#24835a" dot={false} strokeWidth={1.4} isAnimationActive={false} connectNulls />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
+          <div className="dash-card-head" style={{ marginTop: 18 }}>
             <h2>최근 판정</h2>
-            <Link to="/village?ai=1" className="pill-link">AI 분석 열기 <IconArrowRight /></Link>
           </div>
           {rows.length === 0 ? (
-            <p className="muted" style={{ margin: '8px 4px' }}>아직 판정할 사건이 없어요. 마을에서 LED를 끄거나 정전을 일으키면 여기에 쌓여요.</p>
+            <p className="muted small" style={{ margin: '4px 2px' }}>아직 판정한 마을 사건이 없어요.</p>
           ) : (
             <table className="dash-table">
               <thead><tr><th>사건</th><th>판정</th><th>판정 주체</th><th className="num">점수</th><th className="num">시각</th></tr></thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.key} className="clickable" onClick={() => nav('/village?ai=1')}>
+                  <tr key={r.key} className="clickable" onClick={() => nav('/frtu')}>
                     <td><span className="row-icon"><IconWave /></span>{r.name}</td>
                     <td><Badge tone={r.tone}>{r.text}</Badge></td>
                     <td className="muted">{r.by}</td>
@@ -105,53 +205,43 @@ export default function Dashboard() {
               </tbody>
             </table>
           )}
-          <div className="dash-sub">
-            <span>FRTU 3대 · 고장표시</span>
-            <FrtuStrip snap={snap} value="inlet" onPick={(id) => nav(`/frtu${id === 'inlet' ? '' : `?id=${id}`}`)} />
-            <FaultLocationBox snap={snap} />
-            <span>실시간 전류 · 인입 / 주택 분기 / 가로등 분기</span>
-            <ResponsiveContainer width="100%" height={120}>
-              <LineChart data={data} margin={{ top: 6, right: 6, left: 0, bottom: 0 }}>
-                <CartesianGrid stroke={CHART.grid} vertical={false} />
-                <XAxis dataKey="t" type="number" domain={['dataMin', 0]} tick={CHART.tick} axisLine={false} tickLine={false} unit="s" />
-                <YAxis tick={CHART.tick} axisLine={false} tickLine={false} width={40} domain={['auto', 'auto']} />
-                <Tooltip formatter={(x) => (typeof x === 'number' ? `${x.toFixed(1)} mA` : x)} labelFormatter={(t) => `${Number(t).toFixed(1)} s`} />
-                <Line dataKey="mA" name="인입" stroke="#2f6bff" dot={false} strokeWidth={1.8} isAnimationActive={false} />
-                <Line dataKey="house" name="주택 분기" stroke="#e08a1e" dot={false} strokeWidth={1.4} isAnimationActive={false} connectNulls />
-                <Line dataKey="lamp" name="가로등 분기" stroke="#24835a" dot={false} strokeWidth={1.4} isAnimationActive={false} connectNulls />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
         </section>
 
-        <section className="dash-card">
-          <div className="dash-card-head">
-            <h2>검토 대기 사건</h2>
-            <Link to="/cases" className="pill-link">전체 보기 <IconArrowRight /></Link>
-          </div>
-          {error ? (
-            <ErrorState message={error} onRetry={load} />
-          ) : !cases ? (
-            <TableSkeleton rows={4} />
-          ) : pending.length === 0 ? (
-            <p className="muted" style={{ margin: '8px 4px' }}>검토할 사건이 없어요.</p>
-          ) : (
-            <ul className="dash-list">
-              {pending.slice(0, 6).map((c) => (
-                <li key={c.id} className="clickable" onClick={() => nav(`/cases/${c.id}`)}>
-                  <div style={{ minWidth: 0 }}>
-                    <strong>{c.title}</strong>
-                    <span>{fmtTime(c.createdAt)}</span>
-                  </div>
-                  <div className="dash-chips">
-                    <DiagnosisBadge status={c.diagnosisStatus} />
-                    <StageBadge stage={c.stage} />
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+        <div className="stack" style={{ gap: 14 }}>
+          {cases && !error && <ResponseCard cases={cases} full={full} now={now} />}
+
+          <section className="dash-card">
+            <div className="dash-card-head">
+              <h2>처리할 사건</h2>
+              <Link to="/cases" className="pill-link">전체 보기 <IconArrowRight /></Link>
+            </div>
+            {error ? (
+              <ErrorState message={error} onRetry={load} />
+            ) : !cases ? (
+              <TableSkeleton rows={4} />
+            ) : todo.length === 0 ? (
+              <p className="muted" style={{ margin: '8px 4px' }}>처리할 사건이 없어요.</p>
+            ) : (
+              <ul className="todo-list">
+                {todo.slice(0, 6).map((c) => {
+                  const t = TODO[c.stage] ?? { text: c.stage, tone: 'neutral' as Tone }
+                  return (
+                    <li key={c.id}>
+                      <button type="button" className="todo-main" onClick={() => nav(`/cases/${c.id}`)}>
+                        <strong>{c.title}</strong>
+                        <span><span className="mono">{c.id}</span> · {fmtDur(now - new Date(c.createdAt).getTime())}째 대기</span>
+                      </button>
+                      <Badge tone={t.tone}>{t.text}</Badge>
+                      {c.caseType === 'WAVEFORM' && (
+                        <button type="button" className="btn btn-sm todo-ask" onClick={() => askAssistantAbout(c.id)} title="이 사건을 AI 도우미로 열기">AI에게 묻기</button>
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </section>
+        </div>
       </div>
     </div>
   )
