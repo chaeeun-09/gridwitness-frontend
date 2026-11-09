@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../api'
 import AssistantChat from '../components/AssistantChat'
+import FieldNotes from '../components/FieldNotes'
 import { DiagnosisBadge, StageBadge, Steps, WAVEFORM_STEPS, waveformStepsDone } from '../components/Badges'
 import FaultAnalysis from '../components/FaultAnalysis'
 import IotCaseView from '../components/IotCaseView'
@@ -82,6 +83,7 @@ export function WaveformCaseView({ c, onChange }: { c: IncidentCase; onChange: (
             actions={<Link className="btn btn-sm" to={`/field/${c.id}`}>현장용 화면 열기</Link>}
           >
             <AssistantChat c={c} />
+            <FieldNotes c={c} />
           </Section>
         )}
         {tab === 'diagnosis' && <DiagnosisPanel c={c} onNext={() => setTab('analysis')} />}
