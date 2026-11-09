@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
 import { Link, Navigate, NavLink, Route, Routes, useLocation, useParams } from 'react-router-dom'
 import { IconAnalysis, IconDashboard, IconShieldCheck, IconDatabase, IconLive, IconLogo, IconMenu, IconBolt, IconSettings, IconVillage } from './components/Icons'
+import GlobalAssistant from './components/GlobalAssistant'
 import { Dot, PageSkeleton } from './components/ui'
 import { useActor } from './lib/actor'
 import { useBackendHealth } from './lib/backend'
@@ -149,6 +150,7 @@ export function Shell({ extraRoutes }: { extraRoutes?: ReactNode } = {}) {
   return (
     <div className={`app no-sidebar ${immersive ? 'immersive' : ''}`}>
       <FloatingMenu actor={actor} />
+      <GlobalAssistant />
 
       <div className="main">
         <ReconnectBanner />
