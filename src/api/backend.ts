@@ -263,7 +263,7 @@ function stub(i: ServerIncident): IncidentCase {
       status,
       rows: 0,
       cols: CHANNELS.length,
-      issues: [{ code: 'REMOTE_RECORD', severity: 'info', message: '다른 곳에서 등록된 사건입니다. 이 브라우저에는 원본 파형이 없어 파형과 진단 상세를 표시하지 않습니다. 이력과 검토 기록은 서버에서 불러옵니다.' }],
+      issues: [{ code: 'REMOTE_RECORD', severity: 'info', message: '다른 곳에서 등록된 사건입니다. 사건을 열면 서버에 보관된 원본 파형·입력 진단·AI 분석·검토 기록을 불러옵니다.' }],
       checkedAt: i.created_at,
     },
     waveform: null,
@@ -271,6 +271,79 @@ function stub(i: ServerIncident): IncidentCase {
     reviews: [],
     history: [],
     backend: { incidentId: i.incident_id, validationId: null, analysisId: null },
+  }
+}
+
+/** 원본 파일을 사건에 붙인다. 서버에 등록된 해시와 다르면 거부 (다른 파일로 바꿔치기 방지) */
+async function applyWaveform(c: IncidentCase, buf: ArrayBuffer) {
+  const sha = await sha256Hex(buf)
+  if (sha !== c.source.sha256) throw new Error('서버에 등록된 파일과 내용이 다릅니다 (SHA-256 불일치). 등록할 때 쓴 원본 CSV를 선택하세요.')
+  const text = new TextDecoder().decode(buf)
+  const parsed = parseCsv(text)
+  const { diagnosis, matrix } = diagnose(parsed, buf.byteLength, {
+    samplingRateHz: c.source.samplingRateHz,
+    systemFrequencyHz: c.source.systemFrequencyHz,
+    sourceType: c.source.sourceType,
+  })
+  if (!matrix) throw new Error('파일을 파형으로 읽지 못했습니다.')
+  c.waveform = matrix
+  c.diagnosis = { ...c.diagnosis, rows: diagnosis.rows, cols: diagnosis.cols, issues: c.diagnosis.issues.filter((i) => i.code !== 'REMOTE_RECORD') }
+  c.source = { ...c.source, fileSize: buf.byteLength, channelOrder: parsed.header ?? c.source.channelOrder }
+}
+
+const VERDICT_FROM_CODE = Object.fromEntries(Object.entries(VERDICT_CODE).map(([k, v]) => [v, k])) as Record<string, Review['verdict']>
+interface ServerReview {
+  reviewer: string
+  final_decision: string
+  comment?: string | null
+  additional_investigation?: string | null
+  created_at: string
+}
+
+/** 다른 브라우저(다른 노트북)에서 등록한 사건: 서버에 남은 원본 파형·입력 진단·AI 분석·검토를 받아 채운다.
+ *  하나가 실패해도(아직 분석 안 함 등) 나머지는 채운다 */
+async function hydrateFromServer(c: IncidentCase) {
+  const id = c.backend!.incidentId
+  if (!c.waveform) {
+    try {
+      const res = await fetch(`${apiBase()}/api/v1/incidents/${id}/waveform`)
+      if (res.ok) await applyWaveform(c, await res.arrayBuffer())
+    } catch {
+      // 파형을 못 받으면 예전처럼 원본 CSV 연결 안내가 남는다
+    }
+  }
+  try {
+    const v = await call<Validation>(`/incidents/${id}/validation`)
+    const d = toDiagnosis(v, [])
+    c.diagnosis = { ...d, rows: c.diagnosis.rows || d.rows, cols: c.diagnosis.cols || d.cols }
+    c.backend = { ...c.backend!, validationId: v.validation_id }
+  } catch {
+    // 진단 기록이 없으면 목록에서 만든 요약을 그대로 둔다
+  }
+  if (!c.analysis) {
+    try {
+      const a = await call<Analysis>(`/incidents/${id}/analysis`)
+      c.analysis = toResult(a)
+      c.backend = { ...c.backend!, analysisId: a.analysis_id }
+      if (c.stage !== 'REVIEWED') c.stage = c.analysis.kind === 'COMPLETED' ? 'ANALYZED' : 'WITHHELD'
+    } catch {
+      // 아직 분석하지 않은 사건
+    }
+  }
+  if (c.reviews.length === 0) {
+    try {
+      const r = await call<{ items: ServerReview[] }>(`/incidents/${id}/reviews`)
+      c.reviews = r.items.map((x) => ({
+        reviewer: x.reviewer,
+        verdict: VERDICT_FROM_CODE[x.final_decision] ?? 'NEEDS_INVESTIGATION',
+        finalJudgment: x.comment ?? '',
+        additionalInvestigation: x.additional_investigation ?? '',
+        reviewedAt: x.created_at,
+      }))
+      if (c.reviews.length) c.stage = 'REVIEWED'
+    } catch {
+      // 검토 기록이 없거나 못 받음
+    }
   }
 }
 
@@ -336,6 +409,7 @@ export const backendApi: GridWitnessApi = {
     if (!store.some((x) => x.id === id)) await syncList()
     const c = find(id)
     if (c.caseType === 'WAVEFORM' && c.backend) {
+      if (!c.waveform || c.diagnosis.issues.some((i) => i.code === 'REMOTE_RECORD')) await hydrateFromServer(c)
       try {
         const audit = await call<{ events: AuditEvent[] }>(`/incidents/${c.backend.incidentId}/audit`)
         if (audit.events?.length) c.history = fromAudit(audit.events, c.history)
@@ -452,18 +526,7 @@ export const backendApi: GridWitnessApi = {
 
   async attachWaveform(id, file) {
     const c = findWaveform(id)
-    const buf = await file.arrayBuffer()
-    const sha = await sha256Hex(buf)
-    if (sha !== c.source.sha256) throw new Error('서버에 등록된 파일과 내용이 다릅니다 (SHA-256 불일치). 등록할 때 쓴 원본 CSV를 선택하세요.')
-    const { diagnosis, matrix } = diagnose(parseCsv(new TextDecoder().decode(buf)), file.size, {
-      samplingRateHz: c.source.samplingRateHz,
-      systemFrequencyHz: c.source.systemFrequencyHz,
-      sourceType: c.source.sourceType,
-    })
-    if (!matrix) throw new Error('파일을 파형으로 읽지 못했습니다.')
-    c.waveform = matrix
-    c.diagnosis = { ...c.diagnosis, rows: diagnosis.rows, cols: diagnosis.cols, issues: c.diagnosis.issues.filter((i) => i.code !== 'REMOTE_RECORD') }
-    c.source = { ...c.source, fileSize: file.size, channelOrder: parseCsv(new TextDecoder().decode(buf)).header ?? c.source.channelOrder }
+    await applyWaveform(c, await file.arrayBuffer())
     return put(c)
   },
 
