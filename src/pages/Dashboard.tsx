@@ -8,6 +8,7 @@ import { Badge, ErrorState, TableSkeleton, type Tone } from '../components/ui'
 import { CHART } from '../lib/chart'
 import { frtuViews, locateFault } from '../lib/frtu'
 import { askAssistantAbout } from '../lib/panels'
+import { openIncident, STAGE_LABEL, useLiveIncidents } from '../lib/liveIncident'
 import { STATUS_LABEL, useVillage } from '../lib/village'
 import { useVillageEvents, type AnalyzedEvent } from '../lib/villageEvents'
 import type { AnyCase, CaseStage, CaseSummary } from '../types'
@@ -94,6 +95,39 @@ function ResponseCard({ cases, full, now }: { cases: CaseSummary[]; full: AnyCas
         <div><span>가장 오래 기다리는 사건</span><strong className={oldest != null && oldest > 86_400_000 ? 'warn' : ''}>{oldest == null ? '—' : fmtDur(oldest)}</strong><small>{pending.length ? `대기 ${pending.length}건` : '대기 없음'}</small></div>
       </div>
     </section>
+  )
+}
+
+/** 오늘 생긴 실시간 사건 (발생 → 처리 단계 → 복구) */
+function TodayIncidents() {
+  const { incidents } = useLiveIncidents()
+  const start = new Date()
+  start.setHours(0, 0, 0, 0)
+  const today = incidents.filter((x) => x.startedAt >= start.getTime())
+  return (
+    <>
+      <div className="dash-card-head" style={{ marginTop: 18 }}>
+        <h2>오늘의 실시간 사건</h2>
+        <span className="small muted">{today.length}건</span>
+      </div>
+      {today.length === 0 ? (
+        <p className="muted small" style={{ margin: '4px 2px' }}>오늘은 고장표시가 없었어요.</p>
+      ) : (
+        <ol className="today-list">
+          {today.slice(0, 6).map((x) => (
+            <li key={x.id} className={x.clearedAt ? '' : 'live'}>
+              <span className="today-time num">{new Date(x.startedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })}</span>
+              <button type="button" className="today-main" onClick={() => openIncident(x.id)}>
+                <strong>{x.title.split(' (')[0]}</strong>
+                <span>{x.clearedAt ? `${Math.round((x.clearedAt - x.startedAt) / 1000)}초 만에 복구` : '진행 중'} · {x.assignee ?? '담당자 미지정'}</span>
+              </button>
+              <Badge tone={x.stage === 'CLOSED' ? 'ok' : x.stage === 'RESTORED' ? 'accent' : 'warn'}>{STAGE_LABEL[x.stage]}</Badge>
+              <Link to={`/report/live/${x.id}`} className="small">보고서</Link>
+            </li>
+          ))}
+        </ol>
+      )}
+    </>
   )
 }
 
@@ -212,6 +246,8 @@ export default function Dashboard() {
               </ResponsiveContainer>
             </div>
           )}
+
+          <TodayIncidents />
 
           <div className="dash-card-head" style={{ marginTop: 18 }}>
             <h2>최근 판정</h2>
