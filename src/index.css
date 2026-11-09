@@ -1080,3 +1080,10 @@ body { background: linear-gradient(180deg, #e6effc 0%, #f1f6fd 380px, #f6f9fe 10
 .dash-chips { display: flex; gap: 6px; flex-shrink: 0; }
 @media (max-width: 1100px) { .kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } .dash-cols { grid-template-columns: 1fr; } }
 @media (max-width: 600px) { .kpi-row { grid-template-columns: 1fr; } .dash-head { flex-direction: column; align-items: flex-start; } .dash-table th:nth-child(3), .dash-table td:nth-child(3) { display: none; } }
+/* 사이드바 없음: 모든 화면이 왼쪽 위 떠 있는 메뉴를 씀 */
+.app.no-sidebar { grid-template-columns: minmax(0, 1fr); }
+.app.no-sidebar:not(.immersive) .page { padding-top: 84px; }
+.embed-app .app.no-sidebar { grid-template-columns: minmax(0, 1fr); position: relative; }
+.embed-app .float-menu { display: none; }
+.embed-app .app.no-sidebar:not(.immersive) .page { padding-top: 20px; }
+.dash-back { margin-left: 0; }

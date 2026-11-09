@@ -139,48 +139,16 @@ function FloatingMenu({ actor }: { actor: string }) {
 /** 앱 화면 틀(사이드바 + 페이지). 소개 화면의 노트북에도 같은 것을 씀 */
 export function Shell({ extraRoutes }: { extraRoutes?: ReactNode } = {}) {
   const [actor] = useActor()
-  const [navOpen, setNavOpen] = useState(false)
   const location = useLocation()
-  useEffect(() => setNavOpen(false), [location.pathname])
   const wide = location.pathname === '/city'
   // 대시보드(마을 시뮬)는 사이드바 없이 화면 전체를 쓰고, 메뉴는 왼쪽 위 떠 있는 버튼으로
   const immersive = location.pathname === '/village'
 
   return (
-    <div className={`app ${navOpen ? 'nav-open' : ''} ${immersive ? 'immersive' : ''}`}>
-      {immersive && <FloatingMenu actor={actor} />}
-      <aside className="sidebar no-print" aria-label="주 메뉴">
-        <Link to="/" className="brand" title="소개 화면">
-          <span className="brand-mark"><IconLogo /></span>
-          <span className="brand-name">GridWitness</span>
-        </Link>
-        <nav>
-          {NAV.map((g) => (
-            <div key={g.label} className="side-group">
-              <div className="side-label">{g.label}</div>
-              {g.items.map((n) => (
-                <NavLink key={n.to} to={n.to} end={n.end} className="side-link">
-                  {n.icon}
-                  <span>{n.label}</span>
-                </NavLink>
-              ))}
-            </div>
-          ))}
-        </nav>
-        <div className="side-foot">
-          <DeviceStatus />
-          <div className="side-user">{actor}</div>
-        </div>
-      </aside>
-      <div className="scrim" onClick={() => setNavOpen(false)} />
+    <div className={`app no-sidebar ${immersive ? 'immersive' : ''}`}>
+      <FloatingMenu actor={actor} />
 
       <div className="main">
-        <div className="mobile-bar no-print">
-          <button className="btn btn-ghost btn-icon" onClick={() => setNavOpen(true)} aria-label="메뉴 열기">
-            <IconMenu />
-          </button>
-          <span className="brand-name">GridWitness</span>
-        </div>
         <ReconnectBanner />
         <main key={location.pathname} className={`page ${wide ? 'wide' : ''}`}>
           <Suspense fallback={<PageSkeleton />}>
