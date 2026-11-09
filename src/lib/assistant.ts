@@ -4,6 +4,7 @@
 // 교류 고장파형 사건에 대한 현장 대응 대화는 components/AssistantChat (사건별) 이 맡는다.
 
 import { FRTUS, frtuViews, locateFault } from './frtu'
+import { inspectionCandidate } from './gis'
 import { getVillage, IOT_CHANNELS, STATUS_LABEL } from './village'
 import type { AnalyzedEvent } from './villageEvents'
 
@@ -42,7 +43,10 @@ export function answer(text: string, events: AnalyzedEvent[]): string {
   if (has(t, '어디', '위치', '구간', '분기', '먼저', '점검', 'FRTU', 'frtu')) {
     const loc = locateFault(s)
     if (loc.scope === 'NONE' || loc.scope === 'OFF' || loc.scope === 'NO_DATA') return `${loc.title}.`
-    return `${loc.title}.\n근거:\n${loc.reasons.map((r) => `· ${r}`).join('\n')}\n분기 안의 어느 LED인지는 제어판의 채널 점검으로 확인해 주세요.`
+    // 설비 연결정보(GIS)가 있으면 실제 설비 이름과 점검 순서까지
+    const cand = inspectionCandidate(loc.scope)
+    const order = cand ? `\n점검 후보: ${cand.section}\n점검 순서: ${cand.steps.map((st, k) => `${k + 1}) ${st.label}`).join(' → ')}\n(설비 정보: ${cand.source})` : ''
+    return `${loc.title}.\n근거:\n${loc.reasons.map((r) => `· ${r}`).join('\n')}${order}\n분기 안의 어느 LED인지는 제어판의 채널 점검으로 확인해 주세요.`
   }
 
   // 조회
