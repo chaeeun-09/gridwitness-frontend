@@ -9,6 +9,7 @@ import { Segmented } from './ui'
 import VillageStatusChat from './VillageStatusChat'
 
 type Mode = 'case' | 'village'
+const FULL_KEY = 'gridwitness.assistant.full.v1'
 
 /** 화면 어디서나 여는 AI 도우미.
  *  - 사건 화면에서는 그 사건의 현장 대응 AI (교류 고장파형 분석 기록)
@@ -23,6 +24,22 @@ export default function GlobalAssistant() {
   const defaultMode: Mode = villageRoute ? 'village' : 'case'
 
   const [open, setOpen] = useState(false)
+  // 전체화면으로 크게 보기 (마지막 선택을 기억)
+  const [full, setFullState] = useState(() => {
+    try {
+      return localStorage.getItem(FULL_KEY) === '1'
+    } catch {
+      return false
+    }
+  })
+  const setFull = (on: boolean) => {
+    setFullState(on)
+    try {
+      localStorage.setItem(FULL_KEY, on ? '1' : '0')
+    } catch {
+      // 저장 못 해도 화면에서는 동작
+    }
+  }
   const [mode, setMode] = useState<Mode>(defaultMode)
   const [list, setList] = useState<CaseSummary[] | null>(null)
   const [pickId, setPickId] = useState<string | null>(null)
@@ -64,10 +81,15 @@ export default function GlobalAssistant() {
 
   useEffect(() => {
     if (!open) return
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
+    // Esc: 전체화면이면 먼저 작게, 아니면 닫기
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      if (full) setFull(false)
+      else setOpen(false)
+    }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [open])
+  }, [open, full])
 
   // 화면의 다른 패널(FRTU 요약·제어판 등)이 열리면 AI 패널은 접는다
   useEffect(() => {
@@ -99,7 +121,7 @@ export default function GlobalAssistant() {
         </button>
       )}
       {open && (
-        <section className="ga-panel" role="dialog" aria-label="AI 도우미">
+        <section className={`ga-panel ${full ? 'full' : ''}`} role="dialog" aria-label="AI 도우미" aria-modal={full || undefined}>
           <header className="ga-head">
             <strong>AI 도우미</strong>
             <Segmented
@@ -111,6 +133,13 @@ export default function GlobalAssistant() {
                 { value: 'village', label: '마을 상태' },
               ]}
             />
+            <button type="button" className="btn btn-ghost btn-icon btn-sm" onClick={() => setFull(!full)} aria-label={full ? '작게 보기' : '전체화면으로 보기'} title={full ? '작게 보기 (Esc)' : '전체화면'}>
+              {full ? (
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /></svg>
+              ) : (
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
+              )}
+            </button>
             <button type="button" className="btn btn-ghost btn-icon btn-sm" onClick={() => setOpen(false)} aria-label="닫기"><IconX /></button>
           </header>
 
