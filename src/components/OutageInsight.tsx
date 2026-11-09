@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { Bar, BarChart, CartesianGrid, Cell, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Section } from './ui'
 import { CHART } from '../lib/chart'
-import { KEPCO_OUTAGE_2025, KEPCO_OUTAGE_SOURCE, loadRegion, outageTotals, saveRegion } from '../data/kepcoOutage'
+import { equipmentTotals, KEPCO_EQUIPMENT, KEPCO_EQUIPMENT_SOURCE, REGION_TO_SIDO } from '../data/kepcoEquipment'
+import { KEPCO_OUTAGE_2025, KEPCO_OUTAGE_SOURCE, loadRegion, outageTotals, outageTrend, saveRegion } from '../data/kepcoOutage'
 
 const fmt = (n: number) => n.toLocaleString('ko-KR')
 
@@ -14,6 +15,11 @@ export default function OutageInsight() {
   const total = outageTotals()
   const mine = KEPCO_OUTAGE_2025.find((r) => r.region === region)!
   const rank = rows.findIndex((r) => r.region === region) + 1
+  const trend = outageTrend(region)
+  const eq = equipmentTotals()
+  const equipment = KEPCO_EQUIPMENT
+  const sido = REGION_TO_SIDO[region] ?? []
+  const mySwitches = KEPCO_EQUIPMENT.filter((r) => sido.includes(r.region)).reduce((n, r) => n + r.switchOverhead + r.switchUnderground, 0)
 
   // 판독 시간 계산: 기본값은 예시 가정값 (현업 인터뷰로 확정 필요)
   const [before, setBefore] = useState(30)
@@ -59,6 +65,56 @@ export default function OutageInsight() {
           출처: <a href={KEPCO_OUTAGE_SOURCE.url} target="_blank" rel="noreferrer">{KEPCO_OUTAGE_SOURCE.name}</a> · {KEPCO_OUTAGE_SOURCE.provider} · 기준 {KEPCO_OUTAGE_SOURCE.asOf} · {KEPCO_OUTAGE_SOURCE.license}. 통계 자료라 AI 학습·판정에는 쓰지 않아요.
         </p>
       </Section>
+      </div>
+
+      <div className="section">
+        <Section
+          title={`정전 추이 · 2016~2025년`}
+          description={`전국 일시정전은 ${fmt(trend[0].nationSustained)}건에서 ${fmt(trend.at(-1)!.nationSustained)}건으로, ${region}는 ${trend[0].regionSustained}건에서 ${trend.at(-1)!.regionSustained}건으로 바뀌었어요.`}
+        >
+          <ResponsiveContainer width="100%" height={260}>
+            <LineChart data={trend} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+              <CartesianGrid stroke={CHART.grid} vertical={false} />
+              <XAxis dataKey="year" tick={CHART.tick} axisLine={false} tickLine={false} />
+              <YAxis yAxisId="n" tick={CHART.tick} axisLine={false} tickLine={false} width={44} />
+              <YAxis yAxisId="r" orientation="right" tick={CHART.tick} axisLine={false} tickLine={false} width={40} />
+              <Tooltip formatter={(v) => `${v}건`} />
+              <Legend wrapperStyle={{ fontSize: 12 }} />
+              <Line yAxisId="n" dataKey="nationSustained" name="전국 일시정전 (왼쪽 축)" stroke="#8792a5" strokeWidth={2} dot={false} isAnimationActive={false} />
+              <Line yAxisId="r" dataKey="regionSustained" name={`${region} 일시정전 (오른쪽 축)`} stroke="#d64545" strokeWidth={2.4} dot={{ r: 3 }} isAnimationActive={false} />
+            </LineChart>
+          </ResponsiveContainer>
+          <p className="xs muted">출처: {KEPCO_OUTAGE_SOURCE.name} 2016~2025년 파일 (공공데이터포털 이력 자료 포함).</p>
+        </Section>
+      </div>
+
+      <div className="section">
+        <Section title="적용 규모 · 배전 개폐기" description="자동화 개폐기에는 배전자동화 단말(FRTU)이 달려요. 개폐기가 많을수록 GridWitness가 읽을 파형도 많아요.">
+          <div className="impact-stats">
+            <div><span>전국 개폐기</span><strong>{fmt(eq.switches)}<small>대</small></strong></div>
+            <div><span>가공 · 지중</span><strong>{fmt(eq.overhead)}<small>· {fmt(eq.underground)}대</small></strong></div>
+            <div className="hl"><span>{sido.join('·')} 개폐기</span><strong>{fmt(mySwitches)}<small>대</small></strong></div>
+            <div><span>전국 지지물 (전주·철탑)</span><strong>{fmt(eq.supports)}<small>기</small></strong></div>
+          </div>
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={equipment} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+              <CartesianGrid stroke={CHART.grid} vertical={false} />
+              <XAxis dataKey="region" tick={CHART.tick} axisLine={false} tickLine={false} interval={0} />
+              <YAxis tick={CHART.tick} axisLine={false} tickLine={false} width={48} />
+              <Tooltip formatter={(v) => `${fmt(Number(v))}대`} />
+              <Legend wrapperStyle={{ fontSize: 12 }} />
+              <Bar dataKey="switchOverhead" name="가공 개폐기" stackId="s" fill="#5b8cff" isAnimationActive={false}>
+                {equipment.map((r) => <Cell key={r.region} fill={sido.includes(r.region) ? '#2f6bff' : '#b8cbff'} />)}
+              </Bar>
+              <Bar dataKey="switchUnderground" name="지중 개폐기" stackId="s" fill="#24835a" isAnimationActive={false}>
+                {equipment.map((r) => <Cell key={r.region} fill={sido.includes(r.region) ? '#24835a' : '#a9d8bf'} />)}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+          <p className="xs muted">
+            출처: <a href={KEPCO_EQUIPMENT_SOURCE.switches.url} target="_blank" rel="noreferrer">{KEPCO_EQUIPMENT_SOURCE.switches.name}</a> · <a href={KEPCO_EQUIPMENT_SOURCE.supports.url} target="_blank" rel="noreferrer">{KEPCO_EQUIPMENT_SOURCE.supports.name}</a> · 기준 {KEPCO_EQUIPMENT_SOURCE.asOf}. 설비 통계는 시도 기준이라 지역본부와 경계가 다를 수 있어요 (예: 서울은 서울·남서울본부 합계). 모든 개폐기에 FRTU가 달린 것은 아니에요.
+          </p>
+        </Section>
       </div>
 
       <div className="section">
