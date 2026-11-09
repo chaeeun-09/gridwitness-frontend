@@ -746,9 +746,8 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .dash-intro .land-features { margin: 0; }
 .dash-intro .land-flow { max-width: none; padding: 0; margin: 28px 0 20px; }
 
-/* 화면 전체를 조금 크게: 넓은 화면에서만 */
-@media (min-width: 1100px) { .app { zoom: 1.12; --z: 1.12; } }
-@media (min-width: 1700px) { .app { zoom: 1.2; --z: 1.2; } }
+/* 아주 넓은 화면에서만 살짝 키움 (예전 1.12/1.2배는 일반 노트북에서 너무 커서 낮춤) */
+@media (min-width: 1700px) { .app { zoom: 1.06; --z: 1.06; } }
 /* 확대(zoom)된 만큼 100vh도 커지므로 나눠서 화면 높이에 맞춤. 안 그러면 사이드바가 화면보다 길어져 같이 스크롤됨 */
 .app { min-height: calc(100vh / var(--z, 1)); }
 .app .sidebar { height: calc(100vh / var(--z, 1)); }
@@ -1260,8 +1259,74 @@ body { background-attachment: fixed; }
 @media (max-width: 1200px) { .ai-panel, .control-drawer { width: 340px; } .scene.scene-full.with-panel .scene-tools { right: 368px; } .scene.scene-full .scene-tools { flex-wrap: wrap; } }
 @media (max-width: 1000px) { .ai-panel, .control-drawer { width: auto; } .scene.scene-full.with-panel .scene-tools { right: 14px; } }
 .control-drawer .channel { padding: 10px 6px; }
-.control-drawer .section > * { padding: 18px 16px !important; box-shadow: none !important; background: #f8f9fb !important; }
+/* 제어판: 섹션마다 독립된 카드 */
+.control-drawer .section-card { margin: 0; padding: 16px 16px 12px; border: 1px solid var(--line); border-radius: 18px; background: #f8f9fb; box-shadow: none; }
+.control-drawer .section-card .section-head { margin-bottom: 8px; align-items: center; }
 .control-drawer .channel { margin: 0 !important; }
 .float-link { padding: 7px 10px; font-size: 14px; }
 .float-menu-pop { width: 220px; padding: 10px; }
 .control-drawer .channels.with-ctl .channel.load { grid-template-columns: minmax(0, 1fr) auto 44px; }
+
+/* ── 밀도 조정: 전체 UI를 한 단계 작게 ─────────────────── */
+.page { padding-top: 28px; padding-bottom: 64px; }
+.page-head { margin-bottom: 22px; }
+.section { margin-top: 24px; }
+.section-card { padding: 20px 22px; border-radius: 16px; }
+.dash-head { margin: 14px 0 16px; }
+.dash-head h1 { font-size: 24px; }
+.dash-head p { margin-top: 4px; font-size: 14px; }
+.kpi-row { gap: 12px; }
+.kpi { gap: 10px; padding: 16px 18px; border-radius: 18px; }
+.kpi-icon { width: 36px; height: 36px; }
+.kpi-icon svg { width: 18px; height: 18px; }
+.kpi-value { font-size: 30px; }
+.kpi-chip { padding: 3px 10px; font-size: 12px; }
+.dash-cols { gap: 14px; margin-top: 14px; }
+.dash-card { padding: 18px; border-radius: 18px; }
+.dash-card-head { margin-bottom: 10px; }
+.dash-card-head h2 { font-size: 17px; }
+.ai-panel { padding: 20px 20px 14px; border-radius: 20px; gap: 10px; }
+.ai-title { font-size: 21px !important; }
+.ai-h { margin-top: 14px; font-size: 15px; }
+.ai-head strong { font-size: 17px; }
+.judge strong { font-size: 17px; }
+.info-box { padding: 14px 16px; border-radius: 14px; }
+.info-box strong { font-size: 24px; }
+.pred { font-size: 36px; }
+.fa-result .pred { font-size: 32px; }
+.metric-value { font-size: 22px; }
+.float-menu-btn { height: 40px; }
+.chat-msg { padding: 10px 14px; border-radius: 16px; font-size: 13.5px; }
+.chat-chip { padding: 7px 12px; font-size: 12.5px; }
+.chat-send, .chat-mic { width: 42px; height: 42px; }
+.chat-input input, .chat-input textarea { min-height: 42px; height: auto; font-size: 14px; }
+.chat-input textarea { padding: 10px 16px; border-radius: 21px; }
+.chat-input input { height: 42px; }
+/* 현장용 화면은 손가락으로 누르기 쉽게 그대로 크게 */
+.chat-field .chat-msg { font-size: 15px; padding: 12px 16px; }
+.chat-field .chat-send { width: 48px; height: 48px; }
+.chat-field .chat-mic { width: 56px; height: 56px; }
+.chat-field .chat-input textarea { min-height: 48px; font-size: 15px; }
+
+/* ── 어디서나 여는 AI 도우미 ───────────────────────────── */
+.ga-fab { position: fixed; right: 20px; bottom: 20px; z-index: 55; display: flex; align-items: center; gap: 6px; height: 50px; padding: 0 18px 0 14px; border: 0; border-radius: 999px; background: #101827; color: #fff; font: inherit; font-weight: 700; font-size: 15px; cursor: pointer; box-shadow: 0 8px 24px -6px rgba(16, 24, 39, .45); transition: transform var(--t) var(--ease), box-shadow var(--t); }
+.ga-fab:hover { transform: translateY(-2px); box-shadow: 0 12px 28px -6px rgba(16, 24, 39, .5); }
+.ga-panel { position: fixed; right: 20px; bottom: 20px; z-index: 56; width: 400px; height: min(640px, calc(100vh / var(--z, 1) - 40px)); display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 22px; background: #fff; box-shadow: var(--overlay-shadow); animation: ga-in .22s var(--ease); }
+@keyframes ga-in { from { opacity: 0; transform: translateY(12px) scale(.98); } to { opacity: 1; transform: none; } }
+.ga-head { display: flex; align-items: center; gap: 8px; }
+.ga-head strong { font-size: 15px; color: var(--ink); white-space: nowrap; }
+.ga-head .ga-mode { margin-left: auto; }
+.ga-target { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.ga-target select { flex: 1; min-width: 0; height: 32px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; background: #fff; font: inherit; font-size: 13px; }
+.ga-target a { white-space: nowrap; }
+.ga-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.ga-body > .chat { flex: 1; min-height: 0; }
+.ga-body .chat-log { flex: 1; height: auto; min-height: 0; background: #f6f7fa; border-radius: 14px; padding: 10px; }
+.ga-body .chat-msg { max-width: 92%; }
+.ga-body .chat-chips { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; }
+.ga-body .chat-voice { font-size: 12px; }
+.ga-empty { display: grid; gap: 10px; justify-items: start; padding: 16px; border-radius: 14px; background: #f6f7fa; font-size: 13.5px; color: var(--text-2); }
+@media (max-width: 640px) {
+  .ga-fab { right: 14px; bottom: 14px; height: 48px; }
+  .ga-panel { left: 8px; right: 8px; bottom: 8px; width: auto; height: calc(100dvh - 72px); border-radius: 20px; }
+}
