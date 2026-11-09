@@ -117,7 +117,7 @@ function RegionOutageCard() {
       </div>
       <div className="region-foot">
         <a href={KEPCO_OUTAGE_SOURCE.url} target="_blank" rel="noreferrer" className="xs muted">출처: 한전 배전 정전통계종합 (공공데이터포털)</a>
-        <Link to="/impact" className="small">사업화 근거 →</Link>
+        <Link to="/public-data#outage" className="small">공공데이터 분석 →</Link>
       </div>
     </section>
   )
