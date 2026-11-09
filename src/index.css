@@ -1426,3 +1426,13 @@ body { background-attachment: fixed; }
 .todo-main:hover strong { color: var(--accent); }
 .todo-ask { flex-shrink: 0; }
 .dash .live-empty { box-shadow: none; background: #fff8ec; padding: 16px 18px; }
+
+/* ── 이전 페이지 버튼 (대시보드 외 화면) · 대시보드 3D 마을 버튼 ── */
+.float-back-btn { display: flex; align-items: center; gap: 4px; height: 40px; padding: 0 16px 0 10px; border: 0; border-radius: 999px; background: rgba(255,255,255,.94); backdrop-filter: blur(14px); box-shadow: 0 4px 16px -6px rgba(20, 30, 60, .25); color: var(--ink); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; transition: transform var(--t) var(--ease), box-shadow var(--t); }
+.float-back-btn:hover { transform: translateX(-2px); box-shadow: 0 6px 20px -6px rgba(20, 30, 60, .3); }
+.dash-head-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.village-btn { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px 0 12px; border-radius: 999px; background: #101827; color: #fff !important; font-size: 14px; font-weight: 600; text-decoration: none; box-shadow: 0 6px 18px -8px rgba(16, 24, 39, .5); transition: transform var(--t) var(--ease); }
+.village-btn:hover { transform: translateY(-1px); }
+.village-btn svg { width: 17px; height: 17px; }
+/* 대시보드는 위쪽 '3D 마을로' 줄이 없어져 로고와 제목 사이를 맞춤 */
+.dash > .dash-head:first-child { margin-top: 56px; }
