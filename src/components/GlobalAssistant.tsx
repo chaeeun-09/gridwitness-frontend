@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { api } from '../api'
-import { ASSISTANT_ASK_EVENT, ASSISTANT_OPEN_EVENT, PANEL_OPEN_EVENT } from '../lib/panels'
+import { ASSISTANT_ASK_EVENT, ASSISTANT_OPEN_EVENT, ASSISTANT_VILLAGE_EVENT, INCIDENT_OPEN_EVENT, PANEL_OPEN_EVENT } from '../lib/panels'
 import type { AnyCase, CaseSummary } from '../types'
 import AssistantChat from './AssistantChat'
 import { CaseBriefSide, VillageLiveSide } from './AssistantSide'
@@ -96,7 +96,22 @@ export default function GlobalAssistant() {
   useEffect(() => {
     const onPanel = () => setOpen(false)
     window.addEventListener(PANEL_OPEN_EVENT, onPanel)
-    return () => window.removeEventListener(PANEL_OPEN_EVENT, onPanel)
+    window.addEventListener(INCIDENT_OPEN_EVENT, onPanel)
+    return () => {
+      window.removeEventListener(PANEL_OPEN_EVENT, onPanel)
+      window.removeEventListener(INCIDENT_OPEN_EVENT, onPanel)
+    }
+  }, [])
+
+  // 실시간 사건에서 "AI에게 묻기": 마을 상태 모드로 열기
+  useEffect(() => {
+    const onVillage = () => {
+      setMode('village')
+      setOpen(true)
+      window.dispatchEvent(new Event(ASSISTANT_OPEN_EVENT))
+    }
+    window.addEventListener(ASSISTANT_VILLAGE_EVENT, onVillage)
+    return () => window.removeEventListener(ASSISTANT_VILLAGE_EVENT, onVillage)
   }, [])
 
   // 대시보드 등에서 "AI에게 묻기": 그 사건으로 바로 열기
