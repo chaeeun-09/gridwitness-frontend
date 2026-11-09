@@ -14,7 +14,7 @@ export default function LiveData() {
 }
 
 /** 장치 값이 없을 때: 0과 빈 그래프 대신 연결 방법만 보여줌 */
-function NoDevice({ real, reconnecting }: { real: boolean; reconnecting: boolean }) {
+export function DeviceConnectCard({ real, reconnecting }: { real: boolean; reconnecting: boolean }) {
   const [busy, setBusy] = useState(false)
   return (
     <div className="live-empty">
@@ -75,7 +75,7 @@ export function LiveAnalysis() {
   if (noData)
     return (
       <div className="live">
-        <NoDevice real={real} reconnecting={snap.reconnecting} />
+        <DeviceConnectCard real={real} reconnecting={snap.reconnecting} />
         <HardwareFlow />
       </div>
     )
