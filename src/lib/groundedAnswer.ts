@@ -80,7 +80,7 @@ export function groundedAnswer(question: string, ctx: IncidentContext): Grounded
       status: 'abstained',
       evidenceIds: ids(ctx, 'analysis.status', 'source'),
       abstainReasons: ['사건에 설비 위치·구간 정보 없음'],
-      neededInfo: ['기록한 FRTU의 설치 위치와 담당 선로 구간 (GIS·설비 연결정보)', '같은 시각 인접 FRTU의 기록'],
+      neededInfo: ['기록한 FRTU의 설치 위치와 담당 선로 구간 (K-GIS 등 전력 GIS의 계통 추적 결과)', '같은 시각 인접 FRTU의 기록'],
     }
   }
 
