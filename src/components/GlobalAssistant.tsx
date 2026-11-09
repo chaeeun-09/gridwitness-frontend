@@ -4,6 +4,7 @@ import { api } from '../api'
 import { ASSISTANT_OPEN_EVENT, PANEL_OPEN_EVENT } from '../lib/panels'
 import type { AnyCase, CaseSummary } from '../types'
 import AssistantChat from './AssistantChat'
+import { CaseBriefSide, VillageLiveSide } from './AssistantSide'
 import { IconX } from './Icons'
 import { Segmented } from './ui'
 import VillageStatusChat from './VillageStatusChat'
@@ -143,6 +144,19 @@ export default function GlobalAssistant() {
             <button type="button" className="btn btn-ghost btn-icon btn-sm" onClick={() => setOpen(false)} aria-label="닫기"><IconX /></button>
           </header>
 
+          <div className={full ? 'ga-full' : 'ga-plain'}>
+          {full && (
+            <aside className="ga-side" aria-label={mode === 'village' ? '마을 FRTU 실시간 계측' : '사건 분석 근거'}>
+              {mode === 'village' ? (
+                <VillageLiveSide />
+              ) : current && current.caseType === 'WAVEFORM' ? (
+                <CaseBriefSide c={current} />
+              ) : (
+                <div className="ga-empty muted">사건을 고르면 분석 근거가 여기에 보여요.</div>
+              )}
+            </aside>
+          )}
+          <div className="ga-chatcol">
           {mode === 'case' && (
             <div className="ga-target">
               {routeCaseId ? (
@@ -173,6 +187,8 @@ export default function GlobalAssistant() {
             ) : (
               <AssistantChat key={current.id} c={current} variant="popup" />
             )}
+          </div>
+          </div>
           </div>
         </section>
       )}
