@@ -18,6 +18,7 @@ import {
 import { IconDownload, IconUpload } from '../components/Icons'
 import IssueList from '../components/IssueList'
 import KepcoReal from '../components/KepcoReal'
+import OutageInsight from '../components/OutageInsight'
 import { Empty, ErrorState, Metric, Metrics, PageHeader, Section, Skeleton } from '../components/ui'
 import { CHART } from '../lib/chart'
 import { startScenario } from '../lib/village'
@@ -241,6 +242,8 @@ export default function PublicData() {
       )}
 
       <KepcoReal />
+
+      <OutageInsight />
 
       <Section title="데이터별 용도" description="세 데이터는 단위·측정 주기·설비 규모·목적이 달라 하나의 모델에 함께 학습시키지 않습니다.">
         <div className="table-wrap">
