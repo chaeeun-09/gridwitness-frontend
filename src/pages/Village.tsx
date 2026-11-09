@@ -123,7 +123,7 @@ export default function Village() {
         </div>
       )}
 
-      <div className={`scene scene-full ${frtu ? 'with-panel' : ''}`}>
+      <div className={`scene scene-full ${frtu || controls ? 'with-panel' : ''}`}>
         <div className="scene-canvas">
           <SceneBoundary>
             <VillageScene
@@ -142,6 +142,7 @@ export default function Village() {
               frtu={frtu}
               onFrtu={() => {
                 setSelected(null)
+                setControls(false)
                 setFrtu(true)
               }}
             />
@@ -174,8 +175,8 @@ export default function Village() {
           <button className={`btn btn-sm glass ${fx ? 'on' : ''}`} onClick={() => setFx(!fx)} aria-pressed={fx} title="AO·블룸 후처리, 고해상도, 60fps (GPU 사용량 증가)">
             고화질 {fx ? '켜짐' : '꺼짐'}
           </button>
-          <button className={`btn btn-sm glass ${controls ? 'on' : ''}`} onClick={() => setControls(!controls)} aria-pressed={controls}>제어판</button>
-          {!underground && !frtu && <button className="btn btn-sm glass btn-ai" onClick={() => { setSelected(null); setFrtu(true) }}>AI 분석 열기</button>}
+          <button className={`btn btn-sm glass ${controls ? 'on' : ''}`} onClick={() => { setControls(!controls); setFrtu(false) }} aria-pressed={controls}>제어판</button>
+          {!underground && !frtu && <button className="btn btn-sm glass btn-ai" onClick={() => { setSelected(null); setControls(false); setFrtu(true) }}>AI 분석 열기</button>}
           <span style={{ marginLeft: 'auto' }}><PowerButton snap={snap} /></span>
           {underground && (
             <>

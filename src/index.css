@@ -1181,3 +1181,27 @@ body { background-attachment: fixed; }
 .control-drawer .sim-grid { grid-template-columns: 1fr !important; }
 .control-drawer .section, .control-drawer .card, .control-drawer section { min-width: 0; max-width: 100%; }
 @media (max-width: 1000px) { .control-drawer { top: 116px; } }
+/* 제어판도 오른쪽에 (FRTU 패널과 같은 자리, 둘 중 하나만 열림) */
+.control-drawer { left: auto; right: 14px; top: 14px; width: 460px; animation: slide-in-right .35s var(--ease); }
+.scene.scene-full.with-panel .scene-tools { right: 488px; }
+@media (max-width: 1200px) { .control-drawer { width: 400px; } .scene.scene-full.with-panel .scene-tools { right: 428px; } }
+@media (max-width: 1000px) { .control-drawer { top: auto; bottom: 8px; left: 8px; right: 8px; width: auto; max-height: 58%; } .scene.scene-full.with-panel .scene-tools { right: 14px; } }
+.control-drawer .channel > :nth-child(2) { grid-column: 1 / -1; }
+.control-drawer .channel > :nth-child(3) { grid-column: 1 / -1; grid-row: 3; text-align: left; padding-left: 38px; }
+/* 마을 전체 화면: 버튼줄을 작게, 한 줄로 */
+.scene.scene-full .scene-tools { gap: 6px; flex-wrap: nowrap; }
+.scene.scene-full .scene-tools .btn, .scene.scene-full .scene-tools .segmented button { height: 32px; padding: 0 11px; font-size: 13px; }
+.scene.scene-full .scene-tools .btn-power { height: 34px; min-width: 0; padding: 0 14px; font-size: 13px; border-radius: 999px; box-shadow: none; }
+.scene.scene-full .scene-tools .btn-power svg { width: 15px; height: 15px; }
+.ai-panel, .control-drawer { width: 380px; }
+.scene.scene-full.with-panel .scene-tools { right: 408px; }
+.float-menu { z-index: 60; }
+.float-menu-pop { position: relative; z-index: 61; }
+@media (max-width: 1200px) { .ai-panel, .control-drawer { width: 340px; } .scene.scene-full.with-panel .scene-tools { right: 368px; } .scene.scene-full .scene-tools { flex-wrap: wrap; } }
+@media (max-width: 1000px) { .ai-panel, .control-drawer { width: auto; } .scene.scene-full.with-panel .scene-tools { right: 14px; } }
+.control-drawer .channel { padding: 10px 6px; }
+.control-drawer .section > * { padding: 18px 16px !important; box-shadow: none !important; background: #f8f9fb !important; }
+.control-drawer .channel { margin: 0 !important; }
+.float-link { padding: 7px 10px; font-size: 14px; }
+.float-menu-pop { width: 220px; padding: 10px; }
+.control-drawer .channels.with-ctl .channel.load { grid-template-columns: minmax(0, 1fr) auto 44px; }
