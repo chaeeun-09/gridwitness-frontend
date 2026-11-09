@@ -56,12 +56,13 @@ export const Pole = memo(function Pole({ p, transformer = false }: { p: V3; tran
 })
 
 // ── FRTU (배전자동화 단말장치) ─────────────────────────
-/** 전봇대 중간의 회색 철제 제어함. 마을 계측의 '현장 단말' 역할이라 맥동 고리로 강조하고, 누르면 AI 분석 패널이 열림 */
-export function Frtu({ p, status, selected, onSelect }: { p: V3; status: NodeStatus; selected: boolean; onSelect: () => void }) {
+/** 전봇대 중간의 회색 철제 제어함. 마을 계측의 '현장 단말' 역할이라 맥동 고리로 강조하고, 누르면 FRTU 요약 패널이 열림.
+ *  name: 라벨 이름, fi: 고장표시가 떠 있는지, dx: 같은 전봇대에 여러 대를 달 때 옆으로 비킬 거리, labelY: 라벨 높이 */
+export function Frtu({ p, status, selected, onSelect, name = 'FRTU', fi = false, dx = 0, labelY = 2.7 }: { p: V3; status: NodeStatus; selected: boolean; onSelect: () => void; name?: string; fi?: boolean; dx?: number; labelY?: number }) {
   const ring = useRef<Mesh>(null)
   const [hover, setHover] = useState(false)
-  const alarm = status === 'WARNING' || status === 'FAULT' || status === 'OUTAGE'
-  const tone = alarm ? STATUS_COLOR[status] : '#3d7bff'
+  const alarm = fi || status === 'WARNING' || status === 'FAULT' || status === 'OUTAGE'
+  const tone = alarm ? STATUS_COLOR[status === 'NORMAL' || status === 'OFF' || status === 'NO_DATA' ? 'WARNING' : status] : '#3d7bff'
   useFrame(({ clock }) => {
     const m = ring.current
     if (!m) return
@@ -71,7 +72,7 @@ export function Frtu({ p, status, selected, onSelect }: { p: V3; status: NodeSta
   })
   return (
     <group
-      position={[p[0], 0, p[2] + 0.2]}
+      position={[p[0] + dx, 0, p[2] + 0.2]}
       scale={1.35}
       onClick={(e) => {
         e.stopPropagation()
@@ -103,14 +104,14 @@ export function Frtu({ p, status, selected, onSelect }: { p: V3; status: NodeSta
       </mesh>
       <mesh position={[-0.18, 2.03, 0.28]}>
         <sphereGeometry args={[0.035, 10, 10]} />
-        <meshBasicMaterial color={alarm ? STATUS_COLOR[status] : '#40c057'} toneMapped={false} />
+        <meshBasicMaterial color={alarm ? tone : '#40c057'} toneMapped={false} />
       </mesh>
       {/* 강조 고리 */}
       <mesh ref={ring} position={[0, 0.03, 0.1]} rotation-x={-Math.PI / 2}>
         <ringGeometry args={[0.55, 0.68, 40]} />
         <meshBasicMaterial color={tone} transparent opacity={0.6} toneMapped={false} depthWrite={false} />
       </mesh>
-      <Label lines={[alarm ? 'FRTU · 이상 감지' : 'FRTU · AI 분석']} position={[0, 2.7, 0.1]} lineHeight={0.42} bg={tone} pointer />
+      <Label lines={[alarm ? `${name} · 고장표시` : name]} position={[0, labelY, 0.1]} lineHeight={0.42} bg={tone} pointer />
     </group>
   )
 }
