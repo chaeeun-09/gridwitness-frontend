@@ -9,6 +9,7 @@ import SceneBoundary from '../components/SceneBoundary'
 import Sparkline from '../components/Sparkline'
 import { Badge, NODE_TONE, Section, Segmented, Status } from '../components/ui'
 import VillageScene from '../components/village/VillageScene'
+import { isFrtuId, type FrtuId } from '../lib/frtu'
 import { NET_COLOR, NET_KIND_LABEL, type NetKind, type PartId } from '../lib/hardware'
 import {
   clearFault,
@@ -100,7 +101,7 @@ export default function Village() {
   const [part, setPart] = useState<PartId | null>(null)
   const [showPins, setShowPins] = useState(false)
   const [params] = useSearchParams()
-  const [frtu, setFrtu] = useState(() => params.get('ai') === '1')
+  const [frtu, setFrtu] = useState<FrtuId | null>(() => (isFrtuId(params.get('frtu')) ? (params.get('frtu') as FrtuId) : params.get('ai') === '1' ? 'inlet' : null))
   const [controls, setControls] = useState(false)
   const sel = selected ? snap.leds[selected] : null
   const selView = sel ? lightView(sel, snap) : null
@@ -131,7 +132,7 @@ export default function Village() {
               selected={selected}
               onSelect={(id) => {
                 setSelected(id)
-                if (id) setFrtu(false)
+                if (id) setFrtu(null)
               }}
               night={night}
               fx={fx}
@@ -140,10 +141,10 @@ export default function Village() {
               onPart={setPart}
               showPins={showPins}
               frtu={frtu}
-              onFrtu={() => {
+              onFrtu={(id) => {
                 setSelected(null)
                 setControls(false)
-                setFrtu(true)
+                setFrtu(id)
               }}
             />
           </SceneBoundary>
@@ -156,7 +157,7 @@ export default function Village() {
               setUnderground(v === 'under')
               setSelected(null)
               setPart(null)
-              setFrtu(false)
+              setFrtu(null)
             }}
             options={[
               { value: 'surface', label: '지상' },
@@ -175,8 +176,8 @@ export default function Village() {
           <button className={`btn btn-sm glass ${fx ? 'on' : ''}`} onClick={() => setFx(!fx)} aria-pressed={fx} title="AO·블룸 후처리, 고해상도, 60fps (GPU 사용량 증가)">
             고화질 {fx ? '켜짐' : '꺼짐'}
           </button>
-          <button className={`btn btn-sm glass ${controls ? 'on' : ''}`} onClick={() => { setControls(!controls); setFrtu(false) }} aria-pressed={controls}>제어판</button>
-          {!underground && !frtu && <button className="btn btn-sm glass btn-ai" onClick={() => { setSelected(null); setControls(false); setFrtu(true) }}>AI 분석 열기</button>}
+          <button className={`btn btn-sm glass ${controls ? 'on' : ''}`} onClick={() => { setControls(!controls); setFrtu(null) }} aria-pressed={controls}>제어판</button>
+          {!underground && !frtu && <button className="btn btn-sm glass btn-ai" onClick={() => { setSelected(null); setControls(false); setFrtu('inlet') }}>FRTU 보기</button>}
           <span style={{ marginLeft: 'auto' }}><PowerButton snap={snap} /></span>
           {underground && (
             <>
@@ -226,8 +227,8 @@ export default function Village() {
             </div>
           </div>
         )}
-        {!underground && !frtu && <div className="scene-hint glass">FRTU(전봇대 철제함)를 누르면 AI 분석이 열립니다</div>}
-        {frtu && !underground && <AiPanel snap={snap} onClose={() => setFrtu(false)} />}
+        {!underground && !frtu && <div className="scene-hint glass">전봇대의 FRTU(인입·주택 분기·가로등 분기)를 누르면 계측과 고장표시가 열립니다</div>}
+        {frtu && !underground && <AiPanel snap={snap} frtu={frtu} onPick={setFrtu} onClose={() => setFrtu(null)} />}
 
         {underground && part && <PartPanel id={part} snap={snap} onClose={() => setPart(null)} />}
         {sel && selView && !underground && (
