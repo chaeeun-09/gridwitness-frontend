@@ -27,7 +27,7 @@ const NAV: { label: string; items: { to: string; label: string; icon: ReactNode;
     items: [
       { to: '/dashboard', label: '대시보드', icon: <IconDashboard /> },
       { to: '/village', label: '마을 시뮬레이션', icon: <IconVillage /> },
-      { to: '/live', label: '실시간 분석', icon: <IconLive /> },
+      { to: '/frtu', label: 'FRTU 상세', icon: <IconLive /> },
       { to: '/city', label: '도시 시뮬레이션', icon: <IconBolt /> },
     ],
   },
