@@ -981,3 +981,53 @@ body { background: linear-gradient(180deg, #e6effc 0%, #f1f6fd 380px, #f6f9fe 10
 /* 모델 평가 카드 (ModelCardPanel) */
 .mc-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
 @media (max-width: 900px) { .mc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* ── 대시보드 = 마을 시뮬 한 화면 ───────────────────────── */
+.app.immersive { grid-template-columns: 1fr; }
+.app.immersive > .sidebar, .app.immersive .mobile-bar { display: none; }
+.app.immersive .page { max-width: none; padding: 0; margin: 0; }
+.workspace { position: relative; height: calc(100vh / var(--z, 1)); }
+.scene.scene-full { height: 100%; border-radius: 0; box-shadow: none; }
+.scene.scene-full .scene-canvas { height: 100%; min-height: 0; }
+.scene.scene-full .scene-tools { left: 232px; top: 14px; right: 14px; flex-wrap: wrap; }
+.scene.scene-full.with-panel .scene-tools { right: 454px; }
+.scene.scene-full.with-panel .scene-hud { right: auto; }
+.btn-ai { background: var(--navy, #1b2b5e) !important; color: #fff !important; }
+
+.float-menu { position: fixed; top: 14px; left: 14px; z-index: 50; }
+.float-menu-btn { display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 14px 0 8px; border: 0; border-radius: 999px; background: rgba(255,255,255,.94); backdrop-filter: blur(14px); box-shadow: var(--overlay-shadow); font-weight: 700; color: var(--ink); cursor: pointer; }
+.float-menu-btn .brand-mark { width: 28px; height: 28px; }
+.float-menu-pop { margin-top: 8px; width: 240px; max-height: calc(100vh / var(--z, 1) - 90px); overflow: auto; padding: 14px; border-radius: 22px; background: rgba(255,255,255,.97); backdrop-filter: blur(14px); box-shadow: var(--overlay-shadow); animation: pop var(--t) var(--ease); }
+.float-group + .float-group { margin-top: 12px; }
+.float-label { font-size: 12px; color: var(--text-2); margin: 0 8px 4px; }
+.float-link { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 12px; color: var(--ink); text-decoration: none; font-weight: 500; }
+.float-link:hover { background: var(--bg-2, #eef3fd); }
+.float-link.active { background: #e6edff; color: var(--navy, #1b2b5e); font-weight: 700; }
+.float-foot { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.float-foot .device-status { color: var(--ink); }
+.float-foot .device-status span { color: var(--text-2); }
+
+.ai-panel, .control-drawer { position: absolute; top: 14px; bottom: 14px; width: 430px; display: flex; flex-direction: column; gap: 12px; padding: 18px; border-radius: 22px; background: rgba(255,255,255,.96); backdrop-filter: blur(16px); box-shadow: var(--overlay-shadow); z-index: 5; }
+.ai-panel { right: 14px; animation: slide-in-right .45s var(--ease); }
+.control-drawer { left: 14px; top: 70px; width: 520px; overflow: auto; animation: slide-in-left .35s var(--ease); }
+.control-drawer .section { margin-top: 12px; }
+.ai-head { display: flex; align-items: center; gap: 8px; }
+.ai-head > :first-child { flex: 1; }
+.ai-head strong { font-size: 20px; color: var(--ink); }
+.ai-body { flex: 1; min-height: 0; overflow: auto; margin: 0 -6px; padding: 0 6px; }
+.ai-sub { font-size: 12px; color: var(--text-2); margin: 12px 0 2px; }
+.ai-verdict { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; border-radius: 14px; background: #eef3fd; }
+.ai-verdict.alarm { background: var(--err-tint); }
+.ai-events { margin-top: 14px; }
+.ai-events .grid-2, .ai-panel .grid-2 { grid-template-columns: 1fr !important; }
+.ai-drop { position: relative; display: flex; flex-direction: column; gap: 4px; align-items: center; justify-content: center; padding: 22px 14px; border: 1.5px dashed #b8c4e0; border-radius: 16px; background: #f6f9ff; text-align: center; cursor: pointer; }
+.ai-drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+@keyframes slide-in-right { from { transform: translateX(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes slide-in-left { from { transform: translateX(-40px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (max-width: 700px) {
+  .scene.scene-full .scene-tools { left: 14px; top: 68px; right: 14px; }
+  .ai-panel { left: 8px; right: 8px; top: auto; bottom: 8px; width: auto; height: 62%; }
+  .control-drawer { left: 8px; right: 8px; width: auto; }
+  .scene.scene-full.with-panel .scene-tools { right: 14px; }
+}
+.ai-panel .fa { grid-template-columns: 1fr; gap: 12px; }

@@ -1,6 +1,6 @@
 import { Fragment, lazy, memo, Suspense, useEffect, useState } from 'react'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { IconMoon, IconSun } from '../components/Icons'
+import { IconMoon, IconPower, IconSun } from '../components/Icons'
 import SceneBoundary from '../components/SceneBoundary'
 import { Badge, ErrorState, Metric, Metrics, PageHeader, Section, Segmented, Skeleton, Status, Switch, type Tone } from '../components/ui'
 import { nightness, SUB_COLOR, type CitySelection } from '../components/city/shared'
@@ -112,7 +112,34 @@ function CityView({ regions }: { regions: string[] }) {
             {snap.playing ? '일시정지' : '재생'}
           </button>
           <Segmented className="glass" value={String(snap.speed)} onChange={(v) => setSpeed(Number(v))} options={SPEEDS} />
+          <span style={{ marginLeft: 'auto' }}>
+            {snap.subs.some((s) => s.fault) ? (
+              <button className="btn btn-xl btn-power on" onClick={restoreAll}><IconPower />전력 복구</button>
+            ) : (
+              <button className="btn btn-xl btn-power off" onClick={() => snap.subs.forEach((s) => faultSub(s.def.id))}><IconPower />도시 정전 발생</button>
+            )}
+          </span>
         </div>
+
+        {(selSub || selFeeder) && (
+          <div className="scene-pop" role="dialog" aria-label="선택한 설비" style={{ top: 86 }}>
+            <div className="scene-pop-head">
+              <strong>{selSub ? `${selSub.def.name} 변전소` : `${selFeeder!.def.name} 선로`}</strong>
+            </div>
+            <p className="small muted" style={{ margin: '0 0 12px' }}>
+              {selSub ? (selSub.fault ? '사고로 꺼져 있습니다' : `부하 ${Math.round(selSub.util * 100)}%`) : selFeeder!.state === 'OK' ? `부하 ${Math.round(selFeeder!.util * 100)}%` : '정전 상태입니다'}
+            </p>
+            {selSub ? (
+              selSub.fault
+                ? <button className="btn btn-sm btn-primary" style={{ width: '100%' }} onClick={() => restoreSub(selSub.def.id)}>이 변전소 복구</button>
+                : <button className="btn btn-sm btn-danger" style={{ width: '100%' }} onClick={() => faultSub(selSub.def.id)}>이 변전소 끄기</button>
+            ) : selFeeder!.state === 'OK' ? (
+              <button className="btn btn-sm btn-danger" style={{ width: '100%' }} onClick={() => faultFeeder(selFeeder!.def.id)}>이 선로 끄기</button>
+            ) : (
+              <button className="btn btn-sm btn-primary" style={{ width: '100%' }} onClick={() => restoreFeeder(selFeeder!.def.id)}>이 선로 복구</button>
+            )}
+          </div>
+        )}
 
         <div className="scene-legend glass" aria-label="범례">
           <span><i className="legend-box" style={{ background: SUB_COLOR.OK }} />변전소 정상</span>

@@ -2,7 +2,7 @@ import { Line, OrbitControls } from '@react-three/drei'
 import { Canvas, useThree } from '@react-three/fiber'
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { Color } from 'three'
-import { CITY, type CitySnap, type SubStatus } from '../../lib/city'
+import { CITY, SPAN, type CitySnap, type SubStatus } from '../../lib/city'
 import Label from '../three/Label'
 import { Buildings, Decor, Ground } from './miniature'
 import { nightness, SUB_COLOR, type CitySelection } from './shared'
@@ -149,24 +149,25 @@ export default function CityScene({ snap, selection, onSelect }: { snap: CitySna
         frameloop="demand"
         resize={{ offsetSize: true }}
         dpr={dpr}
-        camera={{ position: [-100, 118, 120], fov: 42, near: 1, far: 800 }}
+        camera={{ position: [-44, 52, 56], fov: 42, near: 1, far: 800 }}
         gl={{ antialias: true, powerPreference: 'default' }}
         onPointerMissed={() => onSelect(null)}
       >
         <Frame active={active} version={snap.version} />
         <color attach="background" args={[bg.r, bg.g, bg.b]} />
-        <fog attach="fog" args={[bg, 220, 520]} />
+        <fog attach="fog" args={[bg, 140, 320]} />
         <hemisphereLight args={[night > 0.5 ? '#4a5f94' : '#eaf4ff', night > 0.5 ? '#141a28' : '#566c42', 0.5 + 0.5 * (1 - night)]} />
         <directionalLight position={[-40, 80, 30]} intensity={2.0 * (1 - night) + 0.3 * night} color={night > 0.5 ? '#9db4ff' : '#fff1dc'} />
         <Ground night={night > 0.5} />
-        <mesh position={[0, -0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <planeGeometry args={[900, 900]} />
-          <meshLambertMaterial color={night > 0.5 ? '#0d1410' : '#8aa070'} />
+        {/* 도시 받침판 (주변 잔디 대신 모형 테이블처럼) */}
+        <mesh position={[-3, -0.6, -2.5]}>
+          <boxGeometry args={[SPAN + 22, 1.1, SPAN + 17]} />
+          <meshLambertMaterial color={night > 0.5 ? '#1c2230' : '#d9dee6'} />
         </mesh>
         <Buildings snap={snap} selection={selection} onSelect={onSelect} />
         <Decor />
         <Grid snap={snap} selection={selection} onSelect={onSelect} />
-        <OrbitControls makeDefault enableDamping target={[-14, 0, -8]} maxPolarAngle={Math.PI / 2.15} minDistance={12} maxDistance={340} />
+        <OrbitControls makeDefault enableDamping target={[-6, 0, -4]} maxPolarAngle={Math.PI / 2.15} minDistance={12} maxDistance={200} />
       </Canvas>
     </div>
   )

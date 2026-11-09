@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
 import { Link, Navigate, NavLink, Route, Routes, useLocation, useParams } from 'react-router-dom'
-import { IconAnalysis, IconDashboard, IconShieldCheck, IconDatabase, IconLive, IconLogo, IconMenu, IconBolt, IconSettings, IconVillage } from './components/Icons'
+import { IconAnalysis, IconDashboard, IconShieldCheck, IconDatabase, IconLive, IconLogo, IconMenu, IconBolt, IconSettings } from './components/Icons'
 import { Dot, PageSkeleton } from './components/ui'
 import { useActor } from './lib/actor'
 import { useBackendHealth } from './lib/backend'
@@ -8,7 +8,6 @@ import { connectSerial, DEVICE_INFO, useVillage } from './lib/village'
 import CaseDetail from './pages/CaseDetail'
 import CaseList from './pages/CaseList'
 import Admin from './pages/Admin'
-import Dashboard from './pages/Dashboard'
 import LiveData from './pages/LiveData'
 import NewCase from './pages/NewCase'
 import PublicData from './pages/PublicData'
@@ -17,23 +16,20 @@ import VillageLoads from './pages/VillageLoads'
 
 const Village = lazy(() => import('./pages/Village'))
 const City = lazy(() => import('./pages/City'))
-const Complex = lazy(() => import('./pages/Complex'))
 
 const NAV: { label: string; items: { to: string; label: string; icon: ReactNode; end?: boolean }[] }[] = [
   {
     label: '모니터링',
     items: [
-      { to: '/dashboard', label: '개요', icon: <IconDashboard /> },
-      { to: '/village', label: '스마트 마을', icon: <IconVillage /> },
+      { to: '/dashboard', label: '대시보드', icon: <IconDashboard /> },
       { to: '/live', label: '실시간 분석', icon: <IconLive /> },
-      { to: '/complex', label: '가상 대단지', icon: <IconVillage /> },
       { to: '/city', label: '도시 시뮬레이션', icon: <IconBolt /> },
     ],
   },
   {
     label: '분석',
     items: [
-      { to: '/cases', label: '고장파형 분석', icon: <IconAnalysis /> },
+      { to: '/cases', label: '사건 기록', icon: <IconAnalysis /> },
       { to: '/public-data', label: '공공데이터 분석', icon: <IconDatabase /> },
     ],
   },
@@ -108,16 +104,49 @@ function ReconnectBanner() {
   )
 }
 
+/** 대시보드 위에 떠 있는 메뉴 (누르면 펼쳐짐) */
+function FloatingMenu({ actor }: { actor: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="float-menu no-print">
+      <button className="float-menu-btn" onClick={() => setOpen(!open)} aria-expanded={open}>
+        <span className="brand-mark"><IconLogo /></span>
+        <span>GridWitness</span>
+        <IconMenu />
+      </button>
+      {open && (
+        <div className="float-menu-pop" onClick={() => setOpen(false)}>
+          {NAV.map((g) => (
+            <div key={g.label} className="float-group">
+              <div className="float-label">{g.label}</div>
+              {g.items.map((n) => (
+                <NavLink key={n.to} to={n.to} className="float-link">{n.icon}<span>{n.label}</span></NavLink>
+              ))}
+            </div>
+          ))}
+          <div className="float-foot">
+            <DeviceStatus />
+            <div className="side-user">{actor}</div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 /** 앱 화면 틀(사이드바 + 페이지). 소개 화면의 노트북에도 같은 것을 씀 */
 export function Shell({ extraRoutes }: { extraRoutes?: ReactNode } = {}) {
   const [actor] = useActor()
   const [navOpen, setNavOpen] = useState(false)
   const location = useLocation()
   useEffect(() => setNavOpen(false), [location.pathname])
-  const wide = location.pathname === '/village' || location.pathname === '/city'
+  const wide = location.pathname === '/city'
+  // 대시보드(마을 시뮬)는 사이드바 없이 화면 전체를 쓰고, 메뉴는 왼쪽 위 떠 있는 버튼으로
+  const immersive = location.pathname === '/dashboard' || location.pathname === '/village'
 
   return (
-    <div className={`app ${navOpen ? 'nav-open' : ''}`}>
+    <div className={`app ${navOpen ? 'nav-open' : ''} ${immersive ? 'immersive' : ''}`}>
+      {immersive && <FloatingMenu actor={actor} />}
       <aside className="sidebar no-print" aria-label="주 메뉴">
         <Link to="/" className="brand" title="소개 화면">
           <span className="brand-mark"><IconLogo /></span>
@@ -155,13 +184,12 @@ export function Shell({ extraRoutes }: { extraRoutes?: ReactNode } = {}) {
           <Suspense fallback={<PageSkeleton />}>
             <Routes location={location}>
               {extraRoutes}
-              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/dashboard" element={<Village />} />
               <Route path="/admin" element={<Admin />} />
               <Route path="/village" element={<Village />} />
               <Route path="/village/loads" element={<VillageLoads />} />
               <Route path="/live" element={<LiveData />} />
               <Route path="/city" element={<City />} />
-              <Route path="/complex" element={<Complex />} />
               <Route path="/cases" element={<CaseList />} />
               <Route path="/cases/new" element={<NewCase />} />
               <Route path="/cases/:id" element={<CaseDetail />} />

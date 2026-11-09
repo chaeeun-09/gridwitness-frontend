@@ -7,7 +7,7 @@ import { CatmullRomCurve3, Vector3, type Group, type Mesh } from 'three'
 import { IOT_CHANNELS, lightView, speech, type ChannelId, type NodeStatus, type VillageSnapshot } from '../../lib/village'
 import House from './House'
 import { BOX_FLOOR, HOUSE_POS, LAMP_POS, POLES, routePoints, type HouseChannel, type LampChannel } from './layout'
-import { Pole, STATUS_COLOR, StreetLamp, Substation } from './Props'
+import { Frtu, Pole, STATUS_COLOR, StreetLamp, Substation } from './Props'
 import Terrain, { WiringBox } from './Terrain'
 import { skyGradient } from './textures'
 import Trees from './Trees'
@@ -134,6 +134,9 @@ function useOnScreen<T extends Element>() {
 type Shot = { pos: Vector3; target: Vector3 }
 const SURFACE: Shot = { pos: new Vector3(-9, 19, 25), target: new Vector3(0, 0, 0) }
 const UNDER: Shot = { pos: new Vector3(-4, BOX_FLOOR + 35, 22), target: new Vector3(-4, BOX_FLOOR, -1.5) }
+/** FRTU가 붙은 전봇대 (마을 인입 구간) */
+export const FRTU_POLE = 1
+const FRTU_SHOT: Shot = { pos: new Vector3(POLES[FRTU_POLE][0] + 5.5, 5.5, POLES[FRTU_POLE][2] + 9.5), target: new Vector3(POLES[FRTU_POLE][0] + 2.2, 1.6, POLES[FRTU_POLE][2]) }
 function partShot(id: PartId): Shot {
   const [x, y, z] = partCenter(id)
   return { pos: new Vector3(x, y + 10.5, z + 4.5), target: new Vector3(x, y, z - 0.6) }
@@ -200,6 +203,8 @@ export default function VillageScene({
   selectedPart = null,
   onPart = () => {},
   showPins = false,
+  frtu = false,
+  onFrtu,
 }: {
   snap: VillageSnapshot
   selected: ChannelId | null
@@ -212,8 +217,12 @@ export default function VillageScene({
   selectedPart?: PartId | null
   onPart?: (id: PartId | null) => void
   showPins?: boolean
+  /** FRTU를 골라 확대해 보는 중 */
+  frtu?: boolean
+  /** 있으면 FRTU를 그리고 누를 수 있게 함 */
+  onFrtu?: () => void
 }) {
-  const shot = useMemo(() => (!underground ? SURFACE : selectedPart ? partShot(selectedPart) : UNDER), [underground, selectedPart])
+  const shot = useMemo(() => (underground ? (selectedPart ? partShot(selectedPart) : UNDER) : frtu ? FRTU_SHOT : SURFACE), [underground, selectedPart, frtu])
   const bg = useMemo(() => (night ? skyGradient('#070d1c', '#1b2b4d') : skyGradient('#9fcbf2', '#e9f3fb')), [night])
   const [wrap, active] = useOnScreen<HTMLDivElement>()
   const dpr = fx ? Math.min(window.devicePixelRatio, 1.75) : Math.min(window.devicePixelRatio, 1.25)
@@ -238,6 +247,7 @@ export default function VillageScene({
 
         <Lift away={underground}>
           <Static status={snap.status} />
+          {onFrtu && <Frtu p={POLES[FRTU_POLE]} status={snap.status} selected={frtu} onSelect={onFrtu} />}
           {IOT_CHANNELS.map((c) => {
             const view = lightView(snap.leds[c.id], snap)
             return <Feeder key={c.id} id={c.id} status={view.status} flowing={snap.leds[c.id].lit} night={night} />

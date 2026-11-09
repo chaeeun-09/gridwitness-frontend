@@ -1,6 +1,7 @@
 import { RoundedBox } from '@react-three/drei'
-import { memo, useMemo } from 'react'
-import { AdditiveBlending } from 'three'
+import { useFrame } from '@react-three/fiber'
+import { memo, useMemo, useRef, useState } from 'react'
+import { AdditiveBlending, type Mesh } from 'three'
 import type { LedState, NodeStatus } from '../../lib/village'
 import Label from '../three/Label'
 import SpeechBubble from '../three/SpeechBubble'
@@ -53,6 +54,66 @@ export const Pole = memo(function Pole({ p, transformer = false }: { p: V3; tran
     </group>
   )
 })
+
+// ── FRTU (배전자동화 단말장치) ─────────────────────────
+/** 전봇대 중간의 회색 철제 제어함. 마을 계측의 '현장 단말' 역할이라 맥동 고리로 강조하고, 누르면 AI 분석 패널이 열림 */
+export function Frtu({ p, status, selected, onSelect }: { p: V3; status: NodeStatus; selected: boolean; onSelect: () => void }) {
+  const ring = useRef<Mesh>(null)
+  const [hover, setHover] = useState(false)
+  const alarm = status === 'WARNING' || status === 'FAULT' || status === 'OUTAGE'
+  const tone = alarm ? STATUS_COLOR[status] : '#3d7bff'
+  useFrame(({ clock }) => {
+    const m = ring.current
+    if (!m) return
+    const k = (clock.elapsedTime * (alarm ? 1.6 : 0.8)) % 1
+    m.scale.setScalar(1 + k * 1.6)
+    ;(m.material as { opacity: number }).opacity = (1 - k) * 0.85
+  })
+  return (
+    <group
+      position={[p[0], 0, p[2] + 0.2]}
+      scale={1.35}
+      onClick={(e) => {
+        e.stopPropagation()
+        onSelect()
+      }}
+      onPointerOver={(e) => {
+        e.stopPropagation()
+        setHover(true)
+        document.body.style.cursor = 'pointer'
+      }}
+      onPointerOut={() => {
+        setHover(false)
+        document.body.style.cursor = ''
+      }}
+    >
+      {/* 받침 브래킷 */}
+      <mesh position={[0, 1.75, -0.1]}>
+        <boxGeometry args={[0.08, 0.5, 0.12]} />
+        <meshStandardMaterial color="#5c5f62" metalness={0.5} roughness={0.5} />
+      </mesh>
+      {/* 철제 함 */}
+      <RoundedBox args={[0.62, 0.8, 0.34]} radius={0.04} position={[0, 1.75, 0.1]} castShadow>
+        <meshStandardMaterial color={hover || selected ? '#b9c3cf' : '#a3abb4'} metalness={0.55} roughness={0.45} emissive={tone} emissiveIntensity={selected ? 0.35 : hover ? 0.2 : 0.06} />
+      </RoundedBox>
+      {/* 문 손잡이 · 상태등 */}
+      <mesh position={[0.2, 1.75, 0.28]}>
+        <boxGeometry args={[0.03, 0.16, 0.03]} />
+        <meshStandardMaterial color="#3a3f45" />
+      </mesh>
+      <mesh position={[-0.18, 2.03, 0.28]}>
+        <sphereGeometry args={[0.035, 10, 10]} />
+        <meshBasicMaterial color={alarm ? STATUS_COLOR[status] : '#40c057'} toneMapped={false} />
+      </mesh>
+      {/* 강조 고리 */}
+      <mesh ref={ring} position={[0, 0.03, 0.1]} rotation-x={-Math.PI / 2}>
+        <ringGeometry args={[0.55, 0.68, 40]} />
+        <meshBasicMaterial color={tone} transparent opacity={0.6} toneMapped={false} depthWrite={false} />
+      </mesh>
+      <Label lines={[alarm ? 'FRTU · 이상 감지' : 'FRTU · AI 분석']} position={[0, 2.7, 0.1]} lineHeight={0.42} bg={tone} pointer />
+    </group>
+  )
+}
 
 // ── 변전소 ──────────────────────────────────────────────
 function Transformer({ x, status }: { x: number; status: NodeStatus }) {

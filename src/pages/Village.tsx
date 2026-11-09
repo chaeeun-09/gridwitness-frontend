@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import AiPanel from '../components/AiPanel'
 import Channels from '../components/Channels'
-import EventCausePanel from '../components/EventCausePanel'
 import EventList from '../components/EventList'
 import { IconMoon, IconPower, IconSun, IconX } from '../components/Icons'
 import PartPanel from '../components/PartPanel'
 import SceneBoundary from '../components/SceneBoundary'
 import Sparkline from '../components/Sparkline'
-import { Badge, NODE_TONE, PageHeader, Section, Segmented, Status } from '../components/ui'
+import { Badge, NODE_TONE, Section, Segmented, Status } from '../components/ui'
 import VillageScene from '../components/village/VillageScene'
 import { NET_COLOR, NET_KIND_LABEL, type NetKind, type PartId } from '../lib/hardware'
 import {
@@ -99,6 +99,8 @@ export default function Village() {
   const [underground, setUnderground] = useState(false)
   const [part, setPart] = useState<PartId | null>(null)
   const [showPins, setShowPins] = useState(false)
+  const [frtu, setFrtu] = useState(false)
+  const [controls, setControls] = useState(false)
   const sel = selected ? snap.leds[selected] : null
   const selView = sel ? lightView(sel, snap) : null
   const mock = snap.source === 'MOCK'
@@ -106,8 +108,7 @@ export default function Village() {
   const hour = snap.scenario ? Math.max(0, snap.scenario.hour) : 0
 
   return (
-    <>
-      <PageHeader title="스마트 마을" actions={<PowerButton snap={snap} />} />
+    <div className="workspace">
 
       {snap.scenario && (
         <div className="scenario-banner">
@@ -121,10 +122,28 @@ export default function Village() {
         </div>
       )}
 
-      <div className="scene" style={{ marginTop: 16 }}>
+      <div className={`scene scene-full ${frtu ? 'with-panel' : ''}`}>
         <div className="scene-canvas">
           <SceneBoundary>
-            <VillageScene snap={snap} selected={selected} onSelect={setSelected} night={night} fx={fx} underground={underground} selectedPart={part} onPart={setPart} showPins={showPins} />
+            <VillageScene
+              snap={snap}
+              selected={selected}
+              onSelect={(id) => {
+                setSelected(id)
+                if (id) setFrtu(false)
+              }}
+              night={night}
+              fx={fx}
+              underground={underground}
+              selectedPart={part}
+              onPart={setPart}
+              showPins={showPins}
+              frtu={frtu}
+              onFrtu={() => {
+                setSelected(null)
+                setFrtu(true)
+              }}
+            />
           </SceneBoundary>
         </div>
         <div className="scene-tools">
@@ -135,6 +154,7 @@ export default function Village() {
               setUnderground(v === 'under')
               setSelected(null)
               setPart(null)
+              setFrtu(false)
             }}
             options={[
               { value: 'surface', label: '지상' },
@@ -153,6 +173,9 @@ export default function Village() {
           <button className={`btn btn-sm glass ${fx ? 'on' : ''}`} onClick={() => setFx(!fx)} aria-pressed={fx} title="AO·블룸 후처리, 고해상도, 60fps (GPU 사용량 증가)">
             고화질 {fx ? '켜짐' : '꺼짐'}
           </button>
+          <button className={`btn btn-sm glass ${controls ? 'on' : ''}`} onClick={() => setControls(!controls)} aria-pressed={controls}>제어판</button>
+          {!underground && !frtu && <button className="btn btn-sm glass btn-ai" onClick={() => { setSelected(null); setFrtu(true) }}>AI 분석 열기</button>}
+          <span style={{ marginLeft: 'auto' }}><PowerButton snap={snap} /></span>
           {underground && (
             <>
               <button className={`btn btn-sm glass ${showPins ? 'on' : ''}`} onClick={() => setShowPins(!showPins)} aria-pressed={showPins}>
@@ -201,7 +224,8 @@ export default function Village() {
             </div>
           </div>
         )}
-        {!underground && <div className="scene-hint glass">드래그 회전 · 휠 확대 · 객체 클릭</div>}
+        {!underground && !frtu && <div className="scene-hint glass">FRTU(전봇대 철제함)를 누르면 AI 분석이 열립니다</div>}
+        {frtu && !underground && <AiPanel snap={snap} onClose={() => setFrtu(false)} />}
 
         {underground && part && <PartPanel id={part} snap={snap} onClose={() => setPart(null)} />}
         {sel && selView && !underground && (
@@ -232,8 +256,13 @@ export default function Village() {
             </div>
           </div>
         )}
-      </div>
 
+      {controls && (
+        <aside className="control-drawer" aria-label="제어판">
+          <div className="ai-head">
+            <strong>제어판</strong>
+            <button className="btn btn-ghost btn-icon" onClick={() => setControls(false)} aria-label="닫기"><IconX /></button>
+          </div>
 <div className="section">
         <Section
           title="LED 채널 제어"
@@ -295,9 +324,9 @@ export default function Village() {
         </Section>
       </div>
 
-      <div className="section">
-        <EventCausePanel />
+        </aside>
+      )}
       </div>
-    </>
+    </div>
   )
 }

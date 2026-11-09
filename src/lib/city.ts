@@ -13,7 +13,7 @@ import { getProfile, type DayType, type UsageDataset } from './publicData'
 // 선로·변전소 용량을 넘으면 트립하고, 자동 절체를 켜면 이웃 선로가 남는 용량만큼 부하를 넘겨받는다.
 // 전력 조류 계산(전압·위상)은 하지 않는다. 마을 모형(IoT)·고장파형 AI와는 별개 데이터다.
 
-export const GRID = 40
+export const GRID = 22
 export const PITCH = 3
 export const BLOCK = 2.3
 export const SPAN = GRID * PITCH
@@ -98,10 +98,10 @@ export interface City {
 
 const SUB_SITES: { name: string; pos: [number, number] }[] = [
   { name: '중앙', pos: [0, 0] },
-  { name: '북서', pos: [-32, -32] },
-  { name: '북동', pos: [32, -32] },
-  { name: '남서', pos: [-32, 32] },
-  { name: '남동(산업)', pos: [34, 30] },
+  { name: '북서', pos: [-18, -18] },
+  { name: '북동', pos: [18, -18] },
+  { name: '남서', pos: [-18, 18] },
+  { name: '남동(산업)', pos: [19, 17] },
 ]
 
 /** 격자 위에서 부드럽게 변하는 값 (-1~1). 구역 경계가 반듯한 도형이 되지 않게 함 */
@@ -291,7 +291,7 @@ function generate(): City {
     tank,
     subs,
     feeders,
-    plant: [-SPAN / 2 - 14, -SPAN / 2 - 10],
+    plant: [-SPAN / 2 - 7, -SPAN / 2 - 5],
   }
   bld.forEach((b, n) => {
     out.bx0[n] = b.x
