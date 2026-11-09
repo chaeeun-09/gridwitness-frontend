@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { api } from '../api'
 import { FaultLocationBox, FrtuStrip } from '../components/AiPanel'
-import { IconAlert, IconArrowRight, IconBrain, IconChevron, IconInbox, IconLive, IconWave } from '../components/Icons'
+import { IconAlert, IconArrowRight, IconBrain, IconInbox, IconLive, IconVillage, IconWave } from '../components/Icons'
 import { Badge, ErrorState, TableSkeleton, type Tone } from '../components/ui'
 import { CHART } from '../lib/chart'
 import { frtuViews, locateFault } from '../lib/frtu'
@@ -135,13 +135,15 @@ export default function Dashboard() {
 
   return (
     <div className="dash">
-      <Link to="/village" className="dash-back"><span className="dash-back-icon"><IconChevron /></span>3D 마을로</Link>
       <div className="dash-head">
         <div>
           <h1>오늘의 관제 현황</h1>
           <p>처리할 사건과 마을 FRTU 상태를 한눈에 봐요.</p>
         </div>
-        <span className="dash-stamp">기준 {new Date(now).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })}</span>
+        <div className="dash-head-actions">
+          <span className="dash-stamp">기준 {new Date(now).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })}</span>
+          <Link to="/village" className="village-btn"><IconVillage /><span>3D 마을 보기</span></Link>
+        </div>
       </div>
 
       <div className="kpi-row">
