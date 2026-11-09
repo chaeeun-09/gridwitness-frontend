@@ -242,7 +242,7 @@ export default function Village() {
             </div>
           </div>
         )}
-        {!underground && !frtu && <div className="scene-hint glass">전봇대의 FRTU(인입·주택 분기·가로등 분기)를 누르면 계측과 고장표시가 열립니다</div>}
+        {!underground && !frtu && <div className="scene-hint glass">전봇대의 FRTU 함을 누르면 계측·고장표시가 열려요</div>}
         {frtu && !underground && <AiPanel snap={snap} frtu={frtu} onPick={setFrtu} onClose={() => setFrtu(null)} />}
 
         {underground && part && <PartPanel id={part} snap={snap} onClose={() => setPart(null)} />}
