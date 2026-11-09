@@ -1,12 +1,13 @@
 import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
 import { Link, Navigate, NavLink, Route, Routes, useLocation, useParams } from 'react-router-dom'
-import { IconAnalysis, IconDashboard, IconShieldCheck, IconDatabase, IconLive, IconLogo, IconMenu, IconBolt, IconSettings } from './components/Icons'
+import { IconAnalysis, IconDashboard, IconShieldCheck, IconDatabase, IconLive, IconLogo, IconMenu, IconBolt, IconSettings, IconVillage } from './components/Icons'
 import { Dot, PageSkeleton } from './components/ui'
 import { useActor } from './lib/actor'
 import { useBackendHealth } from './lib/backend'
 import { connectSerial, DEVICE_INFO, useVillage } from './lib/village'
 import CaseDetail from './pages/CaseDetail'
 import CaseList from './pages/CaseList'
+import Dashboard from './pages/Dashboard'
 import Admin from './pages/Admin'
 import LiveData from './pages/LiveData'
 import NewCase from './pages/NewCase'
@@ -22,6 +23,7 @@ const NAV: { label: string; items: { to: string; label: string; icon: ReactNode;
     label: '모니터링',
     items: [
       { to: '/dashboard', label: '대시보드', icon: <IconDashboard /> },
+      { to: '/village', label: '마을 시뮬레이션', icon: <IconVillage /> },
       { to: '/live', label: '실시간 분석', icon: <IconLive /> },
       { to: '/city', label: '도시 시뮬레이션', icon: <IconBolt /> },
     ],
@@ -142,7 +144,7 @@ export function Shell({ extraRoutes }: { extraRoutes?: ReactNode } = {}) {
   useEffect(() => setNavOpen(false), [location.pathname])
   const wide = location.pathname === '/city'
   // 대시보드(마을 시뮬)는 사이드바 없이 화면 전체를 쓰고, 메뉴는 왼쪽 위 떠 있는 버튼으로
-  const immersive = location.pathname === '/dashboard' || location.pathname === '/village'
+  const immersive = location.pathname === '/village'
 
   return (
     <div className={`app ${navOpen ? 'nav-open' : ''} ${immersive ? 'immersive' : ''}`}>
@@ -184,7 +186,7 @@ export function Shell({ extraRoutes }: { extraRoutes?: ReactNode } = {}) {
           <Suspense fallback={<PageSkeleton />}>
             <Routes location={location}>
               {extraRoutes}
-              <Route path="/dashboard" element={<Village />} />
+              <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/admin" element={<Admin />} />
               <Route path="/village" element={<Village />} />
               <Route path="/village/loads" element={<VillageLoads />} />

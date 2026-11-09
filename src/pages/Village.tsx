@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import AiPanel from '../components/AiPanel'
 import Channels from '../components/Channels'
 import EventList from '../components/EventList'
@@ -99,7 +99,8 @@ export default function Village() {
   const [underground, setUnderground] = useState(false)
   const [part, setPart] = useState<PartId | null>(null)
   const [showPins, setShowPins] = useState(false)
-  const [frtu, setFrtu] = useState(false)
+  const [params] = useSearchParams()
+  const [frtu, setFrtu] = useState(() => params.get('ai') === '1')
   const [controls, setControls] = useState(false)
   const sel = selected ? snap.leds[selected] : null
   const selView = sel ? lightView(sel, snap) : null

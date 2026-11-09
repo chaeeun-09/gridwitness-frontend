@@ -1031,3 +1031,6 @@ body { background: linear-gradient(180deg, #e6effc 0%, #f1f6fd 380px, #f6f9fe 10
   .scene.scene-full.with-panel .scene-tools { right: 14px; }
 }
 .ai-panel .fa { grid-template-columns: 1fr; gap: 12px; }
+.dash-scene { position: relative; margin-top: 20px; border-radius: var(--r-lg); overflow: hidden; background: #dfecf8; box-shadow: inset 0 0 0 1px var(--line); }
+.dash-scene-canvas { height: min(52vh, 480px); min-height: 320px; }
+.dash-scene-bar { position: absolute; left: 12px; right: 12px; bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px 8px 14px; border-radius: var(--r); }
