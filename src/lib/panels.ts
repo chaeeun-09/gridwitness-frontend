@@ -9,6 +9,12 @@ export const PANEL_OPEN_EVENT = 'gw:panel-open'
 
 export const announcePanelOpen = () => window.dispatchEvent(new Event(PANEL_OPEN_EVENT))
 
+/** 실시간 사건 화면이 열림 (AI 패널·마을 카드 패널은 비켜 줌) */
+export const INCIDENT_OPEN_EVENT = 'gw:incident-open'
+/** AI 도우미를 마을 상태 모드로 열기 (실시간 사건에서 "AI에게 묻기") */
+export const ASSISTANT_VILLAGE_EVENT = 'gw:assistant-village'
+export const askAssistantVillage = () => window.dispatchEvent(new Event(ASSISTANT_VILLAGE_EVENT))
+
 /** 다른 화면에서 "이 사건을 AI에게 묻기": AI 도우미를 그 사건으로 연다 */
 export const ASSISTANT_ASK_EVENT = 'gw:assistant-ask'
 export const askAssistantAbout = (caseId: string) => window.dispatchEvent(new CustomEvent<string>(ASSISTANT_ASK_EVENT, { detail: caseId }))
