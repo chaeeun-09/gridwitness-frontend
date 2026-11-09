@@ -1388,3 +1388,7 @@ body { background-attachment: fixed; }
   .ga-side { display: none; }
 }
 @media (max-width: 640px) { .ga-panel.full { height: 100dvh; } .ga-full { padding: 0; } .ga-full .ga-chatcol { border-radius: 0; box-shadow: none; } }
+/* 전체화면 ↔ 작은 창 전환 버튼: 아이콘 + 글자 */
+.ga-size { display: inline-flex; align-items: center; gap: 5px; padding: 0 9px; font-size: 12.5px; color: var(--text-2); white-space: nowrap; }
+.ga-size:hover { color: var(--ink); }
+@media (max-width: 420px) { .ga-size span { display: none; } }
