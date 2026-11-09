@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
 import { FI_LABEL, frtuViews, type FrtuId } from '../lib/frtu'
 import { buildIncidentContext, EVIDENCE_GROUP_LABEL, eventKo, type EvidenceGroup } from '../lib/incidentContext'
 import { STATUS_LABEL, THRESHOLDS, useVillage } from '../lib/village'
@@ -32,7 +31,6 @@ export function VillageLiveSide() {
       <div className="ga-fi">고장표시 · <b>{FI_LABEL[f.fi]}</b></div>
       <div className="ga-chart"><LiveWave snap={snap} frtu={id} /></div>
       <FaultLocationBox snap={snap} />
-      <Link to={`/frtu${id === 'inlet' ? '' : `?id=${id}`}`} className="small">FRTU 상세 열기 →</Link>
     </div>
   )
 }
@@ -66,7 +64,6 @@ export function CaseBriefSide({ c }: { c: IncidentCase }) {
           </section>
         ))}
       </div>
-      <Link to={`/cases/${c.id}`} className="small">사건 상세 열기 →</Link>
     </div>
   )
 }
