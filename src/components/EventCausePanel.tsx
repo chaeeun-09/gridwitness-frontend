@@ -93,7 +93,7 @@ function Detail({ a }: { a: AnalyzedEvent }) {
   )
 }
 
-/** 스케치 v3 가 보낸 사건 파형마다 원인을 분석해 보여준다 (고장파형 AI 와 같은 흐름을 마을 규모로) */
+/** 스케치 v3.1 이 보낸 사건 파형마다 원인을 분석해 보여준다 (고장파형 AI 와 같은 흐름을 마을 규모로) */
 export default function EventCausePanel() {
   const list = useVillageEvents()
   const [sel, setSel] = useState<number | null>(null)

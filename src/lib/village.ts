@@ -753,7 +753,7 @@ function onSerialLine(line: string) {
     emit()
     return
   }
-  // 스케치 v3 의 사건 파형 (사건이 날 때만 옴): 원인 분석으로 넘긴다
+  // 스케치 v3.1 의 사건 파형 (사건이 날 때만 옴): 원인 분석으로 넘긴다
   if (line.startsWith('{"ev"')) {
     const ev = parseEventLine(line)
     if (ev) {

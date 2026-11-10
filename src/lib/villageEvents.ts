@@ -90,7 +90,7 @@ export function parseEventLine(line: string): VillageEvent | null {
   }
 }
 
-/** 입력 검사: 스케치 v3 형식과 다르면 분석하지 않는다 */
+/** 입력 검사: 스케치 v3.1 형식과 다르면 분석하지 않는다 */
 export function checkEvent(e: VillageEvent): string[] {
   const bad: string[] = []
   if (e.dtMs !== EXPECTED_DT_MS) bad.push(`샘플 간격이 ${EXPECTED_DT_MS} ms가 아님 (스케치 v3.1 필요)`)

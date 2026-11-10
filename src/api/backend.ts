@@ -44,6 +44,8 @@ const AUDIT_KO: Record<string, string> = {
   'incident.validation.completed': '입력 진단',
   'incident.analysis.completed': '서버 분석',
   'review.created': '사람 검토',
+  'assistant.answered': '현장 AI 답변',
+  'field_note.created': '현장 메모',
 }
 
 function load(): AnyCase[] {
