@@ -1,14 +1,14 @@
 import { useState } from 'react'
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { CHART } from '../lib/chart'
+import { IOT_CHANNELS } from '../lib/village'
 import { clearVillageEvents, EVENT_MODEL, eventModelReady, useVillageEvents, type AnalyzedEvent } from '../lib/villageEvents'
 import { Badge, Section } from './ui'
 
-const CH_NAME = ['주택 1', '주택 2', '주택 3', '가로등 1', '가로등 2']
 
 function cmdText(cmd: string): string {
   const m = /^CH (\d) ([01])$/.exec(cmd)
-  if (m) return `${CH_NAME[Number(m[1]) - 1]} ${m[2] === '1' ? '켜기' : '끄기'} 명령`
+  if (m) return `${IOT_CHANNELS.find((c) => c.ch === Number(m[1]))?.name ?? `채널 ${m[1]}`} ${m[2] === '1' ? '켜기' : '끄기'} 명령`
   if (cmd === 'RELAY 0') return '마을 전원 차단 명령'
   if (cmd === 'RELAY 1') return '마을 전원 복구 명령'
   return cmd
@@ -93,7 +93,7 @@ function Detail({ a }: { a: AnalyzedEvent }) {
   )
 }
 
-/** 스케치 v3 가 보낸 사건 파형마다 원인을 분석해 보여준다 (고장파형 AI 와 같은 흐름을 마을 규모로) */
+/** 스케치 v3.1 이 보낸 사건 파형마다 원인을 분석해 보여준다 (고장파형 AI 와 같은 흐름을 마을 규모로) */
 export default function EventCausePanel() {
   const list = useVillageEvents()
   const [sel, setSel] = useState<number | null>(null)
@@ -102,12 +102,12 @@ export default function EventCausePanel() {
   return (
     <Section
       title="사건 원인 분석"
-      description="모형에서 전류가 갑자기 바뀌면 우노가 그 앞뒤 1.3초를 녹화해 보냅니다. 파형으로 단선·순간/반복 접촉 불량·정상 개폐·복구를 가리고, 근거가 부족하면 보류합니다."
+      description="모형에서 전류가 갑자기 바뀌면 우노가 그 앞 0.6초·뒤 2.0초를 녹화해 보냅니다. 파형으로 단선·순간/반복 접촉 불량·정상 개폐·복구를 가리고, 근거가 부족하면 보류합니다."
       actions={list.length > 0 && <button className="btn btn-sm btn-ghost" onClick={clearVillageEvents}>목록 비우기</button>}
     >
       {list.length === 0 ? (
         <p className="muted small" style={{ margin: 0 }}>
-          아직 받은 사건이 없습니다. 모형에서 LED를 뽑거나 건드리거나, 스위치로 채널을 끄고 켜 보세요. (우노에 스케치 v3가 올라가 있어야 합니다)
+          아직 받은 사건이 없습니다. 모형에서 LED를 뽑거나 건드리거나, 스위치로 채널을 끄고 켜 보세요. (우노에 스케치 v3.1이 올라가 있어야 합니다)
         </p>
       ) : (
         <>

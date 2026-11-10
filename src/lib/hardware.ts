@@ -24,8 +24,9 @@ export interface Part {
 
 const CH_PARTS: { id: ChPartId; led: ChannelId; ledNo: number; name: string; pin: string; zone: 'inaH' | 'inaL' }[] = [
   { id: 'ch1', led: 'h1', ledNo: 1, name: '주택 1', pin: 'D3', zone: 'inaH' },
-  { id: 'ch2', led: 'h2', ledNo: 2, name: '주택 2', pin: 'D4', zone: 'inaH' },
-  { id: 'ch3', led: 'h3', ledNo: 3, name: '주택 3', pin: 'D5', zone: 'inaH' },
+  // 실제 배선에서 주택 2·3이 서로 바뀌어 있음 (village.ts IOT_CHANNELS 와 같게: 채널 ② D4 = 주택 3, 채널 ③ D5 = 주택 2)
+  { id: 'ch2', led: 'h3', ledNo: 3, name: '주택 3', pin: 'D4', zone: 'inaH' },
+  { id: 'ch3', led: 'h2', ledNo: 2, name: '주택 2', pin: 'D5', zone: 'inaH' },
   { id: 'ch4', led: 'l1', ledNo: 4, name: '가로등 1', pin: 'D6', zone: 'inaL' },
   { id: 'ch5', led: 'l2', ledNo: 5, name: '가로등 2', pin: 'D7', zone: 'inaL' },
 ]
@@ -81,7 +82,7 @@ export const PARTS: Part[] = [
     name: 'Arduino UNO R3',
     role: '릴레이 6개 제어 · INA219 2개 측정 · 웹 통신',
     spec: 'ATmega328P · USB(Web Serial 115200)',
-    pins: { D2: '전체 릴레이 제어', D3: '채널 ① 주택 1', D4: '채널 ② 주택 2', D5: '채널 ③ 주택 3', D6: '채널 ④ 가로등 1', D7: '채널 ⑤ 가로등 2', '5V': '릴레이·INA219 전원 공급', GND: '공통 GND', A4: 'I2C SDA', A5: 'I2C SCL', USB: '노트북 연결 (전원·통신)' },
+    pins: { D2: '전체 릴레이 제어', D3: '채널 ① 주택 1', D4: '채널 ② 주택 3', D5: '채널 ③ 주택 2', D6: '채널 ④ 가로등 1', D7: '채널 ⑤ 가로등 2', '5V': '릴레이·INA219 전원 공급', GND: '공통 GND', A4: 'I2C SDA', A5: 'I2C SCL', USB: '노트북 연결 (전원·통신)' },
   },
   {
     id: 'bb',

@@ -21,7 +21,9 @@ const ids = (ctx: IncidentContext, ...groups: string[]) => ctx.evidence.filter((
 
 /** 설비를 조작하라는 요청인지 (답하지 않고 거절) */
 export const isControlRequest = (q: string) =>
-  has(q, /(꺼|끄|켜줘|켜라|켜봐|차단해|차단시|투입해|개방해|개폐해|열어|닫아|복구해|복구시|재폐로|정전(을)?(일으|발생|시켜))/)
+  has(q, /(꺼|끄|켜줘|켜라|켜봐|차단해|차단시|투입해|투입시|개방해|개폐해|열어|닫아|복구해|복구시|재폐로|정전(을)?(일으|발생|시켜)|조작해|조작시|트립시)/) ||
+  // '스위치 내려줘'처럼 설비 이름 + 조작 동사 (서버 규칙 gridwitness-api app/services/assistant.py 와 같게)
+  has(q, /(스위치|개폐기|차단기|리클로저|릴레이|전원|선로).{0,6}(내려|올려|넣어|빼줘|빼라|조작)/)
 
 function summary(ctx: IncidentContext): GroundedAnswer {
   const a = ctx.analysis
