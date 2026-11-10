@@ -199,7 +199,6 @@ export default function Dashboard() {
       <div className="dash-head">
         <div>
           <h1>오늘의 관제 현황</h1>
-          <p>처리할 사건과 마을 FRTU 상태를 한눈에 봐요.</p>
         </div>
         <div className="dash-head-actions">
           <span className="dash-stamp">기준 {new Date(now).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })}</span>
