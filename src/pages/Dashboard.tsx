@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { api } from '../api'
@@ -8,6 +8,7 @@ import { Badge, ErrorState, TableSkeleton, type Tone } from '../components/ui'
 import { CHART } from '../lib/chart'
 import { frtuViews, locateFault } from '../lib/frtu'
 import { askAssistantAbout } from '../lib/panels'
+import { API_CHANGED_EVENT } from '../lib/backend'
 import { openIncident, STAGE_LABEL, useLiveIncidents } from '../lib/liveIncident'
 import { STATUS_LABEL, useVillage } from '../lib/village'
 import { useVillageEvents, type AnalyzedEvent } from '../lib/villageEvents'
@@ -164,18 +165,36 @@ export default function Dashboard() {
   const [cases, setCases] = useState<CaseSummary[] | null>(null)
   const [full, setFull] = useState<AnyCase[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [now, setNow] = useState(() => Date.now())
+  const loadSequence = useRef(0)
   const load = useCallback(() => {
+    const sequence = ++loadSequence.current
     setError(null)
+    setNow(Date.now())
     api
       .listCases()
       .then(async (list) => {
+        if (sequence !== loadSequence.current) return
         setCases(list)
-        setFull(await api.exportCases())
+        // 대시보드 지표를 읽을 때 전체 백업·보관 사건·원본 첨부까지 내려받지 않는다.
+        const current = await Promise.all(list.map((c) => api.getCase(c.id)))
+        if (sequence === loadSequence.current) setFull(current)
       })
-      .catch((e: Error) => setError(e.message))
+      .catch((e: Error) => { if (sequence === loadSequence.current) setError(e.message) })
   }, [])
-  useEffect(load, [load])
-  const [now] = useState(() => Date.now())
+  useEffect(() => {
+    const refresh = () => { if (document.visibilityState !== 'hidden') load() }
+    refresh()
+    const timer = setInterval(refresh, 30_000)
+    window.addEventListener('focus', refresh)
+    window.addEventListener(API_CHANGED_EVENT, refresh)
+    return () => {
+      loadSequence.current++
+      clearInterval(timer)
+      window.removeEventListener('focus', refresh)
+      window.removeEventListener(API_CHANGED_EVENT, refresh)
+    }
+  }, [load])
 
   const open = snap.events.filter((e) => !e.clearedAt)
   const withheld = events.filter((a) => a.verdict.kind === 'WITHHELD').length

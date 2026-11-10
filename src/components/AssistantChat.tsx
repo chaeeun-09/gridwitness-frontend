@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { askAssistant, clearLocalConversation, listAssistantMessages, type AssistantMeta, type AssistantTurn } from '../api/assistant'
+import { askAssistant, assistantTimeoutMs, getAssistantConversationNotice, getCachedAssistantMessages, listAssistantMessages, resetAssistantConversation, retryAssistantMessages, type AssistantMeta, type AssistantTurn } from '../api/assistant'
 import { getActor } from '../lib/actor'
+import { apiBase, useCapabilities } from '../lib/backend'
 import { EVIDENCE_GROUP_LABEL, type EvidenceGroup } from '../lib/incidentContext'
 import type { IncidentCase } from '../types'
 
@@ -43,6 +44,16 @@ const STATUS_CHIP: Record<AssistantMeta['status'], [string, string]> = {
   abstained: ['warn', '판단 보류'],
   refused: ['err', '요청 거절'],
 }
+const FALLBACK_REASON: Record<string, string> = {
+  llm_not_configured: '서버 LLM이 설정되지 않았어요.',
+  llm_unavailable: '서버 LLM에 연결하지 못했어요.',
+  llm_timeout: '서버 LLM 응답 시간이 초과됐어요.',
+  llm_invalid_response: '서버 LLM의 응답 형식이 올바르지 않았어요.',
+  llm_unsupported_evidence: 'LLM 답변의 근거 검증을 통과하지 못했어요.',
+  llm_abstained: 'LLM이 답변을 보류했어요.',
+  safety_policy: '설비 제어 요청은 규칙으로 거절해요.',
+  unsupported_scope: '이 사건 기록으로 확인할 수 없는 질문이에요.',
+}
 
 function BotMeta({ m, text }: { m: AssistantMeta; text: string }) {
   const groups = Object.entries(
@@ -53,11 +64,13 @@ function BotMeta({ m, text }: { m: AssistantMeta; text: string }) {
     <div className="chat-meta">
       <div className="chat-meta-row">
         <span className={`chat-tag ${tone}`}>{label}</span>
-        <span className="chat-tag">{m.mode === 'server' ? '서버 AI' : '기록 기반'}</span>
-        {m.modelVersion && <span className="chat-tag mono">{m.modelVersion}</span>}
+        <span className="chat-tag">{m.answerMode === 'llm' ? '서버 LLM' : m.answerMode === 'rules' ? '서버 규칙' : m.mode === 'server' ? '서버 답변 · 방식 미확인' : '브라우저 규칙'}</span>
+        {m.answerMode === 'llm' && m.llmModel && <span className="chat-tag mono">LLM {m.llmModel}</span>}
+        {m.modelVersion && <span className="chat-tag mono">파형 모델 {m.modelVersion}</span>}
         {canSpeak && <button type="button" className="chat-replay" onClick={() => speak(text)} aria-label="이 답 다시 듣기">다시 듣기</button>}
       </div>
       {m.notice && <div className={`chat-notice ${m.notice.tone}`}>{m.notice.text}</div>}
+      {m.fallbackReason && <div className="chat-notice warn">대체 답변 사유: {FALLBACK_REASON[m.fallbackReason] ?? m.fallbackReason}</div>}
       {m.abstainReasons.length > 0 && (
         <div className="chat-why"><b>{m.status === 'refused' ? '거절 이유' : '보류 이유'}</b> {m.abstainReasons.join(' · ')}</div>
       )}
@@ -81,10 +94,17 @@ function BotMeta({ m, text }: { m: AssistantMeta; text: string }) {
 }
 
 /** 사건 하나에 대한 현장 대응 AI 대화. 글·음성으로 묻고, 근거와 판단 보류 이유를 함께 보여준다. 설비는 조작하지 않는다 */
-export default function AssistantChat({ c, variant = 'panel' }: { c: IncidentCase; variant?: 'panel' | 'field' | 'popup' }) {
-  const [turns, setTurns] = useState<AssistantTurn[]>([])
+type AssistantChatProps = { c: IncidentCase; variant?: 'panel' | 'field' | 'popup' }
+export default function AssistantChat(props: AssistantChatProps) {
+  return <AssistantConversation key={`${apiBase()}.${props.c.id}`} {...props} />
+}
+function AssistantConversation({ c, variant = 'panel' }: AssistantChatProps) {
+  const [turns, setTurns] = useState<AssistantTurn[]>(() => getCachedAssistantMessages(c))
   const [loading, setLoading] = useState(true)
   const [pending, setPending] = useState(false)
+  const [cancellable, setCancellable] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const capabilities = useCapabilities()
   const [input, setInput] = useState('')
   const [fromVoice, setFromVoice] = useState(false)
   const [listening, setListening] = useState(false)
@@ -93,6 +113,7 @@ export default function AssistantChat({ c, variant = 'panel' }: { c: IncidentCas
   const rec = useRef<Rec | null>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const end = useRef<HTMLDivElement>(null)
+  const request = useRef<AbortController | null>(null)
 
   // 사건이 바뀌면 그 사건의 대화를 불러온다
   useEffect(() => {
@@ -104,10 +125,11 @@ export default function AssistantChat({ c, variant = 'panel' }: { c: IncidentCas
     })
     return () => {
       alive = false
+      request.current?.abort()
       rec.current?.stop()
       if (canSpeak) window.speechSynthesis.cancel()
     }
-  }, [c])
+  }, [c.id, c.backend?.incidentId]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     end.current?.scrollIntoView({ block: 'end' })
   }, [turns, pending])
@@ -120,13 +142,23 @@ export default function AssistantChat({ c, variant = 'panel' }: { c: IncidentCas
     setFromVoice(false)
     setMicMsg(null)
     setPending(true)
+    setCancellable(true)
+    setError(null)
+    const controller = new AbortController()
+    request.current = controller
     try {
-      const next = await askAssistant(c, q, via, getActor(), turns)
+      const next = await askAssistant(c, q, via, getActor(), turns, controller.signal)
       setTurns(next)
       const last = next[next.length - 1]
       if (via === 'voice' || voiceReply) speak(last.text)
+    } catch (e) {
+      setTurns(getCachedAssistantMessages(c))
+      setError(controller.signal.aborted ? '요청을 취소했어요. 서버에서 이미 처리됐을 수 있으니 다시 동기화하면 같은 질문 ID로 확인해요.' : (e as Error).message)
+      if (!controller.signal.aborted) setInput(q)
     } finally {
+      if (request.current === controller) request.current = null
       setPending(false)
+      setCancellable(false)
     }
   }
 
@@ -169,17 +201,37 @@ export default function AssistantChat({ c, variant = 'panel' }: { c: IncidentCas
     }
   }
 
-  function reset() {
-    clearLocalConversation(c.id)
-    setTurns([])
+  async function reset() {
+    if (pending) return
+    setPending(true)
+    setCancellable(false)
+    setError(null)
+    try { await resetAssistantConversation(c, getActor()); setTurns([]) }
+    catch (e) { setError((e as Error).message) }
+    finally { setPending(false) }
+  }
+  async function resync() {
+    if (pending) return
+    const controller = new AbortController()
+    request.current = controller
+    setPending(true)
+    setCancellable(true)
+    setError(null)
+    try { setTurns(await retryAssistantMessages(c, controller.signal)) }
+    catch (e) { setTurns(getCachedAssistantMessages(c)); setError((e as Error).message) }
+    finally { if (request.current === controller) request.current = null; setPending(false); setCancellable(false) }
   }
 
   return (
     <div className={`chat chat-${variant}`}>
       <div className="chat-scope small muted">
         <span>사건 <b className="mono">{c.id}</b> · 교류 고장파형 분석 기록만 사용</span>
-        {turns.length > 0 && <button type="button" className="chat-link" onClick={reset}>대화 지우기</button>}
+        {turns.length > 0 && <button type="button" className="chat-link" onClick={reset} disabled={pending}>현재 대화 보관 후 새로 시작</button>}
       </div>
+      <div className="small muted">{capabilities.state === 'ok' ? !capabilities.data?.assistant.configured ? '서버 LLM 미설정 · 서버 규칙으로 답변' : capabilities.data.assistant.available === true ? `LLM 연결 확인 · ${capabilities.data.assistant.model}` : capabilities.data.assistant.available === false ? `LLM 응답 불가 · ${capabilities.data.assistant.model ?? '모델 미지정'}` : `LLM 준비 상태 미확인 · ${capabilities.data.assistant.model ?? '모델 미지정'}` : 'LLM 연결 상태 미확인'} · 각 답변에 실제 사용 방식을 표시해요.</div>
+      {error && <div className="chat-notice err" role="alert">{error}</div>}
+      {getAssistantConversationNotice(c) && <div className="chat-notice info" role="status">{getAssistantConversationNotice(c)}</div>}
+      {c.backend?.incidentId && <button type="button" className="chat-link" onClick={resync} disabled={pending}>{turns.some((t) => t.sync === 'pending') ? '미전송 대화 다시 동기화' : '최신 대화 확인'}</button>}
       <div className="chat-log" aria-live="polite">
         {!loading && turns.length === 0 && (
           <div className="chat-msg bot">이 사건의 분석 결과를 근거와 함께 알려 드려요. 기록에 없는 원인이나 위치는 지어내지 않고 판단을 보류해요.</div>
@@ -188,10 +240,11 @@ export default function AssistantChat({ c, variant = 'panel' }: { c: IncidentCas
           <div key={t.id} className={`chat-msg ${t.role === 'user' ? 'user' : 'bot'}`}>
             {t.role === 'user' && t.via === 'voice' && <span className="chat-via">음성</span>}
             {t.text}
+            {t.sync === 'pending' && t.role === 'user' && <span className="chat-via">서버 전송 대기</span>}
             {t.meta && <BotMeta m={t.meta} text={t.text} />}
           </div>
         ))}
-        {pending && <div className="chat-msg bot pending">기록을 조회하고 있어요…</div>}
+        {pending && <div className="chat-msg bot pending">기록을 조회하고 있어요… 질문 응답은 최대 {Math.ceil(assistantTimeoutMs() / 1000)}초 기다려요. {cancellable && <button type="button" className="chat-link" onClick={() => request.current?.abort()}>요청 취소</button>}</div>}
         <div ref={end} />
       </div>
       <div className="chat-dock">

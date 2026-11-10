@@ -2,24 +2,24 @@ import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
 import { Link, Navigate, NavLink, Route, Routes, useLocation, useParams } from 'react-router-dom'
 import { IncidentBanner, IncidentSheet, IncidentWatcher } from './components/LiveIncident'
 import { IconAnalysis, IconDashboard, IconShieldCheck, IconDatabase, IconLive, IconLogo, IconMenu, IconBolt, IconSettings, IconVillage } from './components/Icons'
-import GlobalAssistant from './components/GlobalAssistant'
 import { Dot, PageSkeleton } from './components/ui'
 import { useActor } from './lib/actor'
-import { useBackendHealth } from './lib/backend'
+import { monitorBackend, useBackendHealth } from './lib/backend'
 import { toggleAlerts, useAlertsOn } from './lib/notify'
 import { connectSerial, DEVICE_INFO, useVillage } from './lib/village'
-import CaseDetail from './pages/CaseDetail'
-import CaseList from './pages/CaseList'
-import Dashboard from './pages/Dashboard'
-import FieldAssistant from './pages/FieldAssistant'
-import FrtuDetail from './pages/FrtuDetail'
-import Admin from './pages/Admin'
-import LiveData from './pages/LiveData'
-import NewCase from './pages/NewCase'
-import PublicData from './pages/PublicData'
-import Report from './pages/Report'
-import Settings from './pages/Settings'
-import VillageLoads from './pages/VillageLoads'
+const GlobalAssistant = lazy(() => import('./components/GlobalAssistant'))
+const CaseDetail = lazy(() => import('./pages/CaseDetail'))
+const CaseList = lazy(() => import('./pages/CaseList'))
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const FieldAssistant = lazy(() => import('./pages/FieldAssistant'))
+const FrtuDetail = lazy(() => import('./pages/FrtuDetail'))
+const Admin = lazy(() => import('./pages/Admin'))
+const LiveData = lazy(() => import('./pages/LiveData'))
+const NewCase = lazy(() => import('./pages/NewCase'))
+const PublicData = lazy(() => import('./pages/PublicData'))
+const Report = lazy(() => import('./pages/Report'))
+const Settings = lazy(() => import('./pages/Settings'))
+const VillageLoads = lazy(() => import('./pages/VillageLoads'))
 
 const Village = lazy(() => import('./pages/Village'))
 const City = lazy(() => import('./pages/City'))
@@ -195,6 +195,7 @@ function TopBar({ actor }: { actor: string }) {
 
 /** 앱 화면 틀(사이드바 + 페이지). 소개 화면의 노트북에도 같은 것을 씀 */
 export function Shell({ extraRoutes }: { extraRoutes?: ReactNode } = {}) {
+  useEffect(monitorBackend, [])
   const [actor] = useActor()
   const location = useLocation()
   const wide = location.pathname === '/city'
@@ -207,7 +208,7 @@ export function Shell({ extraRoutes }: { extraRoutes?: ReactNode } = {}) {
       <IncidentWatcher />
       <IncidentBanner />
       <IncidentSheet />
-      <GlobalAssistant />
+      <Suspense fallback={null}><GlobalAssistant /></Suspense>
 
       <div className="main">
         <ReconnectBanner />
@@ -232,6 +233,7 @@ export function Shell({ extraRoutes }: { extraRoutes?: ReactNode } = {}) {
               <Route path="/history" element={<Navigate to="/cases" replace />} />
               <Route path="/history/:id" element={<HistoryRedirect />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="*" element={<div className="empty"><h1>화면을 찾을 수 없습니다</h1><p>주소를 확인하거나 대시보드에서 다시 시작하세요.</p><Link className="btn btn-primary" to="/dashboard">대시보드로</Link></div>} />
             </Routes>
           </Suspense>
         </main>

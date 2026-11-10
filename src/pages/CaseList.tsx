@@ -6,6 +6,7 @@ import { IconAnalysis, IconPlus } from '../components/Icons'
 import ModelCardPanel from '../components/ModelCardPanel'
 import { Badge, Empty, ErrorState, PageHeader, TableSkeleton } from '../components/ui'
 import { fmtTime } from '../lib/actor'
+import { API_CHANGED_EVENT } from '../lib/backend'
 import type { CaseSummary } from '../types'
 
 type Filter = 'ALL' | 'PENDING' | 'REVIEWED'
@@ -21,7 +22,14 @@ export default function CaseList() {
     setError(null)
     api.listCases().then((all) => setCases(all.filter((c) => c.caseType === 'WAVEFORM'))).catch((e: Error) => setError(e.message))
   }, [])
-  useEffect(load, [load])
+  useEffect(() => {
+    load()
+    const refresh = () => { if (!document.hidden) load() }
+    const timer = setInterval(refresh, 30_000)
+    window.addEventListener('focus', refresh)
+    window.addEventListener(API_CHANGED_EVENT, load)
+    return () => { clearInterval(timer); window.removeEventListener('focus', refresh); window.removeEventListener(API_CHANGED_EVENT, load) }
+  }, [load])
 
   const match = (c: CaseSummary, f: Filter) => f === 'ALL' || (f === 'REVIEWED') === (c.stage === 'REVIEWED')
   const shown = cases?.filter((c) => match(c, filter))
@@ -32,7 +40,7 @@ export default function CaseList() {
     <>
       <PageHeader
         title="고장파형 분석"
-        description="7채널 입력을 먼저 검사하고, 지원하는 분석만 실행한 뒤 사람이 검토해 기록합니다. 검토 기록과 이력은 각 사건의 '검토·이력' 탭에 남습니다."
+        description="CN 7채널·RU 5채널 입력을 각 모델 계약에 맞춰 검사하고, 분석 결과와 사람의 검토를 서버에 기록합니다."
         actions={
           <Link to="/cases/new" className="btn btn-primary">
             <IconPlus />
@@ -40,6 +48,7 @@ export default function CaseList() {
           </Link>
         }
       />
+      {cases?.some((c) => c.sync?.error) && <div className="alert alert-warn" role="status">{cases.find((c) => c.sync?.error)?.sync?.error} <button className="btn btn-sm" onClick={load}>다시 불러오기</button></div>}
 
       <div className="tabs" role="tablist">
         {(Object.keys(FILTER_LABEL) as Filter[]).map((f) => (

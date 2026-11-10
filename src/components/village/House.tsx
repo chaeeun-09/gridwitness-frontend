@@ -6,31 +6,7 @@ import type { LedState, NodeStatus } from '../../lib/village'
 import Label from '../three/Label'
 import SpeechBubble from '../three/SpeechBubble'
 import { glowTexture, shingleTexture, sidingTexture, tiled } from './textures'
-
-export type HouseStyle = 'cottage' | 'twoStory' | 'wide'
-
-interface Spec {
-  w: number // 폭 (x)
-  d: number // 깊이 (z)
-  wallH: number
-  roofH: number
-  floors: 1 | 2
-  wall: string
-  trim: string
-  roof: string
-}
-
-export const HOUSE_SPECS: Record<HouseStyle, Spec> = {
-  cottage: { w: 3.2, d: 2.6, wallH: 1.9, roofH: 1.35, floors: 1, wall: '#f3e6cc', trim: '#ffffff', roof: '#b4472f' },
-  twoStory: { w: 2.9, d: 2.5, wallH: 3.3, roofH: 1.3, floors: 2, wall: '#e9edf2', trim: '#ffffff', roof: '#4b5563' },
-  wide: { w: 4.0, d: 2.7, wallH: 2.0, roofH: 1.2, floors: 1, wall: '#efe0c4', trim: '#fdfaf3', roof: '#8a4b2f' },
-}
-
-/** 지붕 위 인입선 지지대 꼭대기 (로컬 좌표) */
-export function mastTop(style: HouseStyle): [number, number, number] {
-  const s = HOUSE_SPECS[style]
-  return [-s.w / 2 + 0.45, s.wallH + s.roofH + 0.55, 0]
-}
+import { HOUSE_SPECS, mastTop, type HouseStyle, type Spec } from './houseGeometry'
 
 /** 라벨에 상태 줄까지 보여줄 상태 (평소엔 이름만) */
 const ALARM_STATUS: NodeStatus[] = ['WARNING', 'FAULT', 'OUTAGE']

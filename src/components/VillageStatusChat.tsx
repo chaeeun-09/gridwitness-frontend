@@ -3,9 +3,16 @@ import { answer, SUGGESTIONS, type ChatMsg } from '../lib/assistant'
 import { useVillageEvents } from '../lib/villageEvents'
 
 // 브라우저 음성 인식 (Chrome·Edge·Safari). 없으면 마이크 버튼을 숨김
-type Rec = { lang: string; interimResults: boolean; onresult: (e: { results: { 0: { transcript: string } }[] }) => void; onend: () => void; onerror: () => void; start: () => void; stop: () => void }
+type Rec = { lang: string; interimResults: boolean; continuous: boolean; onresult: (e: { resultIndex: number; results: ArrayLike<{ isFinal: boolean; 0: { transcript: string } }> }) => void; onend: () => void; onerror: (e: { error: string }) => void; start: () => void; stop: () => void }
 const RecCtor = (window as unknown as { SpeechRecognition?: new () => Rec; webkitSpeechRecognition?: new () => Rec }).SpeechRecognition
   ?? (window as unknown as { webkitSpeechRecognition?: new () => Rec }).webkitSpeechRecognition
+const MIC_ERROR: Record<string, string> = {
+  'not-allowed': '마이크 권한이 없어요. 브라우저 주소창에서 마이크를 허용하거나 글로 질문해 주세요.',
+  'service-not-allowed': '이 브라우저에서 음성 인식을 쓸 수 없어요. 글로 질문해 주세요.',
+  'no-speech': '말소리를 듣지 못했어요. 다시 눌러 말하거나 글로 질문해 주세요.',
+  'audio-capture': '마이크를 찾지 못했어요. 글로 질문해 주세요.',
+  network: '음성 인식 서버에 연결하지 못했어요. 글로 질문해 주세요.',
+}
 
 function speak(text: string) {
   if (!('speechSynthesis' in window)) return
@@ -21,53 +28,80 @@ export default function VillageStatusChat() {
   const [msgs, setMsgs] = useState<ChatMsg[]>([{ role: 'bot', text: "마을 FRTU 3대(인입·주택 분기·가로등 분기)의 상태와 고장 구간을 알려 드려요.\n예: '어느 분기가 문제야?', '왜 이상이야?'\nLED·전원 조작은 마을 화면 제어판에서 해 주세요." }])
   const [input, setInput] = useState('')
   const [listening, setListening] = useState(false)
+  const [fromVoice, setFromVoice] = useState(false)
+  const [micMsg, setMicMsg] = useState<string | null>(RecCtor ? null : '이 브라우저는 음성 인식을 지원하지 않아요. 글로 질문해 주세요.')
   const [voiceReply, setVoiceReply] = useState(false)
   const rec = useRef<Rec | null>(null)
   const end = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  useEffect(() => () => { rec.current?.stop(); if ('speechSynthesis' in window) window.speechSynthesis.cancel() }, [])
   useEffect(() => {
     end.current?.scrollIntoView({ block: 'end' })
   }, [msgs])
 
-  function send(text: string, viaVoice = false) {
+  function send(text: string, viaVoice = fromVoice) {
     const q = text.trim()
     if (!q) return
     const a = answer(q, events)
     setMsgs((m) => [...m, { role: 'user', text: q }, { role: 'bot', text: a }])
     setInput('')
+    setFromVoice(false)
+    setMicMsg(null)
     if (viaVoice || voiceReply) speak(a)
   }
 
   function toggleMic() {
     if (!RecCtor) return
     if (listening) return rec.current?.stop()
+    setMicMsg(null)
     const r = new RecCtor()
     r.lang = 'ko-KR'
-    r.interimResults = false
-    r.onresult = (e) => send(e.results[0][0].transcript, true)
-    r.onend = () => setListening(false)
-    r.onerror = () => setListening(false)
+    r.interimResults = true
+    r.continuous = false
+    let finalText = ''
+    r.onresult = (e) => {
+      let interim = ''
+      for (let k = e.resultIndex; k < e.results.length; k++) {
+        if (e.results[k].isFinal) finalText += e.results[k][0].transcript
+        else interim += e.results[k][0].transcript
+      }
+      setInput((finalText + interim).trim())
+    }
+    r.onend = () => {
+      setListening(false)
+      if (finalText.trim()) {
+        setFromVoice(true)
+        setMicMsg('인식한 문장을 확인하고, 고칠 곳이 있으면 고친 뒤 보내세요.')
+        inputRef.current?.focus()
+      }
+    }
+    r.onerror = (e) => { setListening(false); setMicMsg(MIC_ERROR[e.error] ?? '음성을 알아듣지 못했어요. 글로 질문해 주세요.') }
     rec.current = r
     setListening(true)
-    r.start()
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel()
+    try { r.start() }
+    catch { setListening(false); setMicMsg('마이크를 시작하지 못했어요. 글로 질문해 주세요.') }
   }
 
   return (
     <div className="chat">
+      <div className="chat-scope small muted">마을 직류 계측 · 브라우저 규칙 도우미 · 서버 LLM을 사용하지 않아요.</div>
       <div className="chat-log" aria-live="polite">
         {msgs.map((m, k) => <div key={k} className={`chat-msg ${m.role}`}>{m.text}</div>)}
         {listening && <div className="chat-msg user listening">듣는 중…</div>}
         <div ref={end} />
       </div>
       <div className="chat-chips">
-        {SUGGESTIONS.map((s) => <button key={s} className="chat-chip" onClick={() => send(s)}>{s}</button>)}
+        {SUGGESTIONS.map((s) => <button key={s} className="chat-chip" onClick={() => send(s, false)}>{s}</button>)}
       </div>
+      {micMsg && <div className={`chat-micmsg ${fromVoice ? 'info' : ''}`} role="status">{micMsg}</div>}
       <form className="chat-input" onSubmit={(e) => (e.preventDefault(), send(input))}>
         {RecCtor && (
           <button type="button" className={`chat-mic ${listening ? 'on' : ''}`} onClick={toggleMic} aria-label={listening ? '음성 입력 멈추기' : '음성으로 말하기'} title="음성으로 말하기">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>
           </button>
         )}
-        <input value={input} onChange={(e) => setInput(e.target.value)} placeholder="예: 지금 상태 어때?" aria-label="질문" />
+        <input ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)} placeholder={listening ? '듣는 중… 말씀하세요' : '예: 지금 상태 어때?'} aria-label="질문" />
         <button type="submit" className="chat-send" aria-label="보내기" disabled={!input.trim()}>
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"><path d="M4 12 20 4l-6 16-3-7-7-1Z" /></svg>
         </button>

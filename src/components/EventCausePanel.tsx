@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { getVillageRecordState, retryVillageRecords, useVillagePersistence } from '../api/village'
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { CHART } from '../lib/chart'
 import { IOT_CHANNELS } from '../lib/village'
@@ -24,13 +25,15 @@ function VerdictBadge({ a }: { a: AnalyzedEvent }) {
 
 function Detail({ a }: { a: AnalyzedEvent }) {
   const { e, verdict: v } = a
+  const stored = getVillageRecordState(a.recordId)
   const data = e.i100.map((x, k) => ({ t: (k - e.pre) * e.dtMs, mA: x / 100 }))
   const maxAbs = v.kind === 'ANSWERED' || v.kind === 'WITHHELD' ? Math.max(...v.evidence.map((x) => Math.abs(x.contribution)), 1e-9) : 1
   return (
     <div className="grid-2" style={{ gap: 16, alignItems: 'start' }}>
       <div>
         <div className="small muted" style={{ marginBottom: 4 }}>
-          사건 #{e.ev} 파형 · 마을 전체 전류 · {e.dtMs} ms 간격 · {e.src === 'cmd' ? cmdText(e.cmd) : '명령 없이 전류가 갑자기 변함'}
+          사건 #{e.ev} 파형 · {e.source === 'MOCK' ? '시뮬레이터' : '실측 Arduino'} · {e.dtMs} ms 간격 · {e.i100.length}샘플 · {new Date(e.receivedAt).toLocaleString('ko-KR')}<br />
+          {stored === 'server' ? '서버 보존 완료' : stored === 'pending' ? '브라우저 보존 · 서버 전송 대기' : '저장 실패 · 이 탭에서만 유지'} · {e.src === 'cmd' ? cmdText(e.cmd) : '명령 없이 전류가 갑자기 변함'}
         </div>
         <ResponsiveContainer width="100%" height={180}>
           <LineChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
@@ -96,15 +99,18 @@ function Detail({ a }: { a: AnalyzedEvent }) {
 /** 스케치 v3.1 이 보낸 사건 파형마다 원인을 분석해 보여준다 (고장파형 AI 와 같은 흐름을 마을 규모로) */
 export default function EventCausePanel() {
   const list = useVillageEvents()
-  const [sel, setSel] = useState<number | null>(null)
-  const chosen = list.find((a) => a.e.ev === sel) ?? list[0]
+  const [sel, setSel] = useState<string | null>(null)
+  const chosen = list.find((a) => a.recordId === sel) ?? list[0]
+  const persistence = useVillagePersistence()
   const m = EVENT_MODEL.metrics
   return (
     <Section
       title="사건 원인 분석"
       description="모형에서 전류가 갑자기 바뀌면 우노가 그 앞 0.6초·뒤 2.0초를 녹화해 보냅니다. 파형으로 단선·순간/반복 접촉 불량·정상 개폐·복구를 가리고, 근거가 부족하면 보류합니다."
-      actions={list.length > 0 && <button className="btn btn-sm btn-ghost" onClick={clearVillageEvents}>목록 비우기</button>}
+      actions={<><button className="btn btn-sm btn-ghost" disabled={persistence.syncing} onClick={() => { void retryVillageRecords() }}>{persistence.syncing ? '저장 중…' : '서버 저장 재시도'}</button>{list.length > 0 && <button className="btn btn-sm btn-ghost" onClick={clearVillageEvents}>현재 목록 숨기기 (원본 보존)</button>}</>}
     >
+      <p className="small muted">{persistence.pending ? `마을 기록 ${persistence.pending}건 서버 전송 대기 · 브라우저에 보존` : '수신한 원시 파형·AI 근거를 서버에 보존해요.'}</p>
+      {persistence.error && <div className="alert alert-warn small" role="status">{persistence.error}</div>}
       {list.length === 0 ? (
         <p className="muted small" style={{ margin: 0 }}>
           아직 받은 사건이 없습니다. 모형에서 LED를 뽑거나 건드리거나, 스위치로 채널을 끄고 켜 보세요. (우노에 스케치 v3.1이 올라가 있어야 합니다)
@@ -113,7 +119,7 @@ export default function EventCausePanel() {
         <>
           <div className="row gap" style={{ flexWrap: 'wrap', marginBottom: 12 }}>
             {list.map((a) => (
-              <button key={a.e.ev} className={`btn btn-sm ${chosen === a ? 'btn-primary' : ''}`} onClick={() => setSel(a.e.ev)}>
+              <button key={a.recordId} className={`btn btn-sm ${chosen === a ? 'btn-primary' : ''}`} onClick={() => setSel(a.recordId)}>
                 #{a.e.ev} <VerdictBadge a={a} />
               </button>
             ))}

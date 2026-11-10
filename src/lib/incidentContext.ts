@@ -11,6 +11,10 @@ export const EVENT_KO: Record<string, string> = {
   MIF: '여러 주기 초기 고장 (MIF)',
   PF: '영구 고장 (PF)',
   TD: '일시적 외란 (TD)',
+  NORMAL: '정상 (NORMAL)',
+  SWITCHING: '개폐 (SWITCHING)',
+  ABNORMAL: '비정상 (ABNORMAL)',
+  FAULT: '고장 (FAULT)',
 }
 export const eventKo = (label: string) => EVENT_KO[label] ?? label
 
@@ -86,7 +90,7 @@ export function buildIncidentContext(c: IncidentCase): IncidentContext {
     model: {
       version: a?.modelVersion ?? null,
       preprocess: a?.preprocessVersion ?? null,
-      country: ai?.modelCountry ?? null,
+      country: ai?.modelCountry ?? (a?.kind === 'COMPLETED' ? (['NORMAL', 'SWITCHING', 'ABNORMAL', 'FAULT'].includes(a.predictedLabel) ? 'RU' : 'CN') : null),
       dataset: ai?.modelDataset ?? null,
       limitations: [...(a?.kind === 'COMPLETED' ? a.limitations : []), ...(ai?.limitations ?? [])],
     },
@@ -117,6 +121,9 @@ export function buildIncidentContext(c: IncidentCase): IncidentContext {
   ctx.reviews.forEach((r, k) => add('review', `review.${k}`, `${r.reviewer} 검토`, `${r.verdict}${r.finalJudgment ? ` — ${r.finalJudgment}` : ''}`))
   add('source', 'source.kind', '자료 출처', `${SOURCE_LABEL[c.source.sourceType]}${c.source.datasetId ? ` · ${c.source.datasetId}` : ''}`)
   add('source', 'source.format', '파형 형식', `${c.source.samplingRateHz} Hz 샘플링 · 계통 ${c.source.systemFrequencyHz} Hz`)
+  add('source', 'source.channels', '실제 입력 채널', c.source.channelOrder.join(', '))
+  if (c.source.labelMeaning) add('source', 'source.labels', '원본 라벨 의미', c.source.labelMeaning)
+  if (c.sync?.error) add('source', 'source.stale', '서버 확인 상태', c.sync.error)
   ctx.evidence = ev
   return ctx
 }

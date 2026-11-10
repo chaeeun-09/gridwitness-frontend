@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { CartesianGrid, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { api } from '../api'
+import { getVillageRecordState, retryVillageRecords, useVillagePersistence } from '../api/village'
 import { getActor } from '../lib/actor'
 import { CHART } from '../lib/chart'
 import { FRTUS } from '../lib/frtu'
@@ -35,15 +36,17 @@ export function IncidentWatcher() {
   const { pathname } = useLocation()
   const { incidents } = useLiveIncidents()
   // 저장돼 있던 지난 사건은 새 사건으로 치지 않음 (새로고침해도 다시 울리지 않게)
-  const seen = useRef(incidents[0]?.id ?? 0)
+  const seen = useRef(new Set(incidents.map((x) => x.recordId)))
+  const [mountedAt] = useState(() => Date.now())
   useEffect(() => observeVillage(snap), [snap])
   useEffect(() => {
     const top = incidents[0]
-    if (!top || top.id <= seen.current) return
-    seen.current = top.id
+    if (!top || seen.current.has(top.recordId)) return
+    seen.current.add(top.recordId)
+    if (top.startedAt < mountedAt) return
     alertIncident(top.title)
-    if (pathname === '/village') openIncident(top.id)
-  }, [incidents, pathname])
+    if (pathname === '/village') openIncident(top.recordId)
+  }, [incidents, pathname, mountedAt])
   return null
 }
 
@@ -52,7 +55,7 @@ export function IncidentBanner() {
   const { incidents, openId, dismissed } = useLiveIncidents()
   const top = incidents[0]
   const now = useNow(!!top)
-  if (!top || openId === top.id || dismissed.includes(top.id)) return null
+  if (!top || openId === top.recordId || dismissed.includes(top.recordId)) return null
   if (top.clearedAt && now - top.clearedAt > 60_000) return null
   const live = !top.clearedAt
   return (
@@ -60,8 +63,8 @@ export function IncidentBanner() {
       <span className="ib-dot" />
       <strong>{live ? top.title : `복구됨 · ${secs(top.clearedAt! - top.startedAt)} 만에`}</strong>
       <span className="ib-time">{live ? `${secs(now - top.startedAt)} 전 발생` : top.title}</span>
-      <button type="button" className="btn btn-sm" onClick={() => openIncident(top.id)}>보기</button>
-      <button type="button" className="ib-x" onClick={() => dismissIncident(top.id)} aria-label="알림 닫기"><IconX /></button>
+      <button type="button" className="btn btn-sm" onClick={() => openIncident(top.recordId)}>보기</button>
+      <button type="button" className="ib-x" onClick={() => dismissIncident(top.recordId)} aria-label="알림 닫기"><IconX /></button>
     </div>
   )
 }
@@ -85,9 +88,9 @@ export function StageBar({ inc }: { inc: LiveIncident }) {
         })}
       </ol>
       <div className="stagebar-ctl">
-        <input value={name} onChange={(e) => setName(e.target.value)} onBlur={() => assignIncident(inc.id, name)} placeholder="담당자 이름" aria-label="담당자" />
+        <input value={name} onChange={(e) => setName(e.target.value)} onBlur={() => assignIncident(inc.recordId, name)} placeholder="담당자 이름" aria-label="담당자" />
         {next && (
-          <button type="button" className="btn btn-sm btn-primary" onClick={() => { assignIncident(inc.id, name); setIncidentStage(inc.id, next, name.trim() || getActor()) }}>
+          <button type="button" className="btn btn-sm btn-primary" onClick={() => { assignIncident(inc.recordId, name); setIncidentStage(inc.recordId, next, name.trim() || getActor()) }}>
             {STAGE_LABEL[next]}(으)로
           </button>
         )}
@@ -99,7 +102,7 @@ export function StageBar({ inc }: { inc: LiveIncident }) {
 /** 실시간 사건 화면: 사건 전후 파형 · 고장 구간 · 원인 판정 · 진행 · 등록/AI */
 export function IncidentSheet() {
   const { incidents, openId } = useLiveIncidents()
-  const inc = incidents.find((x) => x.id === openId) ?? null
+  const inc = incidents.find((x) => x.recordId === openId) ?? null
 
   // 열리면 다른 패널을 비키게 하고, AI·마을 패널이 열리면 접힘
   useEffect(() => {
@@ -123,12 +126,13 @@ function SheetBody({ inc }: { inc: LiveIncident }) {
   const live = !inc.clearedAt
   const now = useNow(live)
   const events = useVillageEvents()
+  const persistence = useVillagePersistence()
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
   const data = inc.points.map((p) => ({ s: +((p.t - inc.startedAt) / 1000).toFixed(1), inlet: p.i * 1000, house: p.ih != null ? p.ih * 1000 : null, lamp: p.il != null ? p.il * 1000 : null }))
   // 우노가 녹화해 보낸 사건 파형이 이 시각 근처에 있으면 그 AI 판정도 함께 (실측 장치)
-  const recorded = events.find((a) => Math.abs(new Date(a.e.receivedAt).getTime() - inc.startedAt) < 8000)
+  const recorded = events.find((a) => a.recordId === inc.rawEventRecordId) ?? events.find((a) => (a.e.source ?? 'SERIAL') === inc.source && Math.abs(new Date(a.e.receivedAt).getTime() - inc.startedAt) < 8000)
   const v = recorded?.verdict
   // 고장 구간 → 설비 연결정보(GIS)로 점검 후보와 순서
   const cand = inspectionCandidate(inc.scope)
@@ -141,7 +145,7 @@ function SheetBody({ inc }: { inc: LiveIncident }) {
     try {
       const c = await api.registerIotEvent({ event: ev, actor: getActor() })
       linkEventToCase(ev.id, c.id)
-      markIncidentRegistered(inc.id, c.id)
+      markIncidentRegistered(inc.recordId, c.id)
     } catch (e) {
       setErr((e as Error).message)
     } finally {
@@ -157,11 +161,13 @@ function SheetBody({ inc }: { inc: LiveIncident }) {
           <h2>{inc.title}</h2>
         </div>
         <Badge tone={live ? 'err' : 'ok'}>{live ? `진행 중 · ${secs(now - inc.startedAt)}` : `복구됨 · ${secs(inc.clearedAt! - inc.startedAt)} 만에`}</Badge>
-        <Link to={`/report/live/${inc.id}`} className="btn btn-sm" onClick={() => openIncident(null)}>보고서</Link>
+        <Link to={`/report/live/${inc.recordId}`} className="btn btn-sm" onClick={() => openIncident(null)}>보고서</Link>
         <button type="button" className="btn btn-ghost btn-icon btn-sm" onClick={() => openIncident(null)} aria-label="닫기"><IconX /></button>
       </header>
 
       <StageBar inc={inc} />
+      <div className="small muted">이 사건: {getVillageRecordState(inc.recordId) === 'server' ? '서버 보존 완료' : getVillageRecordState(inc.recordId) === 'pending' ? '브라우저 보존 · 서버 전송 대기' : '브라우저 저장 실패 · 이 탭에서만 유지'} · 마을 전체 전송 대기 {persistence.pending}건 <button type="button" className="chat-link" disabled={persistence.syncing} onClick={() => { void retryVillageRecords() }}>저장 재시도</button></div>
+      {persistence.error && <div className="alert alert-warn small" role="status">{persistence.error}</div>}
 
       <div className="is-grid">
         <div className="is-wave">

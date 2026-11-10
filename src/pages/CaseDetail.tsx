@@ -11,6 +11,7 @@ import ReviewPanel from '../components/ReviewPanel'
 import TrustStrip from '../components/TrustStrip'
 import { ErrorState, PageHeader, PageSkeleton, Section } from '../components/ui'
 import { fmtTime, getActor } from '../lib/actor'
+import { API_CHANGED_EVENT } from '../lib/backend'
 import { needsWaveform, SOURCE_LABEL, type AnalysisType, type AnyCase, type ChannelFeatures, type IncidentCase } from '../types'
 
 type Tab = 'analysis' | 'assistant' | 'diagnosis' | 'review' | 'source'
@@ -30,7 +31,14 @@ export default function CaseDetail() {
     setError(null)
     api.getCase(id).then(setC).catch((e: Error) => setError(e.message))
   }, [id])
-  useEffect(load, [load])
+  useEffect(() => {
+    load()
+    const refresh = () => { if (!document.hidden) load() }
+    const timer = setInterval(refresh, 30_000)
+    window.addEventListener('focus', refresh)
+    window.addEventListener(API_CHANGED_EVENT, load)
+    return () => { clearInterval(timer); window.removeEventListener('focus', refresh); window.removeEventListener(API_CHANGED_EVENT, load) }
+  }, [load])
 
   if (error) return <ErrorState message={error} onRetry={load} />
   if (!c) return <PageSkeleton />
@@ -59,10 +67,11 @@ export function WaveformCaseView({ c, onChange }: { c: IncidentCase; onChange: (
       />
       <Steps steps={WAVEFORM_STEPS} done={waveformStepsDone(c.stage)} />
       <TrustStrip c={c} onGo={setTab} />
+      {c.sync?.error && <div className="alert alert-warn" role="status">{c.sync.error}{c.sync.checkedAt && ` · 마지막 확인 ${fmtTime(c.sync.checkedAt)}`}</div>}
       {missing && (
         <div className="alert alert-warn no-print" style={{ marginTop: 20 }}>
           <span>
-            <strong>원본 CSV가 없어 분석과 검토를 할 수 없습니다.</strong> 서버 기록만 있는 사건입니다. 등록할 때 쓴 원본 CSV를 연결하면 파형을 보고 분석·검토할 수 있습니다.{' '}
+            <strong>서버에서 원본 파형을 불러오지 못했습니다.</strong> 다시 불러오거나 등록할 때 쓴 CSV를 연결하면 파형을 보고 분석·검토할 수 있습니다.{' '}
             {tab !== 'analysis' && <button className="btn btn-sm" onClick={() => setTab('analysis')}>원본 CSV 연결하기</button>}
           </span>
         </div>
@@ -120,13 +129,17 @@ function SourcePanel({ c }: { c: IncidentCase }) {
   const rows: [string, React.ReactNode][] = [
     ['파일', s.fileName],
     ['크기', `${(s.fileSize / 1024).toFixed(1)} KB`],
-    ['SHA-256', <span className="mono break">{s.sha256}</span>],
+    ['SHA-256', <span key="file-hash" className="mono break">{s.sha256}</span>],
     ['출처', SOURCE_LABEL[s.sourceType]],
     ['데이터셋 / 장비 ID', s.datasetId || '—'],
     ['채널 순서', s.channelOrder.join(', ')],
     ['샘플링', `${s.samplingRateHz} Hz`],
     ['계통 주파수', `${s.systemFrequencyHz} Hz`],
     ['라벨 의미', s.labelMeaning || '—'],
+    ['원래 파일 해시', s.provenance?.originalSha256 ? <span key="original-hash" className="mono break">{s.provenance.originalSha256}</span> : '별도 원본 메타데이터 없음'],
+    ['원본 파일', s.provenance?.originalFiles.map((f) => `${f.name} (${f.size.toLocaleString()} B · ${f.sha256.slice(0, 12)}…)`).join(' / ') || '—'],
+    ['COMTRADE 기록 장치', s.comtrade ? `${s.comtrade.station} · ${s.comtrade.device} · ${s.comtrade.fileType} · ${s.comtrade.revYear}` : '해당 없음'],
+    ['채널 매핑', s.comtrade ? Object.entries(s.comtrade.mapping).map(([ch, original]) => `${ch} ← ${original}`).join(' / ') : 'CSV 열 순서 사용'],
     ['등록 시각', fmtTime(c.createdAt)],
   ]
   return (
@@ -136,6 +149,7 @@ function SourcePanel({ c }: { c: IncidentCase }) {
           <div key={k}><dt>{k}</dt><dd>{v}</dd></div>
         ))}
       </dl>
+      {s.format === 'COMTRADE' && <p className="hint">위 SHA-256은 분석에 사용한 변환 CSV의 해시입니다. 원래 cfg/dat의 개별 해시와 채널 매핑은 별도로 보존합니다.</p>}
     </Section>
   )
 }
@@ -244,7 +258,7 @@ function FeatureTable({ features }: { features: ChannelFeatures[] }) {
   )
 }
 
-/** 다른 곳에서 등록된 사건: 서버에는 원본이 없어 같은 CSV를 고르면 파형을 표시 */
+/** 원본 다운로드에 실패한 경우 동일한 CSV를 직접 연결할 수 있다. */
 function AttachWaveform({ c, onChange }: { c: IncidentCase; onChange: (c: AnyCase) => void }) {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -268,6 +282,7 @@ function AttachWaveform({ c, onChange }: { c: IncidentCase; onChange: (c: AnyCas
           <div><dt>SHA-256</dt><dd><span className="mono break">{c.source.sha256}</span></dd></div>
         </dl>
         <div className="cluster">
+          <button className="btn" disabled={busy} onClick={async () => { setBusy(true); setError(null); try { onChange(await api.getCase(c.id)) } catch (e) { setError((e as Error).message) } finally { setBusy(false) } }}>서버에서 다시 불러오기</button>
           <label className="btn btn-primary" style={{ cursor: busy ? 'wait' : 'pointer' }}>
             {busy ? '확인 중…' : '원본 CSV 선택'}
             <input type="file" accept=".csv,text/csv" hidden disabled={busy} onChange={(e) => pick(e.target.files?.[0])} />

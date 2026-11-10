@@ -162,8 +162,8 @@ export const INPUT_SCENARIOS: InputScenario[] = [
     id: 'ct-no-in',
     group: '입력 검사 · COMTRADE',
     label: '중성선(In) 채널 없음',
-    expect: 'ACCEPTED',
-    note: 'In 열을 빼고 COMTRADE로 바꿈 · In을 Ia+Ib+Ic로 계산',
+    expect: 'REJECTED',
+    note: 'In 열을 빼고 COMTRADE로 바꿈 · 없는 채널을 계산값으로 채우지 않아 거부',
     build: (s) => {
       const { cfg, dat } = toComtrade(s.MIF.matrix, { station: 'XIONG_PUBLIC', device: 'CONVERTED-6CH', fs: 4096, lf: 50, channels: [0, 1, 2, 4, 5, 6] })
       return { file: new File([dat], 'no_neutral.dat'), cfg: new File([cfg], 'no_neutral.cfg'), ...check('In 채널 없음 (COMTRADE)') }

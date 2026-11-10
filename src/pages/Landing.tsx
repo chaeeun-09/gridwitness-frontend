@@ -71,7 +71,7 @@ export default function Landing() {
         <Reveal className="land-laptop tilt">
           {demoCase ? <LandingDemo demoCase={demoCase} /> : <div className="laptop-screen laptop-wait" />}
           <div className="laptop-base" />
-          <div className="land-caption">실제 공개 고장파형(Xiong et al., MIT) 원본입니다. 중국 10kV 배전 기록이며 국내 자료가 아닙니다.</div>
+          <div className="land-caption">실제 공개 고장파형(Xiong et al., MIT) 원본입니다. 중국 연구진이 공개한 배전계통 실측 기록이며 국내 자료가 아닙니다.</div>
         </Reveal>
 
         <aside className="land-signals reveal-group">

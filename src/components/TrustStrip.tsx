@@ -38,7 +38,7 @@ export default function TrustStrip({ c, onGo }: { c: IncidentCase; onGo: (t: Tab
     {
       title: '③ AI 판단',
       value: !a ? '실행 전' : a.kind === 'COMPLETED' ? `${a.predictedLabel} 로 답함` : '보류',
-      sub: a?.kind === 'WITHHELD' ? (reasons.map((r) => REASON_SHORT[r] ?? r).join(' · ') || a.reasons[0] || '') : a?.kind === 'COMPLETED' ? '판단 기준 3개 통과' : '—',
+      sub: a?.kind === 'WITHHELD' ? (reasons.map((r) => REASON_SHORT[r] ?? r).join(' · ') || a.reasons[0] || '') : a?.kind === 'COMPLETED' ? (ai?.thresholds && Object.keys(ai.thresholds).length ? '서버 모델 판단 기준 확인' : '기준 상세는 서버 응답에 없음') : '—',
       tone: !a ? 'off' : a.kind === 'COMPLETED' ? 'ok' : 'warn',
       tab: 'analysis',
     },

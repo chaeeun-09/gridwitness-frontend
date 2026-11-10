@@ -31,11 +31,11 @@ export default function AiEvidence({ ai, compact }: { ai: AiDetail; compact?: bo
 
       {hasGates && (
         <>
-          <div className="small muted" style={{ marginBottom: 6 }}>판단 기준 (셋 다 통과해야 답함)</div>
+          <div className="small muted" style={{ marginBottom: 6 }}>{ai.modelCountry ? `${ai.modelCountry} 모델 ` : ''}서버에서 받은 판단 기준</div>
           <ul className="ai-gates">
             <Gate label="1순위 점수" value={f2(ai.topScore)} limit={`≥ ${f2(th.score)}`} pass={(ai.topScore ?? 0) >= th.score} note="충분히 뚜렷한가" />
-            {th.margin != null && <Gate label="1·2위 점수 차" value={f2(ai.margin)} limit={`≥ ${f2(th.margin)}`} pass={(ai.margin ?? 0) >= th.margin} note="두 유형을 가를 수 있는가" />}
-            {th.ood_ratio != null && <Gate label="학습 범위 밖 특징" value={`${Math.round((ai.oodRatio ?? 0) * 100)}%`} limit={`≤ ${Math.round(th.ood_ratio * 100)}%`} pass={(ai.oodRatio ?? 0) <= th.ood_ratio} note="배운 적 있는 파형인가" />}
+            {th.margin != null && ai.margin != null && <Gate label="1·2위 점수 차" value={f2(ai.margin)} limit={`≥ ${f2(th.margin)}`} pass={ai.margin >= th.margin} note="두 유형을 가를 수 있는가" />}
+            {th.ood_ratio != null && ai.oodRatio != null && <Gate label="학습 범위 밖 특징" value={`${Math.round(ai.oodRatio * 100)}%`} limit={`≤ ${Math.round(th.ood_ratio * 100)}%`} pass={ai.oodRatio <= th.ood_ratio} note="배운 적 있는 파형인가" />}
           </ul>
           {!answered && ai.reasonCodes.length > 0 && (
             <p className="small" style={{ margin: '8px 0 0' }}>

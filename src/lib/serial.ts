@@ -50,19 +50,21 @@ export const serialSupported = () => typeof navigator !== 'undefined' && 'serial
 /** 한 줄을 측정값으로 해석. 형식이 틀리면 null */
 export function parseFrame(line: string): SerialReading | null {
   try {
-    // Arduino는 계산이 안 된 실수를 nan·inf로 찍어 JSON이 깨지므로 0으로 바꿔 읽는다
-    const obj = JSON.parse(line.replace(/:\s*-?(nan|inf)\b/gi, ':0')) as Record<string, unknown>
-    const v = Number(obj.v)
-    const i = Number(obj.i)
-    if (!Number.isFinite(v) || !Number.isFinite(i) || obj.relay === undefined) return null
-    const out: SerialReading = { v, i, relay: Number(obj.relay) === 1 }
+    // 센서 오류(nan/inf/null)를 실제 0V 계측으로 바꾸지 않는다.
+    const obj = JSON.parse(line) as Record<string, unknown>
+    if (!obj || typeof obj !== 'object') return null
+    const measured = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x) && x >= 0
+    const bit = (x: unknown) => x === 0 || x === 1 || x === false || x === true
+    if (!measured(obj.v) || !measured(obj.i) || !bit(obj.relay)) return null
+    const out: SerialReading = { v: obj.v, i: obj.i, relay: obj.relay === 1 || obj.relay === true }
     if (Array.isArray(obj.ch)) {
-      if (obj.ch.length !== 5) return null
-      out.ch = obj.ch.map((x) => Number(x) === 1)
+      if (obj.ch.length !== 5 || !obj.ch.every(bit)) return null
+      out.ch = obj.ch.map((x) => x === 1 || x === true)
     }
-    const z = ['vh', 'ih', 'vl', 'il'].map((k) => Number(obj[k]))
-    if (obj.ih !== undefined) {
-      if (!z.every(Number.isFinite)) return null
+    const keys = ['vh', 'ih', 'vl', 'il']
+    const z = keys.map((k) => obj[k])
+    if (keys.some((k) => obj[k] !== undefined)) {
+      if (!z.every(measured)) return null
       out.zones = { house: { v: z[0], i: z[1] }, lamp: { v: z[2], i: z[3] } }
     }
     return out
@@ -115,14 +117,27 @@ export async function openSerial(onLine: (line: string) => void, onClose: (reaso
     port = await serial.requestPort({ filters: BOARD_VIDS.map((usbVendorId) => ({ usbVendorId })) })
     await port.open({ baudRate: 115200 })
   }
-  if (!port.readable || !port.writable) throw new Error('포트를 열 수 없습니다.')
+  if (!port.readable || !port.writable) {
+    await port.close().catch(() => {})
+    throw new Error('포트를 열 수 없습니다.')
+  }
   // 일부 보드·브라우저는 DTR을 켜야 데이터를 보낸다 (지원하지 않으면 무시)
   await port.setSignals?.({ dataTerminalReady: true, requestToSend: true }).catch(() => {})
 
-  const reader = port.readable.pipeThrough(new TextDecoderStream() as unknown as ReadableWritablePair<string, Uint8Array>).getReader()
+  const reader = port.readable.getReader()
   const writer = port.writable.getWriter()
   const encoder = new TextEncoder()
+  const decoder = new TextDecoder()
   let closed = false
+  let closing: Promise<void> | null = null
+
+  const close = (): Promise<void> => closing ??= (async () => {
+    closed = true
+    await reader.cancel().catch(() => {})
+    reader.releaseLock()
+    writer.releaseLock()
+    await port.close()
+  })()
 
   ;(async () => {
     let buf = ''
@@ -130,7 +145,8 @@ export async function openSerial(onLine: (line: string) => void, onClose: (reaso
       for (;;) {
         const { value, done } = await reader.read()
         if (done) break
-        buf += value
+        buf += decoder.decode(value, { stream: true })
+        if (buf.length > 65_536) throw new Error('장치가 줄바꿈 없이 너무 긴 데이터를 보냈습니다.')
         let nl: number
         while ((nl = buf.indexOf('\n')) >= 0) {
           const line = buf.slice(0, nl).trim()
@@ -138,19 +154,14 @@ export async function openSerial(onLine: (line: string) => void, onClose: (reaso
           if (line) onLine(line)
         }
       }
-      if (!closed) onClose('장치 연결이 끊겼습니다.')
+      if (!closed) { onClose('장치 연결이 끊겼습니다.'); void close().catch(() => {}) }
     } catch (e) {
-      if (!closed) onClose(`수신 오류: ${(e as Error).message}`)
+      if (!closed) { onClose(`수신 오류: ${(e as Error).message}`); void close().catch(() => {}) }
     }
   })()
 
   return {
     write: (line) => writer.write(encoder.encode(`${line}\n`)),
-    async close() {
-      closed = true
-      await reader.cancel().catch(() => {})
-      writer.releaseLock()
-      await port.close().catch(() => {})
-    },
+    close,
   }
 }

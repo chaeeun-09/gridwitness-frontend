@@ -3,7 +3,7 @@ import { Brush, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XA
 import { CHART } from '../lib/chart'
 import { preprocess, PREPROCESS_VERSION } from '../lib/waveform'
 import { Segmented } from './ui'
-import { CHANNELS, type Channel } from '../types'
+import { channelsFor, type Channel } from '../types'
 
 // 상(A·B·C)별 색은 전류·전압이 같은 계열, 전압은 한 단계 밝게
 export const COLORS: Record<Channel, string> = {
@@ -17,6 +17,7 @@ const GROUPS: { label: string; channels: Channel[] }[] = [
 ]
 
 export default function WaveformChart({ matrix, samplingRateHz }: { matrix: number[][]; samplingRateHz: number }) {
+  const channels = channelsFor(matrix[0]?.length ?? 0)
   const [mode, setMode] = useState<'raw' | 'prep'>('raw')
   const [visible, setVisible] = useState<Set<Channel>>(new Set(['Ia', 'Ib', 'Ic', 'In']))
 
@@ -24,10 +25,10 @@ export default function WaveformChart({ matrix, samplingRateHz }: { matrix: numb
     const m = mode === 'raw' ? matrix : preprocess(matrix)
     return m.map((r, i) => {
       const row: Record<string, number> = { t: +((i / samplingRateHz) * 1000).toFixed(2) }
-      CHANNELS.forEach((c, j) => (row[c] = r[j]))
+      channels.forEach((c, j) => (row[c] = r[j]))
       return row
     })
-  }, [matrix, mode, samplingRateHz])
+  }, [matrix, mode, samplingRateHz, channels])
 
   const toggle = (c: Channel) =>
     setVisible((prev) => {
@@ -44,7 +45,7 @@ export default function WaveformChart({ matrix, samplingRateHz }: { matrix: numb
         {GROUPS.map((g) => (
           <div key={g.label} className="chips">
             <span className="muted">{g.label}</span>
-            {g.channels.map((c) => (
+            {g.channels.filter((c) => channels.includes(c)).map((c) => (
               <button
                 key={c}
                 className={`chip ${visible.has(c) ? 'on' : ''}`}
@@ -66,7 +67,7 @@ export default function WaveformChart({ matrix, samplingRateHz }: { matrix: numb
             <XAxis dataKey="t" unit="ms" type="number" domain={['dataMin', 'dataMax']} tick={CHART.tick} axisLine={false} tickLine={false} />
             <YAxis tick={CHART.tick} axisLine={false} tickLine={false} width={64} />
             <Tooltip formatter={(v) => (typeof v === 'number' ? v.toFixed(3) : v)} labelFormatter={(t) => `${t} ms`} />
-            {CHANNELS.filter((c) => visible.has(c)).map((c) => (
+            {channels.filter((c) => visible.has(c)).map((c) => (
               <Line key={c} dataKey={c} stroke={COLORS[c]} dot={false} strokeWidth={1.25} isAnimationActive={false} />
             ))}
             <Brush dataKey="t" height={22} travellerWidth={8} stroke={CHART.secondary} fill="#fafafb" />

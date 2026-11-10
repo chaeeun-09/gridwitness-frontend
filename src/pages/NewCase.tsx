@@ -5,8 +5,8 @@ import { IconUpload } from '../components/Icons'
 import { DIAG_LABEL, PageHeader, Section } from '../components/ui'
 import { getActor } from '../lib/actor'
 import { INPUT_SCENARIOS, loadRealSamples } from '../lib/scenarios'
-import { MODEL_SCOPE } from '../lib/waveform'
-import { CHANNELS, SOURCE_LABEL, type SourceType } from '../types'
+import { MODEL_SCOPE, MODEL_SCOPES } from '../lib/waveform'
+import { SOURCE_LABEL, type SourceType, type ModelCountry } from '../types'
 
 const ext = (f: File) => f.name.split('.').pop()?.toLowerCase() ?? ''
 const base = (f: File) => f.name.replace(/\.[^.]+$/, '').toLowerCase()
@@ -41,6 +41,7 @@ export default function NewCase() {
   const [drag, setDrag] = useState(false)
   const [title, setTitle] = useState('')
   const [sourceType, setSourceType] = useState<SourceType>('PUBLIC_DATASET')
+  const [country, setCountry] = useState<ModelCountry>('CN')
   const [datasetId, setDatasetId] = useState('Xiong-public-fault-dataset')
   const [samplingRateHz, setFs] = useState<number>(MODEL_SCOPE.samplingRateHz)
   const [systemFrequencyHz, setSysHz] = useState<50 | 60>(50)
@@ -49,6 +50,7 @@ export default function NewCase() {
   const [error, setError] = useState<string | null>(null)
   const comtrade = !!cfg
   const chosen = INPUT_SCENARIOS.find((s) => s.id === scenario)
+  const scope = MODEL_SCOPES[country]
 
   function takeFiles(list: File[]) {
     const r = pickFiles(list)
@@ -75,6 +77,7 @@ export default function NewCase() {
     setPickError(null)
     setTitle(f.title)
     setSourceType(f.sourceType)
+    setCountry('CN')
     setDatasetId(f.datasetId)
     setFs(f.samplingRateHz)
     setSysHz(f.systemFrequencyHz)
@@ -117,7 +120,7 @@ export default function NewCase() {
 
       <form onSubmit={submit}>
         <div className="split">
-          <Section title="파형 파일" description={`CSV: 열 순서 ${CHANNELS.join(', ')} · COMTRADE: .cfg와 .dat를 함께 선택`}>
+          <Section title="파형 파일" description={`CSV: ${country} 열 순서 ${scope.channels.join(', ')} · COMTRADE: .cfg와 .dat를 함께 선택`}>
             <label
               className={`dropzone ${file ? 'has-file' : ''} ${drag ? 'drag' : ''}`}
               onDragOver={(e) => {
@@ -174,6 +177,13 @@ export default function NewCase() {
 
           <Section title="출처와 계측 조건">
             <div className="form">
+              <label className="field">모델 입력 계약<select value={country} onChange={(e) => {
+                const next = e.target.value as ModelCountry
+                setCountry(next)
+                setFs(MODEL_SCOPES[next].samplingRateHz)
+                setDatasetId(next === 'CN' ? 'Xiong-public-fault-dataset' : 'oscgrid_ru')
+                setLabelMeaning(next === 'CN' ? '이벤트 유형(SIF/MIF/PF/TD), 물리적 원인 아님' : 'NORMAL/SWITCHING/ABNORMAL/FAULT, 러시아 공개 자료의 이벤트 유형')
+              }}><option value="CN">중국 Xiong · 7채널 · SIF/MIF/PF/TD</option><option value="RU">러시아 OscGrid · 5채널 · NORMAL/SWITCHING/ABNORMAL/FAULT</option></select></label>
               <label className="field">사건 제목<input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="예: OO 선로 A상 고장" /></label>
               <div className="form-row">
                 <label className="field">
@@ -187,7 +197,7 @@ export default function NewCase() {
               <div className="form-row">
                 <label className="field">
                   샘플링 (Hz)
-                  <input type="number" value={samplingRateHz} onChange={(e) => setFs(Number(e.target.value))} disabled={comtrade} />
+                  <input type="number" min={1} required value={samplingRateHz} onChange={(e) => setFs(Number(e.target.value))} disabled={comtrade} />
                 </label>
                 <label className="field">
                   계통 주파수
@@ -200,7 +210,7 @@ export default function NewCase() {
               {comtrade && <p className="hint" style={{ marginTop: -8 }}>COMTRADE는 .cfg에 적힌 샘플링·계통 주파수를 그대로 씁니다.</p>}
               <label className="field">라벨 의미<input value={labelMeaning} onChange={(e) => setLabelMeaning(e.target.value)} /></label>
               <div className="scope">
-                <strong>현재 모델 학습 범위</strong> — {MODEL_SCOPE.rows}×{MODEL_SCOPE.cols} · {MODEL_SCOPE.samplingRateHz} Hz · 계통 {MODEL_SCOPE.systemFrequencyHz} Hz · 이벤트 유형 4종. 이 조건과 다르면 분석이 보류됩니다.
+                <strong>{country} 모델 입력 조건</strong> — {scope.rows}×{scope.cols} · {scope.samplingRateHz} Hz · 계통 {scope.systemFrequencyHz} Hz. 없는 채널을 채우거나 자동 리샘플링하지 않습니다. {country === 'CN' ? 'CN 모델은 정상·개폐를 학습하지 않아 정상/고장 탐지로 쓰지 않습니다.' : '러시아 자료의 분류이며 국내 현장 성능 검증은 별도로 필요합니다.'}
               </div>
             </div>
           </Section>

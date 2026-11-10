@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api'
+import { getVillagePersistence, listVillageRecords } from '../api/village'
 import { Empty, ErrorState, Metric, Metrics, NODE_TONE, PageHeader, Section, Segmented, Status, TableSkeleton } from '../components/ui'
 import { fmtTime } from '../lib/actor'
+import { apiBase } from '../lib/backend'
 import { calibrateLedA, DEFAULT_LED_A, DEFAULT_THRESHOLDS, DEVICE_INFO, ledA, resetThresholds, setLedA, setThresholds, SOURCE_LABEL, STATUS_LABEL, TICK_MS, useVillage } from '../lib/village'
 import { CASE_TYPE_LABEL, type ActivityItem, type CaseSummary, type CaseType } from '../types'
 
@@ -27,6 +29,7 @@ export default function Admin() {
   const [filter, setFilter] = useState<'ALL' | CaseType>('ALL')
   const [saved, setSaved] = useState<string | null>(null)
   const [more, setMore] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const th = snap.thresholds
 
   const load = useCallback(() => {
@@ -46,14 +49,24 @@ export default function Admin() {
   }
 
   async function exportAll() {
-    const all = await api.exportCases()
-    const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), note: '이 브라우저에 보관된 사건 (서버 기록 중 목록에 있는 것)', cases: all }, null, 2)], { type: 'application/json' })
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = `gridwitness-cases-${new Date().toISOString().slice(0, 10)}.json`
-    a.click()
-    URL.revokeObjectURL(a.href)
-    flash(`사건 ${all.length}건을 내보냈습니다.`)
+    setExporting(true)
+    setError(null)
+    try {
+      const all = await api.exportCases()
+      const villageRecords = []
+      for (const kind of ['event', 'incident', 'iot_case'] as const) {
+        villageRecords.push(...await listVillageRecords(kind))
+        if (getVillagePersistence().error) throw new Error(getVillagePersistence().error!)
+      }
+      const blob = new Blob([JSON.stringify({ schema: 'gridwitness-backup-v2', exportedAt: new Date().toISOString(), server: apiBase(), scope: '서버 사건(보관 포함)·원본 파형·진단·최신 분석·검토·감사·대화·현장 메모·COMTRADE 원본·마을 원시 사건·처리 단계 및 브라우저 전송 대기 기록', cases: all, villageRecords, pendingVillageRecords: getVillagePersistence().pending }, null, 2)], { type: 'application/json' })
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = `gridwitness-cases-${new Date().toISOString().slice(0, 10)}.json`
+      a.click()
+      URL.revokeObjectURL(a.href)
+      flash(`사건 ${all.length}건·마을 기록 ${villageRecords.length}건을 내보냈습니다.`)
+    } catch (e) { setError(`전체 내보내기를 완료하지 못했습니다. ${(e as Error).message}`) }
+    finally { setExporting(false) }
   }
 
   const pending = cases?.filter((c) => c.stage !== 'REVIEWED').length ?? 0
@@ -166,9 +179,9 @@ export default function Admin() {
         )}
       </Section>
 
-      <Section title="데이터 관리" description="등록·진단·분석·검토 기록은 서버에 남고, 원본 파형은 등록한 브라우저에 보관됩니다.">
+      <Section title="데이터 관리" description="서버에 보관된 사건과 원본 파형·분석·검토·대화·메모, 마을 사건의 원시 기록과 처리 단계를 함께 내보냅니다. 조회 실패 시 부분 백업을 전체 백업으로 저장하지 않습니다.">
         <div className="cluster">
-          <button className="btn" onClick={exportAll} disabled={!cases?.length}>사건 전체 내보내기 (JSON)</button>
+          <button className="btn" onClick={exportAll} disabled={exporting}>{exporting ? '서버 전체 기록 확인 중…' : '사건 전체 내보내기 (JSON)'}</button>
           <Link to="/settings" className="btn btn-ghost">목록 비우기 (설정)</Link>
         </div>
       </Section>

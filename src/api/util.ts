@@ -10,6 +10,7 @@ export function summarize(c: AnyCase): CaseSummary {
     stage: c.stage,
     source: c.caseType === 'IOT' ? `IoT 모형 · ${c.device.scope}` : SOURCE_LABEL[c.source.sourceType],
     diagnosisStatus: c.diagnosis.status,
-    needsWaveform: needsWaveform(c) || undefined,
+    needsWaveform: (needsWaveform(c) && !(c.caseType === 'WAVEFORM' && c.backend)) || undefined,
+    sync: c.sync,
   }
 }

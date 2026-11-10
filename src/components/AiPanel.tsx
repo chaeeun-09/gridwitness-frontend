@@ -6,8 +6,8 @@ import { useActor } from '../lib/actor'
 import { CHART } from '../lib/chart'
 import { FI_LABEL, FRTUS, frtuViews, locateFault, type FrtuId } from '../lib/frtu'
 import { STATUS_LABEL, type VillageSnapshot } from '../lib/village'
-import { MODEL_SCOPE, parseCsv, diagnose } from '../lib/waveform'
-import type { AnalysisResult, InputDiagnosis } from '../types'
+import { MODEL_SCOPES, parseCsv, diagnose } from '../lib/waveform'
+import type { AnalysisResult, InputDiagnosis, ModelCountry } from '../types'
 import { useVillageEvents } from '../lib/villageEvents'
 import FaultAnalysis from './FaultAnalysis'
 import { IconArrowRight, IconX } from './Icons'
@@ -52,8 +52,10 @@ export function CsvAnalysis() {
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const [country, setCountry] = useState<ModelCountry>('CN')
+  const scope = MODEL_SCOPES[country]
 
-  async function load(f: File | undefined) {
+  async function load(f: File | undefined, selected: ModelCountry = country) {
     setFile(f ?? null)
     setMatrix(null)
     setDiag(null)
@@ -61,7 +63,8 @@ export function CsvAnalysis() {
     setErr(null)
     if (!f) return
     const parsed = parseCsv(await f.text())
-    const r = diagnose(parsed, f.size, { samplingRateHz: MODEL_SCOPE.samplingRateHz, systemFrequencyHz: MODEL_SCOPE.systemFrequencyHz, sourceType: 'PUBLIC_DATASET' })
+    const selectedScope = MODEL_SCOPES[selected]
+    const r = diagnose(parsed, f.size, { samplingRateHz: selectedScope.samplingRateHz, systemFrequencyHz: selectedScope.systemFrequencyHz, sourceType: 'PUBLIC_DATASET' })
     setDiag(r.diagnosis)
     setMatrix(r.matrix)
   }
@@ -71,7 +74,7 @@ export function CsvAnalysis() {
     setBusy(true)
     setErr(null)
     try {
-      const c = await api.registerCase({ title: file.name, file, sourceType: 'PUBLIC_DATASET', datasetId: 'upload', samplingRateHz: MODEL_SCOPE.samplingRateHz, systemFrequencyHz: MODEL_SCOPE.systemFrequencyHz, labelMeaning: '', actor })
+      const c = await api.registerCase({ title: file.name, file, sourceType: 'PUBLIC_DATASET', datasetId: country === 'CN' ? 'Xiong-public-fault-dataset' : 'oscgrid_ru', samplingRateHz: scope.samplingRateHz, systemFrequencyHz: scope.systemFrequencyHz, labelMeaning: country === 'CN' ? 'SIF/MIF/PF/TD' : 'NORMAL/SWITCHING/ABNORMAL/FAULT', actor })
       const done = await api.runAnalysis(c.id, 'EVENT_TYPE', actor)
       setAnalysis(done.analysis)
     } catch (e) {
@@ -83,10 +86,11 @@ export function CsvAnalysis() {
 
   return (
     <div className="stack">
+      <label className="field">공개 자료 입력 조건<select value={country} disabled={busy} onChange={(e) => { const next = e.target.value as ModelCountry; setCountry(next); void load(file ?? undefined, next) }}><option value="CN">중국 Xiong · CN</option><option value="RU">러시아 OscGrid · RU</option></select></label>
       <label className="ai-drop">
         <input type="file" accept=".csv,text/csv" onChange={(e) => void load(e.target.files?.[0])} />
         <strong>{file ? file.name : '고장파형 CSV 넣기'}</strong>
-        <span className="small muted">7채널 (Ia Ib Ic In Va Vb Vc) · {MODEL_SCOPE.samplingRateHz} Hz</span>
+        <span className="small muted">{scope.channels.join(' ')} · {scope.rows}개 · {scope.samplingRateHz} Hz</span>
       </label>
       {diag && (
         <div className="row gap" style={{ flexWrap: 'wrap' }}>
@@ -98,7 +102,7 @@ export function CsvAnalysis() {
       )}
       {err && <div className="alert alert-err small">{err}</div>}
       {matrix && (
-        <FaultAnalysis matrix={matrix} fs={MODEL_SCOPE.samplingRateHz} hz={MODEL_SCOPE.systemFrequencyHz} analysis={analysis} blocked={diag?.status === 'REJECTED'} busy={busy} types={['EVENT_TYPE']} onRun={run} compact />
+        <FaultAnalysis matrix={matrix} fs={scope.samplingRateHz} hz={scope.systemFrequencyHz} analysis={analysis} blocked={diag?.status === 'REJECTED'} busy={busy} types={['EVENT_TYPE']} onRun={run} compact />
       )}
     </div>
   )

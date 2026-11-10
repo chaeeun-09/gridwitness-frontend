@@ -1,5 +1,5 @@
 import type { ChannelId } from '../../lib/village'
-import { mastTop, type HouseStyle } from './House'
+import { mastTop, type HouseStyle } from './houseGeometry'
 
 // 마을 배치 (단위: m 비슷한 월드 단위). 지면 y = 0.
 

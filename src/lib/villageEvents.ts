@@ -4,10 +4,14 @@
 // features() 는 gridwitness-ai gw_ai/iot/events.py 의 features() 와 똑같이 계산해야 한다.
 // 직류 모형의 전류라 한전 교류 고장파형과 같은 신호가 아니다.
 
-import { useSyncExternalStore } from 'react'
+import { useEffect, useSyncExternalStore } from 'react'
 import MODEL from '../data/village_events_model.json'
+import { getCachedVillageRecords, listVillageRecords, saveVillageRecord, subscribeVillageRecords } from '../api/village'
+import { API_CHANGED_EVENT } from './backend'
 
 export interface VillageEvent {
+  source?: 'SERIAL' | 'MOCK'
+  deviceId?: string
   ev: number
   dtMs: number
   pre: number
@@ -84,6 +88,8 @@ export function parseEventLine(line: string): VillageEvent | null {
       ch: Array.isArray(o.ch) ? o.ch.map(Number) : [],
       i100: i.map(Number),
       receivedAt: new Date().toISOString(),
+      source: 'SERIAL',
+      deviceId: 'arduino-village',
     }
   } catch {
     return null
@@ -220,23 +226,45 @@ export function analyzeEvent(e: VillageEvent): EventVerdict {
   }
 }
 
-// ── 받은 사건 보관 (최근 20개, 이 탭에서만) ─────────────────
+// ── 원시 파형·판정·근거 보존. 우노 사건 번호가 재시작해도 UUID로 구분한다. ──
 
 export interface AnalyzedEvent {
+  recordId: string
   e: VillageEvent
   verdict: EventVerdict
 }
-let recent: AnalyzedEvent[] = []
+const readCached = () => getCachedVillageRecords<AnalyzedEvent>('event').map((r) => ({ ...r.data, recordId: r.record_id }))
+  .filter((a) => a.e && Array.isArray(a.e.i100) && a.verdict)
+  .sort((a, b) => b.e.receivedAt.localeCompare(a.e.receivedAt))
+let recent: AnalyzedEvent[] = readCached()
+const hidden = new Set<string>()
 const listeners = new Set<() => void>()
-export function pushVillageEvent(e: VillageEvent) {
-  recent = [{ e, verdict: analyzeEvent(e) }, ...recent].slice(0, 20)
+function refreshCached() {
+  recent = readCached().filter((a) => !hidden.has(a.recordId))
   listeners.forEach((l) => l())
 }
+subscribeVillageRecords(refreshCached)
+export const getVillageEvents = () => recent
+export function pushVillageEvent(e: VillageEvent) {
+  const record: AnalyzedEvent = { recordId: crypto.randomUUID(), e: { ...e, source: e.source ?? 'SERIAL', deviceId: e.deviceId ?? 'arduino-village' }, verdict: analyzeEvent(e) }
+  recent = [record, ...recent]
+  listeners.forEach((l) => l())
+  // 오류는 공용 저장 상태에 표시된다. 기록은 메모리·재시도 큐에도 유지한다.
+  void saveVillageRecord(record.recordId, 'event', record.e.deviceId!, record).catch(() => {})
+}
 export function clearVillageEvents() {
+  recent.forEach((a) => hidden.add(a.recordId))
   recent = []
   listeners.forEach((l) => l())
 }
 export function useVillageEvents(): AnalyzedEvent[] {
+  useEffect(() => {
+    const sync = () => { void listVillageRecords<AnalyzedEvent>('event') }
+    sync()
+    const timer = setInterval(sync, 30_000)
+    window.addEventListener(API_CHANGED_EVENT, sync)
+    return () => { clearInterval(timer); window.removeEventListener(API_CHANGED_EVENT, sync) }
+  }, [])
   return useSyncExternalStore(
     (l) => {
       listeners.add(l)

@@ -9,7 +9,7 @@ import { fmtTime } from '../lib/actor'
 import { FRTUS } from '../lib/frtu'
 import { inspectionCandidate } from '../lib/gis'
 import { buildIncidentContext, EVIDENCE_GROUP_LABEL, eventKo, type EvidenceGroup } from '../lib/incidentContext'
-import { FI_SHORT, STAGE_LABEL, useLiveIncidents, type LiveIncident } from '../lib/liveIncident'
+import { FI_SHORT, STAGE_LABEL, getLiveIncident, useLiveIncidents, type LiveIncident } from '../lib/liveIncident'
 import { SOURCE_LABEL, type AnyCase, type IncidentCase } from '../types'
 
 // 사고조사 보고서: 기획서의 출력 형태(구간 → 유형 → 원인 가설 → 점검 목록 → 근거)를 한 장으로.
@@ -55,14 +55,14 @@ function Frame({ id, kind, title, children }: { id: string; kind: string; title:
 
 export default function Report() {
   const { kind = '', id = '' } = useParams()
-  if (kind === 'live') return <LiveReport id={Number(id)} />
+  if (kind === 'live') return <LiveReport id={id} />
   return <CaseReport id={id} />
 }
 
-function LiveReport({ id }: { id: number }) {
-  const { incidents } = useLiveIncidents()
-  const inc = incidents.find((x) => x.id === id)
-  if (!inc) return <ErrorState message={`실시간 사건 #${id}을 이 브라우저에서 찾지 못했어요.`} />
+function LiveReport({ id }: { id: string }) {
+  useLiveIncidents()
+  const inc = getLiveIncident(id)
+  if (!inc) return <ErrorState message={`실시간 사건 ${id}을 현재 서버의 기록에서 찾지 못했어요.`} />
   return <LiveBody inc={inc} />
 }
 
@@ -117,7 +117,7 @@ function LiveBody({ inc }: { inc: LiveIncident }) {
         {inc.caseId && <p>등록한 사건: <Link to={`/cases/${inc.caseId}`}>{inc.caseId}</Link></p>}
       </Block>
       <Block no={8} title="데이터 출처 · 한계">
-        <p>마을 모형의 INA219 두 개(주택·가로등 분기)와 그 합(인입)으로 만든 직류 계측이에요. 교류 고장파형 분석과 섞지 않았어요. 설비 정보는 모형 목업이며, 실제 현장에서는 K-GIS 계통 추적으로 대체해요.</p>
+        <p>{inc.points.some((p) => p.ih != null && p.il != null) ? '주택·가로등 분기 INA219 두 개와 그 합(인입)' : '마을 전체 INA219 한 개'}의 기록으로 만든 직류 계측이에요. {inc.points.some((p) => p.ih != null && p.il != null) ? '구간 안 설비는 현장 점검이 필요합니다.' : '분기별 계측이 없어 특정 분기·설비를 확인할 수 없습니다.'} 설비 정보는 모형 정보이며 실제 현장에서는 K-GIS 계통 추적 자료가 필요합니다.</p>
       </Block>
     </Frame>
   )
@@ -146,6 +146,7 @@ function CaseBody({ c, notes }: { c: IncidentCase; notes: FieldNote[] }) {
   const verdict = a.status === 'NONE' ? '분석 전' : a.status === 'COMPLETED' ? `${eventKo(a.label!)} · ${a.score != null ? Math.round(a.score * 100) : '—'}%` : '판단 보류'
   return (
     <Frame id={c.id} kind={`교류 고장파형 · ${SOURCE_LABEL[c.source.sourceType]}`} title={c.title}>
+      {c.sync?.error && <p className="alert alert-warn">{c.sync.error}</p>}
       <Block no={1} title="요약">
         <p>{fmtTime(c.createdAt)}에 등록된 사건이에요. AI 판독 결과는 <b>{verdict}</b>, 입력 검사는 <b>{{ ACCEPTED: '통과', LIMITED: '제한 통과', REJECTED: '거부' }[ctx.diagnosis.status]}</b>, 담당자 검토는 <b>{ctx.reviews.length ? ctx.reviews.at(-1)!.verdict : '대기'}</b>입니다.</p>
       </Block>
@@ -180,6 +181,9 @@ function CaseBody({ c, notes }: { c: IncidentCase; notes: FieldNote[] }) {
       </Block>
       <Block no={8} title="데이터 출처 · 한계">
         <p>{SOURCE_LABEL[c.source.sourceType]}{c.source.datasetId ? ` · ${c.source.datasetId}` : ''} · {c.source.samplingRateHz} Hz · 계통 {c.source.systemFrequencyHz} Hz · 모델 {ctx.model.version ?? '미실행'}. {ctx.model.limitations[0] ?? ''}</p>
+        <p>입력 채널: {c.source.channelOrder.join(', ')}. {c.source.labelMeaning}</p>
+        {ctx.model.country === 'CN' && <p>CN 모델은 정상·개폐 사건을 학습하지 않아 정상/고장 여부를 확정하는 용도로 사용할 수 없습니다.</p>}
+        {ctx.model.country === 'RU' && <p>RU 모델은 OscGrid의 NORMAL/SWITCHING/ABNORMAL/FAULT 분류입니다. 한국 현장의 검증 결과는 포함되지 않습니다.</p>}
       </Block>
     </Frame>
   )

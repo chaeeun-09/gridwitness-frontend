@@ -75,12 +75,16 @@ export default function DevicePanel({ snap }: { snap: VillageSnapshot }) {
         <summary>시리얼 프로토콜</summary>
         <pre>{`115200 baud, 줄 단위
 
-장치 → 웹  0.5초마다 (INA219 전체 값 + 릴레이 상태)
-{"v":5.02,"i":0.281,"relay":1}
+장치 → 웹  0.5초마다 (전체 전압·전류, 채널 상태)
+{"v":5.02,"i":0.033,"relay":1,"ch":[1,1,1,1,1]}
+센서 2개일 때만 vh/ih/vl/il 구간 값 추가
+사건 파형: dt=10ms, pre=60, 전류 260점
 
 웹 → 장치  (D2 릴레이)
 RELAY 0    → 정전 발생 (마을 전체 차단)
-RELAY 1    → 전력 복구`}</pre>
+RELAY 1    → 전력 복구
+CH 3 0     → 채널 3 끄기 (D5, 주택 2)
+CH 3 1     → 채널 3 켜기`}</pre>
         <p className="small muted">Arduino 예제: <code>arduino/gridwitness_village/gridwitness_village.ino</code></p>
       </details>
     </div>

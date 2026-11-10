@@ -21,13 +21,14 @@ const CONTROL_REFUSAL = '대화 도우미는 장치를 켜고 끄지 않아요. 
 
 function verdictText(a: AnalyzedEvent): string {
   const v = a.verdict
+  const source = `${a.e.source === 'MOCK' ? '시뮬레이터' : '실측 Arduino'} · ${new Date(a.e.receivedAt).toLocaleString('ko-KR')}`
   if (v.kind === 'ANSWERED') {
     const why = v.evidence.slice(0, 2).map((e) => e.label).join(', ')
-    return `사건 #${a.e.ev}은(는) '${v.labelKo}'(으)로 판정했어요. 점수 ${Math.round(v.score * 100)}%, 주요 근거는 ${why}입니다.`
+    return `${source} 사건 #${a.e.ev}은(는) '${v.labelKo}'(으)로 판정했어요. 점수 ${Math.round(v.score * 100)}%, 주요 근거는 ${why}입니다.`
   }
-  if (v.kind === 'WITHHELD') return `사건 #${a.e.ev}은(는) 판정을 보류했어요. 1순위는 '${v.labelKo}'였지만 ${v.reasons[0] ?? '근거가 부족'}해서요.`
-  if (v.kind === 'NO_MODEL') return `사건 #${a.e.ev}의 파형은 기록했지만, 원인 분류 모델이 아직 학습 전이라 판정하지 않았어요.`
-  return `사건 #${a.e.ev}은(는) 입력 검사에서 거부됐어요: ${v.reasons[0]}`
+  if (v.kind === 'WITHHELD') return `${source} 사건 #${a.e.ev}은(는) 판정을 보류했어요. 1순위는 '${v.labelKo}'였지만 ${v.reasons[0] ?? '근거가 부족'}해서요.`
+  if (v.kind === 'NO_MODEL') return `${source} 사건 #${a.e.ev}의 파형은 기록했지만, 원인 분류 모델이 아직 학습 전이라 판정하지 않았어요.`
+  return `${source} 사건 #${a.e.ev}은(는) 입력 검사에서 거부됐어요: ${v.reasons[0]}`
 }
 
 /** 질문 하나에 대한 답. 값을 읽어 줄 뿐, 장치에 명령을 보내지 않는다 */
@@ -39,8 +40,14 @@ export function answer(text: string, events: AnalyzedEvent[]): string {
   // 조작 요청은 거절 (제어 로직과 대화 분리)
   if ((has(t, '정전') && has(t, '발생', '일으', '내줘', '시켜')) || has(t, '복구', '다시 켜', '꺼줘', '켜줘', '끄', '차단')) return CONTROL_REFUSAL
 
+  // 지난 사건 조회는 현재 계측과 구분한다. 그 외 현재 상태·전압·원인에는
+  // 연결 없음/오래된 계측의 0 값을 측정값이나 정상 근거로 쓰지 않는다.
+  const pastEvent = has(t, '마지막', '최근', '판정', '사건')
+  if (!pastEvent && (!s.connected || s.status === 'NO_DATA'))
+    return '현재 계측값이 없어 전압·전류나 정상·복구 여부를 판단할 수 없어요. 실측 장치 연결과 최신 데이터 수신을 확인해 주세요.'
+
   // 위치·구간: FRTU별 고장표시로 좁힌 결과를 그대로 읽어 줌
-  if (has(t, '어디', '위치', '구간', '분기', '먼저', '점검', 'FRTU', 'frtu')) {
+  if (has(t, '어디', '위치', '구간', '분기', '먼저', '점검', 'FRTU', 'frtu') && !has(t, '전류', '전압')) {
     const loc = locateFault(s)
     if (loc.scope === 'NONE' || loc.scope === 'OFF' || loc.scope === 'NO_DATA') return `${loc.title}.`
     // 설비 연결정보(GIS)가 있으면 실제 설비 이름과 점검 순서까지
@@ -67,7 +74,7 @@ export function answer(text: string, events: AnalyzedEvent[]): string {
     return FRTUS.map((f) => `${f.name}: ${fv[f.id].available ? `${(fv[f.id].i * 1000).toFixed(1)} mA (예상 ${(fv[f.id].expected * 1000).toFixed(1)} mA)` : '값 없음'}`).join('\n')
   }
   if (has(t, '전압')) return `전압은 ${s.v.toFixed(2)} V예요.`
-  if (has(t, '상태', '어때', '괜찮', '현황')) {
+  if (has(t, '상태', '어때', '괜찮', '현황', '정상')) {
     if (!s.connected) return '실측 장치와 연결이 끊겨 있어요. 메뉴의 실측 장치에서 다시 연결해 주세요.'
     const off = IOT_CHANNELS.filter((c) => !s.leds[c.id].channelOn).map((c) => c.name)
     return `마을은 '${STATUS_LABEL[s.status]}' 상태예요. ${s.v.toFixed(2)} V, ${(s.i * 1000).toFixed(1)} mA, 이상 점수 ${s.score.toFixed(2)}${off.length ? `. 꺼 둔 LED: ${off.join(', ')}` : '. LED는 모두 켜져 있어요'}.`

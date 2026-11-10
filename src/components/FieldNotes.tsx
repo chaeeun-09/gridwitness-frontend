@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { listFieldNotes, saveFieldNote, type FieldNote } from '../api/fieldNotes'
+import { listFieldNotes, retryFieldNotes, saveFieldNote, type FieldNote } from '../api/fieldNotes'
 import { fmtTime, getActor } from '../lib/actor'
 import type { IncidentCase } from '../types'
 
@@ -18,6 +18,14 @@ export default function FieldNotes({ c }: { c: IncidentCase }) {
       alive = false
     }
   }, [c])
+
+  async function resync() {
+    setBusy(true)
+    setErr(null)
+    try { setNotes(await retryFieldNotes(c)) }
+    catch (e) { setErr((e as Error).message) }
+    finally { setBusy(false) }
+  }
 
   async function save() {
     if (!ok || !text.trim()) return
@@ -40,6 +48,7 @@ export default function FieldNotes({ c }: { c: IncidentCase }) {
       <div className="fnotes-head">
         <strong>현장 메모</strong>
         <span className="xs muted">담당자가 확인한 내용만 저장돼요 · AI 답변과 따로 기록</span>
+        {c.backend?.incidentId && <button type="button" className="btn btn-sm" onClick={resync} disabled={busy}>메모 동기화·재시도</button>}
       </div>
       <textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} placeholder="예: P-02 분기 접속부 타버림 흔적 확인, 교체 요청" aria-label="현장 메모" />
       <div className="fnotes-actions">
@@ -55,7 +64,8 @@ export default function FieldNotes({ c }: { c: IncidentCase }) {
           {notes.map((n) => (
             <li key={n.id}>
               <p>{n.text}</p>
-              <span className="xs muted">{n.actor} · {fmtTime(n.at)} · {n.stored === 'server' ? '서버에 저장' : '이 브라우저에만 저장 (서버 메모 API 준비 전)'}</span>
+              <span className="xs muted">{n.actor} · {fmtTime(n.at)} · {n.stored === 'server' ? '서버에 저장' : n.stored === 'pending' ? '브라우저에 보존 · 서버 전송 대기' : '이 브라우저에만 저장'}</span>
+              {n.syncError && <div className="small warn" role="status">{n.syncError}</div>}
             </li>
           ))}
         </ul>
