@@ -1,12 +1,12 @@
 import { RoundedBox } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
-import { memo, useMemo, useRef, useState } from 'react'
+import { memo, useRef, useState } from 'react'
 import { AdditiveBlending, type Mesh } from 'three'
 import type { LedState, NodeStatus } from '../../lib/village'
 import Label from '../three/Label'
 import SpeechBubble from '../three/SpeechBubble'
-import { POLE_H, SUBSTATION, type V3 } from './layout'
-import { glowTexture, gravelTexture, tiled } from './textures'
+import { POLE_H, type V3 } from './layout'
+import { glowTexture } from './textures'
 
 export const STATUS_COLOR: Record<NodeStatus, string> = {
   NORMAL: '#ffd43b',
@@ -114,114 +114,6 @@ export function Frtu({ p, status, selected, onSelect }: { p: V3; status: NodeSta
     </group>
   )
 }
-
-// ── 변전소 ──────────────────────────────────────────────
-function Transformer({ x, status }: { x: number; status: NodeStatus }) {
-  return (
-    <group position={[x, 0.18, -0.2]}>
-      <RoundedBox args={[1.1, 1.3, 1.0]} radius={0.05} position={[0, 0.65, 0]} castShadow receiveShadow>
-        <meshStandardMaterial color="#b9c0c7" metalness={0.4} roughness={0.5} />
-      </RoundedBox>
-      {/* 방열판 */}
-      {Array.from({ length: 6 }, (_, k) => (
-        <mesh key={k} position={[-0.42 + k * 0.17, 0.6, 0.56]} castShadow>
-          <boxGeometry args={[0.05, 1.0, 0.16]} />
-          <meshStandardMaterial color="#9aa3ab" metalness={0.5} roughness={0.5} />
-        </mesh>
-      ))}
-      {/* 부싱 */}
-      {[-0.3, 0, 0.3].map((bx) => (
-        <group key={bx} position={[bx, 1.3, -0.15]}>
-          <mesh castShadow>
-            <cylinderGeometry args={[0.06, 0.09, 0.55, 10]} />
-            <meshStandardMaterial color="#6b4e3d" roughness={0.4} />
-          </mesh>
-          {[0.05, 0.15, 0.25].map((y) => (
-            <mesh key={y} position={[0, y - 0.1, 0]}>
-              <cylinderGeometry args={[0.12, 0.12, 0.035, 12]} />
-              <meshStandardMaterial color="#5a4033" roughness={0.4} />
-            </mesh>
-          ))}
-        </group>
-      ))}
-      <mesh position={[0.35, 0.95, 0.51]}>
-        <circleGeometry args={[0.07, 16]} />
-        <meshStandardMaterial color={STATUS_COLOR[status]} emissive={status === 'NORMAL' ? '#40c057' : STATUS_COLOR[status]} emissiveIntensity={2} toneMapped={false} />
-      </mesh>
-    </group>
-  )
-}
-
-export const Substation = memo(function Substation({ status, showLabel = true }: { status: NodeStatus; showLabel?: boolean }) {
-  const gravel = useMemo(() => tiled(gravelTexture(), 3, 2.4), [])
-  const W = 5
-  const D = 4
-  const posts = useMemo(() => {
-    const out: V3[] = []
-    for (let x = -W / 2; x <= W / 2 + 0.01; x += 0.5) out.push([x, 0, -D / 2], [x, 0, D / 2])
-    for (let z = -D / 2 + 0.5; z < D / 2; z += 0.5) out.push([-W / 2, 0, z], [W / 2, 0, z])
-    return out.filter(([x, , z]) => !(z === D / 2 && Math.abs(x) < 0.6))
-  }, [])
-  return (
-    <group position={SUBSTATION}>
-      <mesh position={[0, 0.08, 0]} receiveShadow>
-        <boxGeometry args={[W + 0.4, 0.16, D + 0.4]} />
-        <meshStandardMaterial map={gravel} roughness={1} />
-      </mesh>
-      <Transformer x={-1.2} status={status} />
-      <Transformer x={0.2} status={status} />
-      {/* 철구조물 + 모선 */}
-      {[-1.8, 1.6].map((x) => (
-        <mesh key={x} position={[x, 1.6, -1.2]} castShadow>
-          <boxGeometry args={[0.1, 3.0, 0.1]} />
-          <meshStandardMaterial color="#868e96" metalness={0.7} roughness={0.4} />
-        </mesh>
-      ))}
-      <mesh position={[-0.1, 3.05, -1.2]} castShadow>
-        <boxGeometry args={[3.5, 0.1, 0.1]} />
-        <meshStandardMaterial color="#868e96" metalness={0.7} roughness={0.4} />
-      </mesh>
-      {/* 제어실 */}
-      <group position={[1.6, 0.16, 0.9]}>
-        <RoundedBox args={[1.2, 1.2, 1.4]} radius={0.04} position={[0, 0.6, 0]} castShadow receiveShadow>
-          <meshStandardMaterial color="#e9ecef" />
-        </RoundedBox>
-        <mesh position={[0, 1.24, 0]} castShadow>
-          <boxGeometry args={[1.35, 0.08, 1.55]} />
-          <meshStandardMaterial color="#495057" />
-        </mesh>
-        <mesh position={[-0.61, 0.5, 0.2]} rotation={[0, -Math.PI / 2, 0]}>
-          <planeGeometry args={[0.5, 0.85]} />
-          <meshStandardMaterial color="#495057" />
-        </mesh>
-      </group>
-      {/* 울타리 */}
-      {posts.map((p, k) => (
-        <mesh key={k} position={[p[0], 0.55, p[2]]}>
-          <cylinderGeometry args={[0.025, 0.025, 1.1, 5]} />
-          <meshStandardMaterial color="#adb5bd" metalness={0.7} roughness={0.4} />
-        </mesh>
-      ))}
-      {[0.35, 1.05].map((y) => (
-        <group key={y}>
-          {[-D / 2, D / 2].map((z) => (
-            <mesh key={z} position={[0, y, z]}>
-              <boxGeometry args={[W, 0.025, 0.025]} />
-              <meshStandardMaterial color="#adb5bd" metalness={0.7} roughness={0.4} />
-            </mesh>
-          ))}
-          {[-W / 2, W / 2].map((x) => (
-            <mesh key={x} position={[x, y, 0]}>
-              <boxGeometry args={[0.025, 0.025, D]} />
-              <meshStandardMaterial color="#adb5bd" metalness={0.7} roughness={0.4} />
-            </mesh>
-          ))}
-        </group>
-      ))}
-      {showLabel && <Label lines={['변전소', '5V 전원 공급']} position={[0, 4.3, 0]} bg="rgba(20,22,27,0.86)" lineHeight={0.6} />}
-    </group>
-  )
-})
 
 // ── 가로등 (실제 회로 채널 CH4·CH5) ─────────────────────
 const LAMP_LABEL_BG: Record<NodeStatus, string> = {

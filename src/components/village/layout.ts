@@ -28,7 +28,6 @@ export const SIDEWALKS: [number, number, number, number][] = [
   [B_EAST + SW / 2, (ROAD_B_END + A_NORTH) / 2, SW, A_NORTH - ROAD_B_END],
 ]
 
-export const SUBSTATION: V3 = [-12.5, 0, 8]
 export const POLE_H = 4.2
 export const POLES: V3[] = [[-8.5, 0, A_NORTH - 0.35], [-3, 0, A_NORTH - 0.35], [3.8, 0, A_NORTH - 0.35], [9, 0, A_NORTH - 0.35], [B_EAST + 0.35, 0, -5.5]]
 
@@ -48,11 +47,10 @@ export const HOUSE_POS: Record<HouseChannel, { pos: V3; rot: number; style: Hous
   h3: { pos: [-3, 0, 7.4], rot: Math.PI, style: 'wide' },
 }
 
-// 변전소 → 전봇대 → 채널 경로 (전봇대 인덱스)
+// 첫 전봇대 → 전봇대 → 채널 경로 (전봇대 인덱스)
 export const ROUTE: Record<ChannelId, number[]> = { h1: [0, 1], h2: [0, 1, 2, 4], h3: [0, 1], l1: [0, 1], l2: [0, 1, 2] }
 
 const poleTop = (p: V3): V3 => [p[0], POLE_H - 0.1, p[2]]
-const SUB_ATTACH: V3 = [SUBSTATION[0] + 0.9, 3.0, SUBSTATION[2] - 0.9]
 
 /** 채널 인입점: 주택은 지붕 지지대 꼭대기, 가로등은 등기구 위 (월드 좌표) */
 function channelAttach(id: ChannelId): V3 {
@@ -74,7 +72,7 @@ function sag(a: V3, b: V3, depth = 0.35, n = 14): V3[] {
 }
 
 export function routePoints(id: ChannelId): V3[] {
-  const stops: V3[] = [SUB_ATTACH, ...ROUTE[id].map((i) => poleTop(POLES[i])), channelAttach(id)]
+  const stops: V3[] = [...ROUTE[id].map((i) => poleTop(POLES[i])), channelAttach(id)]
   const pts: V3[] = []
   for (let k = 0; k < stops.length - 1; k++) pts.push(...sag(stops[k], stops[k + 1]).slice(k === 0 ? 0 : 1))
   return pts

@@ -1,6 +1,6 @@
 import { memo, useMemo } from 'react'
 import { Color, Object3D, type InstancedMesh } from 'three'
-import { GROUND_D, GROUND_W, HOUSE_POS, LAMP_POS, POLES, ROAD_A_Z, ROAD_B_X, ROAD_W, rng, SUBSTATION } from './layout'
+import { GROUND_D, GROUND_W, HOUSE_POS, LAMP_POS, POLES, ROAD_A_Z, ROAD_B_X, ROAD_W, rng } from './layout'
 
 type Tree = { x: number; z: number; s: number; round: boolean; tint: number }
 
@@ -11,7 +11,6 @@ export default memo(function Trees() {
     const blocked = (x: number, z: number) =>
       Math.abs(z - ROAD_A_Z) < ROAD_W / 2 + 1.3 ||
       (Math.abs(x - ROAD_B_X) < ROAD_W / 2 + 1.3 && z < ROAD_A_Z) ||
-      Math.hypot(x - SUBSTATION[0], z - SUBSTATION[2]) < 4.5 ||
       Object.values(HOUSE_POS).some(({ pos }) => Math.hypot(x - pos[0], z - pos[2]) < 4.2) ||
       POLES.some((p) => Math.hypot(x - p[0], z - p[2]) < 1.2) ||
       Object.values(LAMP_POS).some(({ pos }) => Math.hypot(x - pos[0], z - pos[2]) < 1.2)
