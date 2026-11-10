@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import AiPanel from '../components/AiPanel'
 import Channels from '../components/Channels'
@@ -9,6 +9,8 @@ import SceneBoundary from '../components/SceneBoundary'
 import Sparkline from '../components/Sparkline'
 import { Badge, NODE_TONE, Section, Segmented, Status } from '../components/ui'
 import VillageScene from '../components/village/VillageScene'
+import { isFrtuId, type FrtuId } from '../lib/frtu'
+import { announcePanelOpen, ASSISTANT_OPEN_EVENT, INCIDENT_OPEN_EVENT } from '../lib/panels'
 import { NET_COLOR, NET_KIND_LABEL, type NetKind, type PartId } from '../lib/hardware'
 import {
   clearFault,
@@ -100,8 +102,27 @@ export default function Village() {
   const [part, setPart] = useState<PartId | null>(null)
   const [showPins, setShowPins] = useState(false)
   const [params] = useSearchParams()
-  const [frtu, setFrtu] = useState(() => params.get('ai') === '1')
+  const [frtu, setFrtu] = useState<FrtuId | null>(() => (isFrtuId(params.get('frtu')) ? (params.get('frtu') as FrtuId) : params.get('ai') === '1' ? 'inlet' : null))
   const [controls, setControls] = useState(false)
+  // AI 도우미가 열리면 화면의 카드 패널(FRTU 요약·제어판·LED 상세)은 내려감
+  useEffect(() => {
+    const onAssistant = () => {
+      setFrtu(null)
+      setControls(false)
+      setSelected(null)
+    }
+    window.addEventListener(ASSISTANT_OPEN_EVENT, onAssistant)
+    // 실시간 사건 화면이 올라와도 같은 자리를 비켜 줌
+    window.addEventListener(INCIDENT_OPEN_EVENT, onAssistant)
+    return () => {
+      window.removeEventListener(ASSISTANT_OPEN_EVENT, onAssistant)
+      window.removeEventListener(INCIDENT_OPEN_EVENT, onAssistant)
+    }
+  }, [])
+  // 반대로 카드 패널을 열면 AI 도우미가 접힘
+  useEffect(() => {
+    if (frtu || controls || selected) announcePanelOpen()
+  }, [frtu, controls, selected])
   const sel = selected ? snap.leds[selected] : null
   const selView = sel ? lightView(sel, snap) : null
   const mock = snap.source === 'MOCK'
@@ -131,7 +152,7 @@ export default function Village() {
               selected={selected}
               onSelect={(id) => {
                 setSelected(id)
-                if (id) setFrtu(false)
+                if (id) setFrtu(null)
               }}
               night={night}
               fx={fx}
@@ -140,10 +161,10 @@ export default function Village() {
               onPart={setPart}
               showPins={showPins}
               frtu={frtu}
-              onFrtu={() => {
+              onFrtu={(id) => {
                 setSelected(null)
                 setControls(false)
-                setFrtu(true)
+                setFrtu(id)
               }}
             />
           </SceneBoundary>
@@ -156,7 +177,7 @@ export default function Village() {
               setUnderground(v === 'under')
               setSelected(null)
               setPart(null)
-              setFrtu(false)
+              setFrtu(null)
             }}
             options={[
               { value: 'surface', label: '지상' },
@@ -175,8 +196,8 @@ export default function Village() {
           <button className={`btn btn-sm glass ${fx ? 'on' : ''}`} onClick={() => setFx(!fx)} aria-pressed={fx} title="AO·블룸 후처리, 고해상도, 60fps (GPU 사용량 증가)">
             고화질 {fx ? '켜짐' : '꺼짐'}
           </button>
-          <button className={`btn btn-sm glass ${controls ? 'on' : ''}`} onClick={() => { setControls(!controls); setFrtu(false) }} aria-pressed={controls}>제어판</button>
-          {!underground && !frtu && <button className="btn btn-sm glass btn-ai" onClick={() => { setSelected(null); setControls(false); setFrtu(true) }}>AI 분석 열기</button>}
+          <button className={`btn btn-sm glass ${controls ? 'on' : ''}`} onClick={() => { setControls(!controls); setFrtu(null) }} aria-pressed={controls}>제어판</button>
+          {!underground && !frtu && <button className="btn btn-sm glass btn-ai" onClick={() => { setSelected(null); setControls(false); setFrtu('inlet') }}>FRTU 보기</button>}
           <span style={{ marginLeft: 'auto' }}><PowerButton snap={snap} /></span>
           {underground && (
             <>
@@ -226,8 +247,8 @@ export default function Village() {
             </div>
           </div>
         )}
-        {!underground && !frtu && <div className="scene-hint glass">FRTU(전봇대 철제함)를 누르면 AI 분석이 열립니다</div>}
-        {frtu && !underground && <AiPanel snap={snap} onClose={() => setFrtu(false)} />}
+        {!underground && !frtu && <div className="scene-hint glass">전봇대의 FRTU 함을 누르면 계측·고장표시가 열려요</div>}
+        {frtu && !underground && <AiPanel snap={snap} frtu={frtu} onPick={setFrtu} onClose={() => setFrtu(null)} />}
 
         {underground && part && <PartPanel id={part} snap={snap} onClose={() => setPart(null)} />}
         {sel && selView && !underground && (
@@ -265,22 +286,11 @@ export default function Village() {
             <strong>제어판</strong>
             <button className="btn btn-ghost btn-icon" onClick={() => setControls(false)} aria-label="닫기"><IconX /></button>
           </div>
-<div className="section">
-        <Section
-          title="LED 채널 제어"
-          description="채널 릴레이(D3~D7)로 LED를 하나씩 끄고 켭니다. 실측 장치가 연결되어 있으면 실제 LED가 꺼집니다."
-          actions={<Link to="/village/loads" className="small">채널 점검 →</Link>}
-        >
-          <Channels snap={snap} selected={selected} onSelect={setSelected} controls />
-        </Section>
-      </div>
+          <Section title="LED 채널 제어" actions={<Link to="/village/loads" className="small">채널 점검 →</Link>}>
+            <Channels snap={snap} selected={selected} onSelect={setSelected} controls />
+          </Section>
 
-<div className="section">
-      <Section
-        title="고장 시뮬레이션"
-        description="계측값만으로 판정하는지 확인하는 시뮬레이터 전용 기능입니다. 위 장면의 집이 상황에 맞게 말합니다."
-        actions={!mock && <Badge>실측 모드에서는 사용 안 함</Badge>}
-      >
+      <Section title="고장 시뮬레이션" actions={!mock && <Badge>실측 모드에서는 사용 안 함</Badge>}>
         <div className="sim-grid">
           <div className="form">
             <label className="field">
@@ -318,13 +328,10 @@ export default function Village() {
           </div>
         </div>
       </Section>
-</div>
 
-      <div className="section">
-        <Section title="이상 이벤트" description="이상 점수가 기준을 넘으면 기록되고, 사건으로 등록할 수 있습니다." actions={<Link to="/village/loads" className="small">부하(LED 5개) 현황 →</Link>}>
-          <EventList events={snap.events} limit={4} />
-        </Section>
-      </div>
+          <Section title="이상 이벤트" actions={<Link to="/village/loads" className="small">부하(LED 5개) 현황 →</Link>}>
+            <EventList events={snap.events} limit={4} />
+          </Section>
 
         </aside>
       )}

@@ -32,6 +32,9 @@ export function mastTop(style: HouseStyle): [number, number, number] {
   return [-s.w / 2 + 0.45, s.wallH + s.roofH + 0.55, 0]
 }
 
+/** 라벨에 상태 줄까지 보여줄 상태 (평소엔 이름만) */
+const ALARM_STATUS: NodeStatus[] = ['WARNING', 'FAULT', 'OUTAGE']
+
 const LABEL_BG: Record<NodeStatus, string> = {
   NORMAL: 'rgba(20,22,27,0.86)',
   OFF: 'rgba(110,116,128,0.86)',
@@ -372,16 +375,14 @@ export default function House({
           <meshBasicMaterial color="#4dabf7" />
         </mesh>
       )}
+      {/* 평소에는 이름만 작게, 선택했거나 이상일 때만 LED·상태 줄까지 */}
       {showLabel && <Label
-        lines={[
-          h.name,
-          `${h.fault ? '⚠ ' : ''}LED ${h.ch} · ${view.text}`,
-        ]}
+        lines={selected || h.fault || ALARM_STATUS.includes(view.status) ? [h.name, `${h.fault ? '⚠ ' : ''}LED ${h.ch} · ${view.text}`] : [h.name]}
         position={[0, labelY, 0]}
         bg={LABEL_BG[view.status]}
         border="rgba(255,255,255,0.14)"
         pointer
-        lineHeight={0.56}
+        lineHeight={0.4}
       />}
       {showLabel && speech && <SpeechBubble text={speech} y={labelY + 1.5} tone={view.status === 'FAULT' || view.status === 'OUTAGE' ? 'err' : 'warn'} />}
     </group>

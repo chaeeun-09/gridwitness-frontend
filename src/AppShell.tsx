@@ -1,18 +1,23 @@
 import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
 import { Link, Navigate, NavLink, Route, Routes, useLocation, useParams } from 'react-router-dom'
+import { IncidentBanner, IncidentSheet, IncidentWatcher } from './components/LiveIncident'
 import { IconAnalysis, IconDashboard, IconShieldCheck, IconDatabase, IconLive, IconLogo, IconMenu, IconBolt, IconSettings, IconVillage } from './components/Icons'
+import GlobalAssistant from './components/GlobalAssistant'
 import { Dot, PageSkeleton } from './components/ui'
 import { useActor } from './lib/actor'
 import { useBackendHealth } from './lib/backend'
+import { toggleAlerts, useAlertsOn } from './lib/notify'
 import { connectSerial, DEVICE_INFO, useVillage } from './lib/village'
 import CaseDetail from './pages/CaseDetail'
 import CaseList from './pages/CaseList'
 import Dashboard from './pages/Dashboard'
+import FieldAssistant from './pages/FieldAssistant'
 import FrtuDetail from './pages/FrtuDetail'
 import Admin from './pages/Admin'
 import LiveData from './pages/LiveData'
 import NewCase from './pages/NewCase'
 import PublicData from './pages/PublicData'
+import Report from './pages/Report'
 import Settings from './pages/Settings'
 import VillageLoads from './pages/VillageLoads'
 
@@ -25,7 +30,7 @@ const NAV: { label: string; items: { to: string; label: string; icon: ReactNode;
     items: [
       { to: '/dashboard', label: '대시보드', icon: <IconDashboard /> },
       { to: '/village', label: '마을 시뮬레이션', icon: <IconVillage /> },
-      { to: '/live', label: '실시간 분석', icon: <IconLive /> },
+      { to: '/frtu', label: 'FRTU 상세', icon: <IconLive /> },
       { to: '/city', label: '도시 시뮬레이션', icon: <IconBolt /> },
     ],
   },
@@ -43,6 +48,16 @@ const NAV: { label: string; items: { to: string; label: string; icon: ReactNode;
       { to: '/settings', label: '설정', icon: <IconSettings /> },
     ],
   },
+]
+
+/** 상단 바에 바로 보이는 주요 화면 (나머지는 ☰ 메뉴) */
+const TOP_NAV = [
+  { to: '/dashboard', label: '대시보드' },
+  { to: '/village', label: '3D 마을' },
+  { to: '/frtu', label: 'FRTU' },
+  { to: '/cases', label: '사건 기록' },
+  { to: '/public-data', label: '공공데이터' },
+  { to: '/city', label: '도시' },
 ]
 
 /** 예전 주소(/history/:id)로 들어와도 사건 화면으로 보냄 */
@@ -107,18 +122,59 @@ function ReconnectBanner() {
   )
 }
 
-/** 대시보드 위에 떠 있는 메뉴 (누르면 펼쳐짐) */
-function FloatingMenu({ actor }: { actor: string }) {
-  const [open, setOpen] = useState(false)
+/** 사건 알림(소리·브라우저 알림) 켜고 끄기 */
+function AlertBell() {
+  const on = useAlertsOn()
   return (
-    <div className="float-menu no-print">
-      <button className="float-menu-btn" onClick={() => setOpen(!open)} aria-expanded={open}>
+    <button type="button" className={`tb-icon ${on ? 'active' : ''}`} onClick={() => void toggleAlerts()} title={on ? '사건 알림 켜짐 (누르면 끔)' : '사건 알림 꺼짐 (누르면 켬)'} aria-label={on ? '사건 알림 끄기' : '사건 알림 켜기'} aria-pressed={on}>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+        <path d="M13.7 21a2 2 0 0 1-3.4 0" />
+        {!on && <path d="M3 3l18 18" />}
+      </svg>
+    </button>
+  )
+}
+
+/** 상단 바 오른쪽: 데이터 출처·연결 상태를 점 하나와 짧은 글자로 */
+function StatusChip() {
+  const snap = useVillage()
+  const health = useBackendHealth()
+  const live = snap.connected && snap.status !== 'NO_DATA'
+  return (
+    <Link to="/settings" className="tb-status" title={`분석 서버: ${health.state === 'ok' ? '정상' : health.state === 'down' ? '연결 안 됨' : '확인 중'}`}>
+      <Dot tone={live ? 'ok' : 'err'} live={live} />
+      <span>{snap.source === 'MOCK' ? '시뮬레이터' : live ? '실측 연결됨' : '장치 끊김'}</span>
+      {health.state === 'down' && <span className="tb-warn">서버 끊김</span>}
+    </Link>
+  )
+}
+
+/** 모든 화면 위의 얇은 상단 바: 로고 · 주요 화면 · 연결 상태 · 관리. 좁은 화면에서는 ☰ 하나로 접힘 */
+function TopBar({ actor }: { actor: string }) {
+  const [open, setOpen] = useState(false)
+  const { pathname } = useLocation()
+  useEffect(() => setOpen(false), [pathname])
+  return (
+    <header className="topbar no-print">
+      <Link to="/dashboard" className="tb-brand" aria-label="GridWitness 대시보드">
         <span className="brand-mark"><IconLogo /></span>
         <span>GridWitness</span>
-        <IconMenu />
-      </button>
+      </Link>
+      <nav className="tb-nav" aria-label="주요 화면">
+        {TOP_NAV.map((n) => (
+          <NavLink key={n.to} to={n.to} className="tb-link">{n.label}</NavLink>
+        ))}
+      </nav>
+      <div className="tb-right">
+        <StatusChip />
+        <AlertBell />
+        <NavLink to="/admin" className="tb-icon" title="관리자" aria-label="관리자"><IconShieldCheck /></NavLink>
+        <NavLink to="/settings" className="tb-icon" title="설정" aria-label="설정"><IconSettings /></NavLink>
+        <button type="button" className="tb-icon tb-burger" onClick={() => setOpen(!open)} aria-expanded={open} aria-label="메뉴"><IconMenu /></button>
+      </div>
       {open && (
-        <div className="float-menu-pop" onClick={() => setOpen(false)}>
+        <div className="tb-pop" onClick={() => setOpen(false)}>
           {NAV.map((g) => (
             <div key={g.label} className="float-group">
               <div className="float-label">{g.label}</div>
@@ -133,7 +189,7 @@ function FloatingMenu({ actor }: { actor: string }) {
           </div>
         </div>
       )}
-    </div>
+    </header>
   )
 }
 
@@ -146,8 +202,12 @@ export function Shell({ extraRoutes }: { extraRoutes?: ReactNode } = {}) {
   const immersive = location.pathname === '/village'
 
   return (
-    <div className={`app no-sidebar ${immersive ? 'immersive' : ''}`}>
-      <FloatingMenu actor={actor} />
+    <div className={`app no-sidebar with-topbar ${immersive ? 'immersive' : ''}`}>
+      <TopBar actor={actor} />
+      <IncidentWatcher />
+      <IncidentBanner />
+      <IncidentSheet />
+      <GlobalAssistant />
 
       <div className="main">
         <ReconnectBanner />
@@ -165,6 +225,9 @@ export function Shell({ extraRoutes }: { extraRoutes?: ReactNode } = {}) {
               <Route path="/cases" element={<CaseList />} />
               <Route path="/cases/new" element={<NewCase />} />
               <Route path="/cases/:id" element={<CaseDetail />} />
+              <Route path="/field/:id" element={<FieldAssistant />} />
+              <Route path="/impact" element={<Navigate to="/public-data#outage" replace />} />
+              <Route path="/report/:kind/:id" element={<Report />} />
               <Route path="/public-data" element={<PublicData />} />
               <Route path="/history" element={<Navigate to="/cases" replace />} />
               <Route path="/history/:id" element={<HistoryRedirect />} />

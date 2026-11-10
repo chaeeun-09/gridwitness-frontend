@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { api } from '../api'
+import AssistantChat from '../components/AssistantChat'
+import FieldNotes from '../components/FieldNotes'
 import { DiagnosisBadge, StageBadge, Steps, WAVEFORM_STEPS, waveformStepsDone } from '../components/Badges'
 import FaultAnalysis from '../components/FaultAnalysis'
 import IotCaseView from '../components/IotCaseView'
@@ -11,9 +13,10 @@ import { ErrorState, PageHeader, PageSkeleton, Section } from '../components/ui'
 import { fmtTime, getActor } from '../lib/actor'
 import { needsWaveform, SOURCE_LABEL, type AnalysisType, type AnyCase, type ChannelFeatures, type IncidentCase } from '../types'
 
-type Tab = 'analysis' | 'diagnosis' | 'review' | 'source'
+type Tab = 'analysis' | 'assistant' | 'diagnosis' | 'review' | 'source'
 const TABS: [Tab, string][] = [
   ['analysis', '파형·AI 분석'],
+  ['assistant', '현장 대응 AI'],
   ['diagnosis', '입력 진단'],
   ['review', '검토·이력'],
   ['source', '원본 정보'],
@@ -52,7 +55,7 @@ export function WaveformCaseView({ c, onChange }: { c: IncidentCase; onChange: (
             <span className="num">{fmtTime(c.createdAt)}</span>
           </>
         }
-        actions={<button className="btn no-print" onClick={() => window.print()}>PDF로 내보내기</button>}
+        actions={<><Link className="btn btn-primary no-print" to={`/report/case/${c.id}`}>사고조사 보고서</Link><button className="btn no-print" onClick={() => window.print()}>화면 인쇄</button></>}
       />
       <Steps steps={WAVEFORM_STEPS} done={waveformStepsDone(c.stage)} />
       <TrustStrip c={c} onGo={setTab} />
@@ -73,6 +76,16 @@ export function WaveformCaseView({ c, onChange }: { c: IncidentCase; onChange: (
 
       <div key={tab} className="tab-panel">
         {tab === 'source' && <SourcePanel c={c} />}
+        {tab === 'assistant' && (
+          <Section
+            title="현장 대응 AI"
+            description="이 사건의 분석 결과·입력 적합성·모델 정보·검토 이력만 근거로 답해요. 기록에 없는 원인이나 위치는 판단을 보류하고, 설비는 조작하지 않아요."
+            actions={<Link className="btn btn-sm" to={`/field/${c.id}`}>현장용 화면 열기</Link>}
+          >
+            <AssistantChat c={c} />
+            <FieldNotes c={c} />
+          </Section>
+        )}
         {tab === 'diagnosis' && <DiagnosisPanel c={c} onNext={() => setTab('analysis')} />}
         {tab === 'analysis' && <AnalysisTab c={c} onChange={onChange} onReview={() => setTab('review')} />}
         {tab === 'review' && (

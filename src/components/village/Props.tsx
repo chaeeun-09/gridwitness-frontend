@@ -8,6 +8,9 @@ import SpeechBubble from '../three/SpeechBubble'
 import { POLE_H, SUBSTATION, type V3 } from './layout'
 import { glowTexture, gravelTexture, tiled } from './textures'
 
+/** 라벨에 상태 줄까지 보여줄 상태 (평소엔 이름만) */
+const ALARM_STATUS: NodeStatus[] = ['WARNING', 'FAULT', 'OUTAGE']
+
 export const STATUS_COLOR: Record<NodeStatus, string> = {
   NORMAL: '#ffd43b',
   OFF: '#495057',
@@ -56,12 +59,13 @@ export const Pole = memo(function Pole({ p, transformer = false }: { p: V3; tran
 })
 
 // ── FRTU (배전자동화 단말장치) ─────────────────────────
-/** 전봇대 중간의 회색 철제 제어함. 마을 계측의 '현장 단말' 역할이라 맥동 고리로 강조하고, 누르면 AI 분석 패널이 열림 */
-export function Frtu({ p, status, selected, onSelect }: { p: V3; status: NodeStatus; selected: boolean; onSelect: () => void }) {
+/** 전봇대 중간의 회색 철제 제어함. 마을 계측의 '현장 단말' 역할이라 맥동 고리로 강조하고, 누르면 FRTU 요약 패널이 열림.
+ *  name: 라벨 이름, fi: 고장표시가 떠 있는지, dx: 같은 전봇대에 여러 대를 달 때 옆으로 비킬 거리, labelY: 라벨 높이 */
+export function Frtu({ p, status, selected, onSelect, name = 'FRTU', fi = false, dx = 0, labelY = 2.7 }: { p: V3; status: NodeStatus; selected: boolean; onSelect: () => void; name?: string; fi?: boolean; dx?: number; labelY?: number }) {
   const ring = useRef<Mesh>(null)
   const [hover, setHover] = useState(false)
-  const alarm = status === 'WARNING' || status === 'FAULT' || status === 'OUTAGE'
-  const tone = alarm ? STATUS_COLOR[status] : '#3d7bff'
+  const alarm = fi || status === 'WARNING' || status === 'FAULT' || status === 'OUTAGE'
+  const tone = alarm ? STATUS_COLOR[status === 'NORMAL' || status === 'OFF' || status === 'NO_DATA' ? 'WARNING' : status] : '#3d7bff'
   useFrame(({ clock }) => {
     const m = ring.current
     if (!m) return
@@ -71,7 +75,7 @@ export function Frtu({ p, status, selected, onSelect }: { p: V3; status: NodeSta
   })
   return (
     <group
-      position={[p[0], 0, p[2] + 0.2]}
+      position={[p[0] + dx, 0, p[2] + 0.2]}
       scale={1.35}
       onClick={(e) => {
         e.stopPropagation()
@@ -103,14 +107,15 @@ export function Frtu({ p, status, selected, onSelect }: { p: V3; status: NodeSta
       </mesh>
       <mesh position={[-0.18, 2.03, 0.28]}>
         <sphereGeometry args={[0.035, 10, 10]} />
-        <meshBasicMaterial color={alarm ? STATUS_COLOR[status] : '#40c057'} toneMapped={false} />
+        <meshBasicMaterial color={alarm ? tone : '#40c057'} toneMapped={false} />
       </mesh>
       {/* 강조 고리 */}
       <mesh ref={ring} position={[0, 0.03, 0.1]} rotation-x={-Math.PI / 2}>
         <ringGeometry args={[0.55, 0.68, 40]} />
         <meshBasicMaterial color={tone} transparent opacity={0.6} toneMapped={false} depthWrite={false} />
       </mesh>
-      <Label lines={[alarm ? 'FRTU · 이상 감지' : 'FRTU · AI 분석']} position={[0, 2.7, 0.1]} lineHeight={0.42} bg={tone} pointer />
+      {/* 평소에는 맥동 고리만, 고장표시가 떴거나 가리키거나 골랐을 때만 이름 */}
+      {(alarm || hover || selected) && <Label lines={[alarm ? `${name} · 고장표시` : name]} position={[0, labelY, 0.1]} lineHeight={0.3} bg={tone} pointer />}
     </group>
   )
 }
@@ -218,7 +223,7 @@ export const Substation = memo(function Substation({ status, showLabel = true }:
           ))}
         </group>
       ))}
-      {showLabel && <Label lines={['변전소', '5V 전원 공급']} position={[0, 4.3, 0]} bg="rgba(20,22,27,0.86)" lineHeight={0.6} />}
+      {showLabel && <Label lines={['변전소']} position={[0, 4.3, 0]} bg="rgba(20,22,27,0.82)" lineHeight={0.42} />}
     </group>
   )
 })
@@ -282,12 +287,12 @@ export function StreetLamp({ c, view, pos, rot, night, selected, onSelect, showL
         </mesh>
       )}
       {showLabel && <Label
-        lines={[c.name, `${c.fault ? '⚠ ' : ''}LED ${c.ch} · ${view.text}`]}
+        lines={selected || c.fault || ALARM_STATUS.includes(view.status) ? [c.name, `${c.fault ? '⚠ ' : ''}LED ${c.ch} · ${view.text}`] : [c.name]}
         position={[0, 3.55, 0]}
         bg={LAMP_LABEL_BG[view.status]}
         border="rgba(255,255,255,0.14)"
         pointer
-        lineHeight={0.42}
+        lineHeight={0.36}
       />}
       {showLabel && speech && <SpeechBubble text={speech} y={4.7} tone={view.status === 'FAULT' || view.status === 'OUTAGE' ? 'err' : 'warn'} />}
     </group>

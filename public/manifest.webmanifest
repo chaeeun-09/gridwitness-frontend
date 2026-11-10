@@ -1,0 +1,15 @@
+{
+  "name": "GridWitness 배전 사고조사 지원",
+  "short_name": "GridWitness",
+  "description": "배전 고장파형 판독·근거·점검 순서를 현장에서 보는 사고조사 보조 앱",
+  "lang": "ko",
+  "start_url": "./dashboard",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f4f7fc",
+  "theme_color": "#101827",
+  "icons": [
+    { "src": "./favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
