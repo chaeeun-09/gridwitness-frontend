@@ -157,7 +157,7 @@ function TopBar({ actor }: { actor: string }) {
   useEffect(() => setOpen(false), [pathname])
   return (
     <header className="topbar no-print">
-      <Link to="/dashboard" className="tb-brand" aria-label="GridWitness 대시보드">
+      <Link to="/" className="tb-brand" aria-label="GridWitness 소개 화면">
         <span className="brand-mark"><IconLogo /></span>
         <span>GridWitness</span>
       </Link>
