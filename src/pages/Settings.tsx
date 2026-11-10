@@ -55,7 +55,7 @@ export default function Settings() {
             {url !== DEFAULT_API && <button className="btn btn-sm btn-ghost" onClick={() => setUrl(DEFAULT_API)}>기본 주소</button>}
           </div>
           <p className="hint">
-            사건 목록은 서버에서 불러오고, 원본 파형은 등록한 브라우저에만 보관합니다. 지금 서버에는 분석 모델이 연결되어 있지 않아 이벤트 유형은 '판단 보류'로 나오고 특징값만 계산됩니다.
+            사건 목록은 서버에서 불러오고, 원본 파형은 등록한 브라우저에만 보관합니다. 서버에는 공개 고장파형으로 학습한 분석 모델(중국 Xiong 2020 · 러시아 OscGrid)이 연결되어 있습니다. 등록할 때 고른 데이터셋으로 모델을 정하고, 맞는 모델이 없거나 확실하지 않으면 다른 모델로 대신 답하지 않고 판단을 보류합니다.
           </p>
         </div>
       </Row>
