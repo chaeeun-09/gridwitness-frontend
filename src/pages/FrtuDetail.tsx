@@ -1,4 +1,4 @@
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { CsvAnalysis, FaultLocationBox, FrtuStrip, LiveWave } from '../components/AiPanel'
 import VillageStatusChat from '../components/VillageStatusChat'
 import { LiveAnalysis } from './LiveData'
@@ -7,7 +7,7 @@ import { Badge, NODE_TONE, Status } from '../components/ui'
 import { FI_LABEL, frtuViews, isFrtuId, locateFault, type FrtuId } from '../lib/frtu'
 import { inspectionCandidate } from '../lib/gis'
 import SingleLineDiagram, { InspectionCard } from '../components/SingleLineDiagram'
-import { DEVICE_INFO, IOT_CHANNELS, STATUS_LABEL, THRESHOLDS, useVillage } from '../lib/village'
+import { connectSerial, DEVICE_INFO, IOT_CHANNELS, STATUS_LABEL, THRESHOLDS, useVillage } from '../lib/village'
 import { useVillageEvents } from '../lib/villageEvents'
 
 type Tab = 'overview' | 'live'
@@ -48,8 +48,13 @@ export default function FrtuDetail() {
   const suspects = id === 'inlet' ? snap.diagnosis?.candidates.map((c) => snap.leds[c].name).join(', ') : undefined
   const mine = IOT_CHANNELS.filter((c) => f.def.channels.includes(c.id))
   const on = mine.filter((c) => snap.leds[c.id].channelOn)
+  // 장치가 끊기면 값이 0으로 남아 정상처럼 보이므로 숫자 대신 안내를 보여 줌
+  const offline = !snap.connected
+  const dash = (text: string) => (offline ? '—' : text)
   // 화면에 보이는 값만으로 만든 근거 문장 (지어내지 않음)
-  const reasons = !f.available
+  const reasons = offline
+    ? ['장치가 연결되지 않아 지금 계측값이 없어서 판단할 수 없어요.']
+    : !f.available
     ? [f.unavailableReason ?? '계측값이 없어요.']
     : [
         `이 FRTU가 맡은 LED 중 켜 둔 것은 ${on.length}개(${on.map((c) => c.name).join(', ') || '없음'})예요.`,
@@ -75,6 +80,19 @@ export default function FrtuDetail() {
         ))}
       </div>
 
+      {offline && (
+        <div className="alert alert-warn" role="status">
+          <span>
+            <strong>장치가 연결되지 않아 지금 들어오는 계측값이 없어요.</strong>{' '}
+            파형과 측정값이 비어 있는 건 고장이 아니라 값이 안 들어와서예요.{' '}
+            {snap.source === 'SERIAL' ? (
+              <button className="btn btn-sm btn-primary" onClick={() => void connectSerial().catch(() => {})}>장치 다시 연결</button>
+            ) : null}{' '}
+            <Link to="/settings" className="btn btn-sm">설정에서 데이터 출처 바꾸기</Link>
+          </span>
+        </div>
+      )}
+
       {tab === 'live' ? (
         <div className="tab-panel"><LiveAnalysis /></div>
       ) : (
@@ -97,7 +115,11 @@ export default function FrtuDetail() {
         <div className="stack" style={{ gap: 14 }}>
           <section className="dash-card">
             <div className="dash-card-head"><h2>파형 추이</h2><span className="small muted">최근 1분</span></div>
-            <LiveWave snap={snap} frtu={id} />
+            {offline ? (
+              <p className="muted small" style={{ padding: '48px 0', textAlign: 'center' }}>장치 연결 끊김 · 들어오는 계측값이 없어 파형을 그릴 수 없어요.</p>
+            ) : (
+              <LiveWave snap={snap} frtu={id} />
+            )}
           </section>
 
           <section className="dash-card">
@@ -113,7 +135,7 @@ export default function FrtuDetail() {
               </div>
               <div className="judge">
                 <span>이상 점수</span>
-                <strong>{f.score.toFixed(2)}</strong>
+                <strong>{dash(f.score.toFixed(2))}</strong>
               </div>
               <div className="judge">
                 <span>마지막 사건 판정</span>
@@ -150,19 +172,19 @@ export default function FrtuDetail() {
             <div className="dash-card-head"><h2>정보</h2></div>
             <div className="info-box">
               <span>측정 전류</span>
-              <strong>{(f.i * 1000).toFixed(1)} mA</strong>
-              <Bar value={ratio / 1.5} tone={Math.abs(ratio - 1) > 0.3 ? 'err' : 'ok'} />
-              <small>예상 {(f.expected * 1000).toFixed(1)} mA 대비 {Math.round(ratio * 100)}%</small>
+              <strong>{dash(`${(f.i * 1000).toFixed(1)} mA`)}</strong>
+              {!offline && <Bar value={ratio / 1.5} tone={Math.abs(ratio - 1) > 0.3 ? 'err' : 'ok'} />}
+              <small>{offline ? '장치 연결 끊김 · 계측값 없음' : `예상 ${(f.expected * 1000).toFixed(1)} mA 대비 ${Math.round(ratio * 100)}%`}</small>
             </div>
             <div className="info-box">
               <span>이상 점수</span>
-              <strong>{Math.round(f.score * 100)}%</strong>
-              <Bar value={f.score} tone={scoreTone} />
+              <strong>{dash(`${Math.round(f.score * 100)}%`)}</strong>
+              {!offline && <Bar value={f.score} tone={scoreTone} />}
               <small>주의 {THRESHOLDS.warn} · 이상 {THRESHOLDS.fault} 기준</small>
             </div>
             <dl className="kv info-kv">
-              <div><dt>전압</dt><dd>{f.v.toFixed(2)} V</dd></div>
-              <div><dt>전력</dt><dd>{(f.v * f.i).toFixed(2)} W</dd></div>
+              <div><dt>전압</dt><dd>{dash(`${f.v.toFixed(2)} V`)}</dd></div>
+              <div><dt>전력</dt><dd>{dash(`${(f.v * f.i).toFixed(2)} W`)}</dd></div>
               <div><dt>맡은 LED</dt><dd>{mine.filter((c) => snap.leds[c.id].lit).length} / {mine.length} 켜짐</dd></div>
               <div><dt>마을 전원</dt><dd>{snap.relay ? '켜짐' : '차단'}</dd></div>
               <div><dt>값 출처</dt><dd>{f.def.measured ? '실측' : '두 분기의 합 (계산값)'}</dd></div>
