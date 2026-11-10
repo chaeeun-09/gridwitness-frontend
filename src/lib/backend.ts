@@ -2,10 +2,15 @@ import { useSyncExternalStore } from 'react'
 
 // 분석 서버(FastAPI) 연결 설정.
 
-// 실제 서버 주소. 서버 CORS가 localhost:5173만 허용하므로 브라우저는 같은 출처의 /gw-api로
-// 요청하고, Vite 개발 서버(vite.config.ts)와 Vercel(vercel.json)이 이 주소로 프록시한다.
+// 실제 서버 주소.
+// - Vite 개발 서버(vite.config.ts)와 Vercel(vercel.json)은 같은 출처의 /gw-api 를 이 주소로 프록시한다
+// - GitHub Pages 는 정적 호스팅이라 프록시가 없다 (/gw-api → 404). 대신 서버 CORS 가 https://jyx-07.github.io 를
+//   허용하므로(gridwitness-api app/main.py) 서버 주소로 바로 요청한다
 export const UPSTREAM_API = 'https://gridwitness-api.https.gsmsv.site'
-export const DEFAULT_API = '/gw-api'
+const PROXY_API = '/gw-api'
+/** 프록시가 없는 정적 호스팅(GitHub Pages)에서 열렸는지 */
+const STATIC_HOST = typeof location !== 'undefined' && location.hostname.endsWith('github.io')
+export const DEFAULT_API = STATIC_HOST ? UPSTREAM_API : PROXY_API
 
 const URL_KEY = 'gridwitness.api.url'
 
@@ -20,8 +25,9 @@ function read(key: string): string | null {
 export function apiBase(): string {
   const raw = read(URL_KEY) ?? (import.meta.env.VITE_API_BASE as string | undefined) ?? DEFAULT_API
   const url = raw.trim().replace(/\/+$/, '')
-  // 예전에 저장된 직접 주소는 CORS에 막히므로 프록시 경로로 돌린다
-  return url === UPSTREAM_API ? DEFAULT_API : url
+  // 프록시가 있는 곳: 직접 주소는 CORS 에 막히므로 프록시 경로로 / 정적 호스팅: 프록시 경로는 없으므로 직접 주소로
+  if (STATIC_HOST) return url === PROXY_API ? UPSTREAM_API : url
+  return url === UPSTREAM_API ? PROXY_API : url
 }
 
 export function setApiBase(url: string) {
