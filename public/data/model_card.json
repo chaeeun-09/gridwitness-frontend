@@ -3,7 +3,7 @@
   "country": "CN",
   "dataset": {
    "key": "xiong_cn",
-   "title": "Xiong et al. 2020 Incipient fault waveform dataset (중국 10kV 배전, 50Hz, 4096Hz)",
+   "title": "Xiong et al. 2020 Incipient fault waveform dataset (중국 연구진 공개 배전계통 실측, 50Hz, 4096Hz)",
    "source": "https://github.com/xiongsiheng/Incipient-fault-waveform-dataset",
    "license": "MIT"
   },
@@ -96,7 +96,7 @@
   "note": "학습 라벨(SIF/MIF/PF/TD)에 없는 실제 사건. 보류·거부가 기대 결과이고, 확신 있게 답한 건은 실패 사례로 기록한다. 원본(10 kHz)을 4096 Hz 로 선형 보간 리샘플했다. 기록이 짧아 필요한 구간을 덮지 못하는 파일은 값을 채우지 않고 뺐다(excluded)."
  },
  "limitations": [
-  "중국 10kV·50Hz 배전 공개 데이터(Xiong 2020) 라벨 범위의 이벤트 유형 분류 결과이며, 다른 나라 계통이나 물리적 고장 원인(수목 접촉 등) 판별을 뜻하지 않습니다.",
+  "중국 연구진 공개 배전계통 실측 데이터(Xiong 2020, 50Hz) 라벨 범위의 이벤트 유형 분류 결과이며, 다른 나라 계통이나 물리적 고장 원인(수목 접촉 등) 판별을 뜻하지 않습니다.",
   "학습 데이터에 정상·개폐(스위칭)·전동기 기동 같은 고장이 아닌 사건이 없어, 그런 사건도 네 유형 중 하나로 답할 수 있습니다 (실제 개폐 기록 1건을 SIF 로 답한 사례가 있음).",
   "점수는 모델 내부 값이며 보정되지 않았습니다. 실제 정답 확률이 아닙니다.",
   "최종 판단은 담당자가 합니다."

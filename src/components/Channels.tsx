@@ -42,7 +42,7 @@ export default function Channels({ snap, selected, onSelect, controls }: { snap:
               </span>
             </div>
             <span className="small muted">{def.relay}</span>
-            <span className="small muted">{ZONE_SENSOR[def.kind]}</span>
+            <span className="small muted">{snap.zones ? ZONE_SENSOR[def.kind] : '구간값 없음 · 전체 계측'}</span>
             <Status tone={tone}>{pending ? '명령 전송 중…' : label}</Status>
             {controls && (
               <Switch

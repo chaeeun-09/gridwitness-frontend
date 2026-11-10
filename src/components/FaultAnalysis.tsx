@@ -2,7 +2,7 @@ import { lazy, Suspense, useMemo, useState, type ReactNode } from 'react'
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { analyzeWaveform, fmtCurrent, fmtPct } from '../lib/faultAnalysis'
 import { CHART } from '../lib/chart'
-import { ANALYSIS_LABEL, EVENT_LABELS, type AnalysisResult, type AnalysisType, type EventLabel } from '../types'
+import { ANALYSIS_LABEL, channelsFor, type AnalysisResult, type AnalysisType, type EventLabel, type EventScores } from '../types'
 import AiEvidence from './AiEvidence'
 import { IconBars, IconWave } from './Icons'
 import { Segmented, Skeleton } from './ui'
@@ -31,7 +31,7 @@ interface Props {
 }
 
 /** 한 종류의 파형(전압·전류·영상전류)을 그리는 칸 */
-function Strip({ title, unit, keys, colors, data, onset, height, first, last }: { title: string; unit: string; keys: string[]; colors: string[]; data: Record<string, number>[]; onset: number | null; height: number; first?: boolean; last?: boolean }) {
+function Strip({ title, unit, keys, colors, data, onset, recovery, height, first, last }: { title: string; unit: string; keys: string[]; colors: string[]; data: Record<string, number>[]; onset: number | null; recovery: number | null; height: number; first?: boolean; last?: boolean }) {
   return (
     <div className="fa-strip">
       <div className="fa-strip-head">
@@ -54,9 +54,10 @@ function Strip({ title, unit, keys, colors, data, onset, height, first, last }: 
               stroke="#cf3434"
               strokeDasharray="4 3"
               strokeWidth={1.5}
-              label={first ? { value: `고장 발생 시점 (${onset.toFixed(3)} s)`, position: 'top', fill: '#cf3434', fontSize: 11, fontWeight: 600 } : undefined}
+              label={first ? { value: `급변 관측 (${onset.toFixed(3)} s)`, position: 'top', fill: '#cf3434', fontSize: 11, fontWeight: 600 } : undefined}
             />
           )}
+          {recovery !== null && <ReferenceLine x={recovery} stroke="#24835a" strokeDasharray="4 3" label={first ? { value: '초반 수준 복귀', fill: '#24835a', fontSize: 11 } : undefined} />}
           {keys.map((k, i) => (
             <Line key={k} dataKey={k} stroke={colors[i]} dot={false} strokeWidth={1.3} isAnimationActive={false} />
           ))}
@@ -75,10 +76,10 @@ function Evidence({ icon, label, children }: { icon: ReactNode; label: string; c
   )
 }
 
-function ScoreBars({ scores, highlight }: { scores: Record<EventLabel, number>; highlight?: EventLabel }) {
+function ScoreBars({ scores, highlight }: { scores: EventScores; highlight?: EventLabel }) {
   return (
     <div className="scores">
-      {EVENT_LABELS.map((k) => (
+      {Object.keys(scores).map((k) => (
         <div key={k} className={`score ${k === highlight ? 'hl' : ''}`}>
           <span className="mono">{k}</span>
           <div className="bar"><div style={{ width: `${scores[k] * 100}%` }} /></div>
@@ -92,12 +93,17 @@ function ScoreBars({ scores, highlight }: { scores: Record<EventLabel, number>; 
 export default function FaultAnalysis({ matrix, fs, hz, analysis, blocked, busy, analysisType = 'EVENT_TYPE', onType, types, onRun, onReview, compact }: Props) {
   const [view, setView] = useState<'2d' | '3d'>('2d')
   const features = useMemo(() => analyzeWaveform(matrix, fs, hz), [matrix, fs, hz])
+  const channels = channelsFor(matrix[0]?.length ?? 0)
+  const currentKeys = channels.filter((c) => /^I[abc]$/.test(c))
+  const voltageKeys = channels.filter((c) => c.startsWith('V'))
+  const phaseColors = (keys: readonly string[]) => keys.map((k) => PHASE_COLOR['abc'.indexOf(k[1])])
   const data = useMemo(() => {
+    const measured = channelsFor(matrix[0]?.length ?? 0)
     const step = Math.max(1, Math.ceil(matrix.length / MAX_POINTS))
     const rows: Record<string, number>[] = []
     for (let i = 0; i < matrix.length; i += step) {
       const r = matrix[i]
-      rows.push({ t: i / fs, Va: r[4] / 1000, Vb: r[5] / 1000, Vc: r[6] / 1000, Ia: r[0], Ib: r[1], Ic: r[2], '3I0': r[3] })
+      rows.push({ t: i / fs, ...Object.fromEntries(measured.map((ch, j) => [ch, ch.startsWith('V') ? r[j] / 1000 : r[j]])) })
     }
     return rows
   }, [matrix, fs])
@@ -120,13 +126,14 @@ export default function FaultAnalysis({ matrix, fs, hz, analysis, blocked, busy,
           )}
           {view === '3d' && !compact ? (
             <Suspense fallback={<Skeleton h={460} style={{ borderRadius: 12 }} />}>
-              <Waveform3D matrix={matrix} samplingRateHz={fs} systemFrequencyHz={hz} />
+              <Waveform3D matrix={matrix} samplingRateHz={fs} systemFrequencyHz={hz} onsetSample={features.onset?.sample ?? null} recoverySeconds={features.recoverSeconds} />
             </Suspense>
           ) : (
             <>
-              <Strip title="전압 파형 (Voltage)" unit="kV" keys={['Va', 'Vb', 'Vc']} colors={PHASE_COLOR} data={data} onset={onset} height={compact ? 118 : 158} first />
-              <Strip title="전류 파형 (Current)" unit="A" keys={['Ia', 'Ib', 'Ic']} colors={PHASE_COLOR} data={data} onset={onset} height={compact ? 118 : 158} />
-              <Strip title="영상전류 (Zero-seq.)" unit="A" keys={['3I0']} colors={['#14161b']} data={data} onset={onset} height={compact ? 96 : 120} last />
+              <Strip title="전압 파형 (Voltage)" unit="kV" keys={voltageKeys} colors={phaseColors(voltageKeys)} data={data} onset={onset} recovery={features.recoverSeconds} height={compact ? 118 : 158} first />
+              <Strip title="전류 파형 (Current)" unit="A" keys={currentKeys} colors={phaseColors(currentKeys)} data={data} onset={onset} recovery={features.recoverSeconds} height={compact ? 118 : 158} last={!channels.includes('In')} />
+              {channels.includes('In') && <Strip title="중성선 전류 (In)" unit="A" keys={['In']} colors={['#14161b']} data={data} onset={onset} recovery={features.recoverSeconds} height={compact ? 96 : 120} last />}
+              {!channels.includes('In') && <p className="hint">RU 입력에는 Ib·In 계측이 없어 표시하지 않습니다.</p>}
               <div className="fa-xaxis">시간 (s)</div>
             </>
           )}
@@ -207,7 +214,7 @@ export default function FaultAnalysis({ matrix, fs, hz, analysis, blocked, busy,
             <span className="small muted">화면에서 직접 계산 · AI 판단과 별개</span>
           </div>
           {!features.onset ? (
-            <p className="small muted">기록 안에서 뚜렷한 급변을 찾지 못했습니다. (한 주기 전과 비교해 크게 달라진 구간이 없음)</p>
+            <p className="small muted">기록 안에서 뚜렷한 급변을 찾지 못했습니다. 기록 시작 전 이상 여부와 회복은 확인하지 못했습니다.</p>
           ) : (
             <div className="fa-ev-grid">
               <Evidence icon={<IconBars />} label="피크값 변화">
@@ -232,7 +239,7 @@ export default function FaultAnalysis({ matrix, fs, hz, analysis, blocked, busy,
                   <div className="small muted">전류 변화 작음</div>
                 )}
               </Evidence>
-              <Evidence icon={<span className="fa-clock" />} label="사건 발생 시점">
+              <Evidence icon={<span className="fa-clock" />} label="급변 관측 시점">
                 <div className="fa-ev-val num big">{features.onset.seconds.toFixed(3)} s</div>
                 <div className="small muted num">샘플 {features.onset.sample.toLocaleString()} · 계통 {hz} Hz</div>
               </Evidence>

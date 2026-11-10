@@ -140,7 +140,7 @@ export default function FrtuDetail() {
           </section>
 
           <section className="dash-card">
-            <div className="dash-card-head"><h2>CSV 고장파형 분석</h2><span className="small muted">교류 7채널 파형을 넣으면 AI가 분석</span></div>
+            <div className="dash-card-head"><h2>CSV 고장파형 분석</h2><span className="small muted">지원 모델의 채널 형식에 맞는 파형을 넣으면 분석</span></div>
             <CsvAnalysis />
           </section>
         </div>

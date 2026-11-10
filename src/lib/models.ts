@@ -10,13 +10,13 @@ export const AI_MODELS = [
     get output() {
       return `이상 점수 0~1 · 주의 ≥ ${THRESHOLDS.warn} · 이상 ≥ ${THRESHOLDS.fault}`
     },
-    data: 'Arduino + INA219(1개) 모형 계측',
+    data: 'Arduino + INA219 모형 계측 (감지된 센서 구성 사용)',
   },
   {
     name: '고장파형 분류',
-    version: '서버 모델 연결 전',
-    input: `7채널 교류 파형 ${MODEL_SCOPE.rows}×${MODEL_SCOPE.cols} · ${MODEL_SCOPE.samplingRateHz}Hz`,
-    output: '이벤트 유형 4종 (SIF·MIF·PF·TD) 또는 판단 보류',
-    data: '공개 고장파형 데이터 (Xiong et al.)',
+    version: '연결·버전은 서버 기능 상태에서 확인',
+    input: `CN ${MODEL_SCOPE.rows}×${MODEL_SCOPE.cols} · ${MODEL_SCOPE.samplingRateHz}Hz / RU 512×5 · 1600Hz`,
+    output: 'CN SIF·MIF·PF·TD / RU 정상·개폐·이상·사고 또는 판단 보류',
+    data: '중국 Xiong · 러시아 OscGrid (나라별 모델)',
   },
 ]

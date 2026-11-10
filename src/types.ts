@@ -1,7 +1,11 @@
 // 기획서 4.1 / 4.3 기준 도메인 타입. FastAPI 응답 스키마(Pydantic)와 1:1로 맞출 예정.
 
 export const CHANNELS = ['Ia', 'Ib', 'Ic', 'In', 'Va', 'Vb', 'Vc'] as const
+export const RU_CHANNELS = ['Ia', 'Ic', 'Va', 'Vb', 'Vc'] as const
 export type Channel = (typeof CHANNELS)[number]
+export type ModelCountry = 'CN' | 'RU'
+/** 입력의 실제 열을 유지한다. RU에 없는 Ib/In은 만들지 않는다. */
+export const channelsFor = (columns: number): readonly Channel[] => columns === 5 ? RU_CHANNELS : columns === 7 ? CHANNELS : []
 
 export type SourceType = 'PUBLIC_DATASET' | 'FIELD_FRTU' | 'SYNTHETIC' | 'UNKNOWN'
 
@@ -27,6 +31,14 @@ export interface SourceRecord {
   format?: 'CSV' | 'COMTRADE'
   /** COMTRADE .cfg에서 읽은 정보 */
   comtrade?: { station: string; device: string; revYear: string; fileType: string; mapping: Record<string, string> }
+  provenance?: {
+    format: 'CSV' | 'COMTRADE'
+    channelOrder: string[]
+    originalFiles: { name: string; size: number; sha256: string; role: 'csv' | 'cfg' | 'dat' }[]
+    originalSha256?: string
+    comtrade?: SourceRecord['comtrade']
+  }
+  originalFiles?: Record<string, { filename: string; sha256: string; size: number; download_url: string }>
 }
 
 /** ② 입력 진단: 정상 / 제한 / 거부 */
@@ -50,13 +62,15 @@ export interface InputDiagnosis {
 export type AnalysisType = 'EVENT_TYPE' | 'PHYSICAL_CAUSE' | 'NORMAL_VS_FAULT'
 
 export const ANALYSIS_LABEL: Record<AnalysisType, string> = {
-  EVENT_TYPE: '이벤트 유형 분류 (SIF·MIF·PF·TD)',
+  EVENT_TYPE: '모델별 이벤트 유형 분류 (CN / RU)',
   PHYSICAL_CAUSE: '물리적 고장원인 추정 (수목 접촉·절연 파괴 등)',
   NORMAL_VS_FAULT: '정상/고장 탐지',
 }
 
 export const EVENT_LABELS = ['SIF', 'MIF', 'PF', 'TD'] as const
-export type EventLabel = (typeof EVENT_LABELS)[number]
+export const RU_EVENT_LABELS = ['NORMAL', 'SWITCHING', 'ABNORMAL', 'FAULT'] as const
+export type EventLabel = (typeof EVENT_LABELS)[number] | (typeof RU_EVENT_LABELS)[number]
+export type EventScores = Record<string, number>
 
 export interface ChannelFeatures {
   channel: Channel
@@ -92,7 +106,7 @@ export type AnalysisResult =
       kind: 'COMPLETED'
       analysisType: AnalysisType
       predictedLabel: EventLabel
-      scores: Record<EventLabel, number>
+      scores: EventScores
       features: ChannelFeatures[]
       limitations: string[]
       modelVersion: string
@@ -106,7 +120,7 @@ export type AnalysisResult =
       reasons: string[]
       neededInfo: string[]
       features: ChannelFeatures[] | null
-      scores: Record<EventLabel, number> | null
+      scores: EventScores | null
       modelVersion: string | null
       preprocessVersion: string | null
       executedAt: string
@@ -138,6 +152,10 @@ export interface HistoryEvent {
 export type CaseStage = 'REGISTERED' | 'DIAGNOSED' | 'ANALYZED' | 'WITHHELD' | 'REVIEWED'
 
 export type CaseType = 'WAVEFORM' | 'IOT'
+export interface CaseSync {
+  checkedAt: string | null
+  error: string | null
+}
 
 export const CASE_TYPE_LABEL: Record<CaseType, string> = {
   WAVEFORM: '고장파형 분석',
@@ -159,6 +177,10 @@ export interface IncidentCase {
   history: HistoryEvent[]
   /** 서버가 부여한 ID. 서버에 올리지 못한 사건에는 없음 */
   backend?: { incidentId: string; validationId: string | null; analysisId: string | null }
+  archived?: boolean
+  sync?: CaseSync
+  /** 내보내기 시 서버의 대화·메모 등 원래 기록을 함께 보존한다. */
+  serverRecords?: { fieldNotes: unknown; assistantMessages: unknown; metadata?: unknown; validation?: unknown; analysis?: unknown; reviews?: unknown; audit?: unknown; originalFiles?: { name: string; base64: string }[]; waveformFile?: { name: string; base64: string } }
 }
 
 // ── IoT (Arduino + INA219 모형) ─────────────────────────
@@ -209,6 +231,8 @@ export interface IotCase {
   detection: IotDetection
   reviews: Review[]
   history: HistoryEvent[]
+  persistence?: 'server' | 'pending'
+  sync?: CaseSync
 }
 
 export type AnyCase = IncidentCase | IotCase
@@ -227,6 +251,7 @@ export interface CaseSummary {
   diagnosisStatus: DiagnosisStatus
   /** 원본 CSV를 다시 연결해야 분석·검토할 수 있음 */
   needsWaveform?: boolean
+  sync?: CaseSync
 }
 
 /** 모든 사건의 실행 이력을 시간순으로 펼친 항목 (관리자 활동 기록용) */

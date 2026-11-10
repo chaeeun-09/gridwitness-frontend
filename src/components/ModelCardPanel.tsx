@@ -23,8 +23,8 @@ export default function ModelCardPanel() {
   const u = card.unknown_events
   return (
     <Section
-      title="이 AI를 얼마나 믿어도 되나"
-      description={`학습에 쓰지 않은 시험 파형 ${s.n}건(${card.model.dataset.title.split(' (')[0]})의 실제 평가 결과입니다. 숫자는 평가 기록을 그대로 옮겼습니다.`}
+      title="중국 CN 모델 평가와 한계"
+      description={`CN 모델이 학습에 쓰지 않은 시험 파형 ${s.n}건(${card.model.dataset.title.split(' (')[0]})의 실제 평가 결과입니다. RU 모델의 평가 수치는 이 카드에 포함되지 않습니다.`}
     >
       <Metrics cols={4}>
         <Metric label="답한 것의 정확도" value={pct(s.selective_accuracy)} foot={`답한 ${answered}건 중 ${correct}건 정답`} />

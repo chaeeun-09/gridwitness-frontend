@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { api } from '../api'
+import { getVillageRecordState, retryVillageRecords, useVillagePersistence } from '../api/village'
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { CHART } from '../lib/chart'
 import { fmtTime } from '../lib/actor'
@@ -15,6 +17,9 @@ const STEPS = ['이상 감지', '계측 기록', '데이터 점검', '이상 점
 
 export default function IotCaseView({ c, onChange }: { c: IotCase; onChange: (c: AnyCase) => void }) {
   const [tab, setTab] = useState<Tab>('record')
+  const persistence = useVillagePersistence()
+  const [syncError, setSyncError] = useState<string | null>(null)
+  const stored = getVillageRecordState(c.id)
   const d = c.detection
   const t0 = c.window[0]?.t ?? 0
   const data = c.window.map((p) => ({
@@ -42,6 +47,8 @@ export default function IotCaseView({ c, onChange }: { c: IotCase; onChange: (c:
         }
         actions={<button className="btn no-print" onClick={() => window.print()}>PDF로 내보내기</button>}
       />
+      <div className="small muted">{stored === 'server' || (stored === 'missing' && c.persistence === 'server') ? '서버에 사건·검토 보존 완료' : stored === 'memory' ? '브라우저 저장 실패 · 이 탭에서만 유지' : '브라우저 보존 · 서버 전송 대기'} <button type="button" className="btn btn-sm no-print" disabled={persistence.syncing} onClick={() => { setSyncError(null); void retryVillageRecords().then(() => api.getCase(c.id)).then(onChange).catch((e: Error) => setSyncError(e.message)) }}>서버 저장 재시도</button></div>
+      {(syncError || c.sync?.error || persistence.error) && <div className="alert alert-warn small" role="status">{syncError ?? c.sync?.error ?? persistence.error}</div>}
       <Steps steps={STEPS} done={c.stage === 'REVIEWED' ? 5 : 4} />
 
       <div className="tabs no-print" role="tablist">

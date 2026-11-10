@@ -1,4 +1,4 @@
-import { CHANNELS, type Channel, type DiagnosisIssue } from '../types'
+import { CHANNELS, RU_CHANNELS, type Channel, type DiagnosisIssue } from '../types'
 
 // COMTRADE (IEEE C37.111) 읽기·쓰기. 보호계전기·FRTU가 고장파형을 저장하는 표준 형식.
 //   .cfg: 채널 정의, 단위, 배율, 계통 주파수, 샘플링
@@ -24,6 +24,7 @@ export interface ComtradeResult {
   analogs: ComtradeAnalog[]
   /** CHANNELS 순서로 맞춘 행렬. 맞추지 못한 채널이 있으면 null */
   matrix: number[][] | null
+  channels: readonly Channel[]
   /** CHANNELS 순서 → 원본 채널 이름 */
   mapping: Partial<Record<Channel, string>>
   issues: DiagnosisIssue[]
@@ -124,13 +125,9 @@ export function parseComtrade(cfgText: string, dat: ArrayBuffer): ComtradeResult
       mapping[target] = ch.id
     }
   }
-  const missing = CHANNELS.filter((c) => !col[c])
-  // 중성선 전류가 없으면 3상 합으로 계산 (흔한 경우)
-  const derivedIn = missing.length === 1 && missing[0] === 'In' && col.Ia && col.Ib && col.Ic
-  if (derivedIn) {
-    issues.push({ code: 'DERIVED_IN', severity: 'info', message: '중성선 전류(In) 채널이 없어 Ia+Ib+Ic로 계산했습니다.' })
-    mapping.In = 'Ia+Ib+Ic (계산)'
-  } else if (missing.length) {
+  const channels = !col.Ib && !col.In && RU_CHANNELS.every((c) => col[c]) ? RU_CHANNELS : CHANNELS
+  const missing = channels.filter((c) => !col[c])
+  if (missing.length) {
     issues.push({ code: 'CHANNEL_MAPPING', severity: 'error', message: `채널을 찾지 못했습니다: ${missing.join(', ')}. 원본 채널: ${analogs.map((a) => `${a.id}(${a.unit})`).join(', ')}`, fix: '.cfg의 상(ph)·단위(uu) 칸이 A/B/C/N, A/V로 되어 있는지 확인하세요.' })
   }
   const unmapped = analogs.filter((a) => !Object.values(col).includes(a))
@@ -138,20 +135,17 @@ export function parseComtrade(cfgText: string, dat: ArrayBuffer): ComtradeResult
 
   const value = (ch: ComtradeAnalog, x: number) => (ch.a * x + ch.b) * unitScale(ch.unit)
   const matrix =
-    missing.length && !derivedIn
+    missing.length
       ? null
       : raw.map((r) => {
           const get = (c: Channel) => {
             const ch = col[c]!
             return value(ch, r[ch.index])
           }
-          const ia = get('Ia')
-          const ib = get('Ib')
-          const ic = get('Ic')
-          return [ia, ib, ic, derivedIn ? ia + ib + ic : get('In'), get('Va'), get('Vb'), get('Vc')]
+          return channels.map(get)
         })
 
-  return { station, device, revYear, fileType, lineFrequency, samplingRate, analogs, matrix, mapping, issues }
+  return { station, device, revYear, fileType, lineFrequency, samplingRate, analogs, matrix, channels, mapping, issues }
 }
 
 /** 행렬을 COMTRADE(.cfg, .dat)로 저장 — 예시 파일 만들기용. channels로 일부 채널만 내보낼 수 있음 */

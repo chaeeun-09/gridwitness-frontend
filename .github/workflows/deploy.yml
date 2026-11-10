@@ -24,6 +24,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm test
       - run: npm run build
         env:
           # https://<계정>.github.io/<저장소>/ 아래에서 동작하도록 경로 지정

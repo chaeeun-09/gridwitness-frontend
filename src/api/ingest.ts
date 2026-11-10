@@ -1,7 +1,7 @@
 import type { RegisterCaseInput } from '.'
 import { parseComtrade } from '../lib/comtrade'
-import { diagnose, parseCsv, toCsv, type ParsedCsv } from '../lib/waveform'
-import { CHANNELS, type DiagnosisIssue, type InputDiagnosis, type SourceRecord } from '../types'
+import { diagnose, parseCsv, sha256Hex, toCsv, type ParsedCsv } from '../lib/waveform'
+import { channelsFor, type DiagnosisIssue, type InputDiagnosis, type SourceRecord } from '../types'
 
 /** 업로드한 파일(CSV 또는 COMTRADE)을 읽어 브라우저에서 할 수 있는 처리를 한 결과. */
 export interface Ingested {
@@ -20,6 +20,7 @@ export interface Ingested {
   local: { diagnosis: InputDiagnosis; matrix: number[][] | null }
   /** 서버에 올릴 CSV. COMTRADE는 7채널로 맞춘 CSV로 변환. 변환할 수 없으면 null */
   uploadFile: File | null
+  provenance: NonNullable<SourceRecord['provenance']>
 }
 
 export async function ingest(input: RegisterCaseInput): Promise<Ingested> {
@@ -33,17 +34,19 @@ export async function ingest(input: RegisterCaseInput): Promise<Ingested> {
   let fileName = input.file.name
   let fileSize = input.file.size
   let uploadFile: File | null = input.file
+  const originalFiles: NonNullable<SourceRecord['provenance']>['originalFiles'] = [{ name: input.file.name, size: buf.byteLength, sha256: await sha256Hex(buf), role: input.cfg ? 'dat' : 'csv' }]
 
   if (input.cfg) {
     // COMTRADE: .cfg로 채널·배율·주파수를 읽고 7채널로 맞춤
     const cfgBuf = await input.cfg.arrayBuffer()
+    originalFiles.unshift({ name: input.cfg.name, size: cfgBuf.byteLength, sha256: await sha256Hex(cfgBuf), role: 'cfg' })
     const r = parseComtrade(new TextDecoder().decode(cfgBuf), buf)
     preIssues = r.issues
     if (r.samplingRate > 0) samplingRateHz = r.samplingRate
     if (r.lineFrequency === 50 || r.lineFrequency === 60) systemFrequencyHz = r.lineFrequency
     comtrade = { station: r.station, device: r.device, revYear: r.revYear, fileType: r.fileType, mapping: r.mapping as Record<string, string> }
-    parsed = r.matrix ? { header: [...CHANNELS], rows: r.matrix.map((row) => row.map(String)) } : { header: null, rows: [] }
-    uploadFile = r.matrix ? new File([toCsv(r.matrix)], `${input.cfg.name.replace(/\.[^.]+$/, '')}_converted.csv`, { type: 'text/csv' }) : null
+    parsed = r.matrix ? { header: [...r.channels], rows: r.matrix.map((row) => row.map(String)) } : { header: null, rows: [] }
+    uploadFile = r.matrix ? new File([toCsv(r.matrix, r.channels)], `${input.cfg.name.replace(/\.[^.]+$/, '')}_converted.csv`, { type: 'text/csv' }) : null
     const joined = new Uint8Array(cfgBuf.byteLength + buf.byteLength)
     joined.set(new Uint8Array(cfgBuf), 0)
     joined.set(new Uint8Array(buf), cfgBuf.byteLength)
@@ -52,6 +55,7 @@ export async function ingest(input: RegisterCaseInput): Promise<Ingested> {
     fileSize = cfgBuf.byteLength + buf.byteLength
   } else {
     parsed = parseCsv(new TextDecoder().decode(buf))
+    if (/\.txt$/i.test(input.file.name)) uploadFile = new File([buf], input.file.name.replace(/\.txt$/i, '.csv'), { type: 'text/csv' })
   }
 
   const result = diagnose(parsed, fileSize, { samplingRateHz, systemFrequencyHz, sourceType: input.sourceType })
@@ -78,5 +82,6 @@ export async function ingest(input: RegisterCaseInput): Promise<Ingested> {
     hashInput,
     local: { diagnosis, matrix },
     uploadFile,
+    provenance: { format: input.cfg ? 'COMTRADE' : 'CSV', channelOrder: parsed.header ?? [...channelsFor(matrix?.[0]?.length ?? 0)], originalFiles, originalSha256: await sha256Hex(hashInput), comtrade },
   }
 }

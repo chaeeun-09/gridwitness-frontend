@@ -14,7 +14,7 @@ export default function VillageLoads() {
       <PageHeader
         crumbs={[{ label: '스마트 마을', to: '/village' }, { label: '부하' }]}
         title="부하"
-        description="LED 5개마다 채널 릴레이(D3~D7)가 있어 웹에서 하나씩 끄고 켤 수 있습니다. 전류는 주택 구간과 가로등 구간을 INA219 두 개로 따로 잽니다."
+        description={`LED 5개는 채널 릴레이(D3~D7)로 하나씩 제어합니다. ${snap.zones ? '감지된 센서 2개로 주택·가로등 구간을 따로 측정합니다.' : '구간별 계측은 없으며 연결된 센서의 전체 값만 사용합니다.'}`}
       />
       {snap.zones && (
         <Metrics cols={2}>

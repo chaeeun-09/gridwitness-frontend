@@ -3,29 +3,14 @@ import { Canvas, useFrame } from '@react-three/fiber'
 import { useMemo, useRef, useState } from 'react'
 import type { Mesh } from 'three'
 import { preprocess } from '../lib/waveform'
-import { CHANNELS } from '../types'
+import { analyzeWaveform } from '../lib/faultAnalysis'
+import { channelsFor } from '../types'
 import Label from './three/Label'
 import { COLORS } from './WaveformChart'
 
 const X_SPAN = 12
 const Z_GAP = 1.3
 const Y_SCALE = 1.1
-
-/** 한 주기 RMS가 처음 주기의 2배를 넘는 첫 지점 (시각화용 표시, 판정 아님) */
-function findChangePoint(m: number[][], fs: number, f: number): number | null {
-  const win = Math.round(fs / f)
-  const rms = (s: number) => {
-    let acc = 0
-    for (let i = s; i < s + win; i++) for (let j = 0; j < 3; j++) acc += m[i][j] ** 2
-    return Math.sqrt(acc / (win * 3))
-  }
-  if (m.length < win * 2) return null
-  const base = rms(0)
-  for (let s = win; s + win <= m.length; s += Math.round(win / 4)) {
-    if (rms(s) > base * 2) return s
-  }
-  return null
-}
 
 function Playhead({ playing, onPos }: { playing: boolean; onPos: (x: number) => void }) {
   const ref = useRef<Mesh>(null)
@@ -44,27 +29,31 @@ function Playhead({ playing, onPos }: { playing: boolean; onPos: (x: number) => 
   )
 }
 
-export default function Waveform3D({ matrix, samplingRateHz, systemFrequencyHz }: { matrix: number[][]; samplingRateHz: number; systemFrequencyHz: number }) {
+export default function Waveform3D({ matrix, samplingRateHz, systemFrequencyHz, onsetSample, recoverySeconds }: { matrix: number[][]; samplingRateHz: number; systemFrequencyHz: number; onsetSample?: number | null; recoverySeconds?: number | null }) {
   const [playing, setPlaying] = useState(true)
   const cursorRef = useRef<HTMLSpanElement>(null)
   const durationMs = (matrix.length / samplingRateHz) * 1000
+  const channels = channelsFor(matrix[0]?.length ?? 0)
 
   const lines = useMemo(() => {
     const m = preprocess(matrix)
     const step = Math.max(1, Math.floor(m.length / 800))
-    return CHANNELS.map((c, j) => {
-      const z = (j - (CHANNELS.length - 1) / 2) * Z_GAP
+    return channels.map((c, j) => {
+      const z = (j - (channels.length - 1) / 2) * Z_GAP
       const pts: [number, number, number][] = []
       for (let i = 0; i < m.length; i += step) {
         pts.push([(i / (m.length - 1) - 0.5) * X_SPAN, m[i][j] * Y_SCALE, z])
       }
       return { c, z, pts }
     })
-  }, [matrix])
+  }, [matrix, channels])
 
-  const change = useMemo(() => findChangePoint(matrix, samplingRateHz, systemFrequencyHz), [matrix, samplingRateHz, systemFrequencyHz])
+  const markers = useMemo(() => analyzeWaveform(matrix, samplingRateHz, systemFrequencyHz), [matrix, samplingRateHz, systemFrequencyHz])
+  const change = onsetSample === undefined ? markers.onset?.sample ?? null : onsetSample
+  const recovery = recoverySeconds === undefined ? markers.recoverSeconds : recoverySeconds
   const changeX = change == null ? null : (change / (matrix.length - 1) - 0.5) * X_SPAN
-  const zMax = ((CHANNELS.length - 1) / 2) * Z_GAP + 0.6
+  const recoveryX = recovery == null ? null : (recovery * samplingRateHz / (matrix.length - 1) - 0.5) * X_SPAN
+  const zMax = ((channels.length - 1) / 2) * Z_GAP + 0.6
 
   return (
     <div className="w3d">
@@ -102,6 +91,7 @@ export default function Waveform3D({ matrix, samplingRateHz, systemFrequencyHz }
             <Label lines={[`급변 지점 · ${((change! / samplingRateHz) * 1000).toFixed(1)} ms`]} position={[0, Y_SCALE * 1.4, -zMax]} color="#ff8787" bg="rgba(15,29,46,0.85)" lineHeight={0.26} />
           </group>
         )}
+        {recoveryX != null && <group position={[recoveryX, 0, 0]}><mesh rotation={[0, Math.PI / 2, 0]}><planeGeometry args={[zMax * 2, Y_SCALE * 2.4]} /><meshBasicMaterial color="#5fb68c" transparent opacity={0.12} depthWrite={false} side={2} /></mesh><Label lines={[`초반 수준 복귀 · ${(recovery! * 1000).toFixed(1)} ms`]} position={[0, Y_SCALE * 1.4, -zMax]} color="#5fb68c" bg="rgba(15,29,46,0.85)" lineHeight={0.26} /></group>}
         <group position={[0, 0, zMax]}>
           <Playhead playing={playing} onPos={(x) => {
             if (cursorRef.current) cursorRef.current.textContent = ((x / X_SPAN + 0.5) * durationMs).toFixed(1)
@@ -110,7 +100,7 @@ export default function Waveform3D({ matrix, samplingRateHz, systemFrequencyHz }
         <Label lines={['시간 →']} position={[X_SPAN / 2 + 0.6, -Y_SCALE - 0.3, zMax]} color="#b8c4d4" lineHeight={0.3} />
         <OrbitControls makeDefault enableDamping target={[0, 0, 0]} />
       </Canvas>
-      <p className="hint">채널별 max-abs 정규화 후 표시. 붉은 면은 전류 RMS가 첫 주기의 2배를 넘은 지점으로, 시각적 참고용이며 판정이 아닙니다.</p>
+      <p className="hint">채널별 max-abs 정규화 후 표시. 붉은 면(급변 관측)·초록 면(초반 수준 복귀)은 2D와 같은 계산을 사용합니다. 회복을 확인하지 못하면 초록 면을 표시하지 않습니다.</p>
     </div>
   )
 }

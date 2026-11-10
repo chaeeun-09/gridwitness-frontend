@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { api } from '../api'
+import { API_CHANGED_EVENT } from '../lib/backend'
 import { ASSISTANT_ASK_EVENT, ASSISTANT_OPEN_EVENT, ASSISTANT_VILLAGE_EVENT, INCIDENT_OPEN_EVENT, PANEL_OPEN_EVENT } from '../lib/panels'
 import type { AnyCase, CaseSummary } from '../types'
 import AssistantChat from './AssistantChat'
@@ -47,6 +48,11 @@ export default function GlobalAssistant() {
   const [c, setC] = useState<AnyCase | null>(null)
   const [error, setError] = useState<string | null>(null)
   const caseId = routeCaseId ?? pickId
+  useEffect(() => {
+    const reset = () => { setList(null); setC(null); setPickId(null); setError(null) }
+    window.addEventListener(API_CHANGED_EVENT, reset)
+    return () => window.removeEventListener(API_CHANGED_EVENT, reset)
+  }, [])
 
   // 화면이 바뀌면 그 화면에 맞는 대상으로
   const [lastPath, setLastPath] = useState(pathname)
@@ -160,7 +166,7 @@ export default function GlobalAssistant() {
               onChange={setMode}
               options={[
                 { value: 'case', label: '사건 분석' },
-                { value: 'village', label: '마을 상태' },
+                { value: 'village', label: '마을 상태 (규칙)' },
               ]}
             />
             <button type="button" className="btn btn-ghost btn-sm ga-size" onClick={() => setFull(!full)} aria-label={full ? '작은 창으로 보기' : '전체화면으로 보기'} title={full ? '작은 창으로 (Esc)' : '전체화면으로'}>
