@@ -261,7 +261,7 @@ function AttachWaveform({ c, onChange }: { c: IncidentCase; onChange: (c: AnyCas
     }
   }
   return (
-    <Section title="이 브라우저에는 파형이 없습니다" description="이 사건은 다른 곳에서 등록되어 서버 기록만 있습니다. 서버는 원본 파일을 다시 내려주지 않으므로, 등록할 때 쓴 원본 CSV를 고르면 그래프를 볼 수 있습니다.">
+    <Section title="이 브라우저에는 파형이 없습니다" description="서버에서 원본 파형을 받지 못했습니다 (서버 연결 또는 원본 파일 문제). 등록할 때 쓴 원본 CSV를 고르면 해시를 확인한 뒤 그래프를 볼 수 있습니다.">
       <div className="stack" style={{ gap: 12 }}>
         <dl className="dl-rows">
           <div><dt>파일명</dt><dd>{c.source.fileName}</dd></div>
